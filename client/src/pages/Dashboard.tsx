@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { StatCard } from "@/components/StatCard";
