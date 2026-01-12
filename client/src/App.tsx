@@ -1,15 +1,19 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
+import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Missions from "@/pages/Missions";
 import Clients from "@/pages/Clients";
 import Participants from "@/pages/Participants";
 import Invoices from "@/pages/Invoices";
+import Users from "@/pages/Users";
 import { Sidebar } from "@/components/Sidebar";
+import { Loader2 } from "lucide-react";
 
 // Placeholder components for pages not yet fully implemented
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -24,25 +28,94 @@ const PlaceholderPage = ({ title }: { title: string }) => (
   </div>
 );
 
+// Protected route wrapper
+function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
+  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
+  if (adminOnly && !isAdmin) {
+    return <Redirect to="/" />;
+  }
+
+  return <Component />;
+}
+
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <Switch>
-      {/* Main pages */}
-      <Route path="/" component={Dashboard} />
-      <Route path="/missions" component={Missions} />
-      <Route path="/missions/:id" component={() => <PlaceholderPage title="Detail Mission" />} />
-      <Route path="/clients" component={Clients} />
-      <Route path="/participants" component={Participants} />
-      <Route path="/invoices" component={Invoices} />
+      {/* Public route */}
+      <Route path="/login">
+        {isAuthenticated ? <Redirect to="/" /> : <Login />}
+      </Route>
+
+      {/* Protected routes */}
+      <Route path="/">
+        <ProtectedRoute component={Dashboard} />
+      </Route>
+      <Route path="/missions">
+        <ProtectedRoute component={Missions} />
+      </Route>
+      <Route path="/missions/:id">
+        <ProtectedRoute component={() => <PlaceholderPage title="Detail Mission" />} />
+      </Route>
+      <Route path="/clients">
+        <ProtectedRoute component={Clients} />
+      </Route>
+      <Route path="/participants">
+        <ProtectedRoute component={Participants} />
+      </Route>
+      <Route path="/invoices">
+        <ProtectedRoute component={Invoices} />
+      </Route>
+
+      {/* Admin only route */}
+      <Route path="/users">
+        <ProtectedRoute component={Users} adminOnly />
+      </Route>
 
       {/* Placeholder pages */}
-      <Route path="/programs" component={() => <PlaceholderPage title="Catalogue Formations" />} />
-      <Route path="/trainers" component={() => <PlaceholderPage title="Formateurs" />} />
-      <Route path="/attendance" component={() => <PlaceholderPage title="Emargements" />} />
-      <Route path="/documents" component={() => <PlaceholderPage title="Documents" />} />
-      <Route path="/reports" component={() => <PlaceholderPage title="Rapports" />} />
-      <Route path="/settings" component={() => <PlaceholderPage title="Parametres" />} />
-      <Route path="/help" component={() => <PlaceholderPage title="Aide" />} />
+      <Route path="/programs">
+        <ProtectedRoute component={() => <PlaceholderPage title="Catalogue Formations" />} />
+      </Route>
+      <Route path="/trainers">
+        <ProtectedRoute component={() => <PlaceholderPage title="Formateurs" />} />
+      </Route>
+      <Route path="/attendance">
+        <ProtectedRoute component={() => <PlaceholderPage title="Emargements" />} />
+      </Route>
+      <Route path="/documents">
+        <ProtectedRoute component={() => <PlaceholderPage title="Documents" />} />
+      </Route>
+      <Route path="/reports">
+        <ProtectedRoute component={() => <PlaceholderPage title="Rapports" />} />
+      </Route>
+      <Route path="/settings">
+        <ProtectedRoute component={() => <PlaceholderPage title="Parametres" />} />
+      </Route>
+      <Route path="/help">
+        <ProtectedRoute component={() => <PlaceholderPage title="Aide" />} />
+      </Route>
 
       {/* Fallback to 404 */}
       <Route component={NotFound} />

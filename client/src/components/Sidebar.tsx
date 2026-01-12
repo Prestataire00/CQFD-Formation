@@ -6,12 +6,8 @@ import {
   GraduationCap,
   Users,
   UserCheck,
-  FileText,
-  Receipt,
-  BarChart3,
+  UserCog,
   Settings,
-  HelpCircle,
-  ClipboardCheck,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -26,6 +22,8 @@ interface NavItem {
 }
 
 // Navigation items with role-based access
+// Admin CQFD: vue globale, crée utilisateurs, crée/supprime missions, paramètre rappels
+// Formateur/Prestataire: accès uniquement à SES missions, dépôt documents, suivi étapes
 const NAV_ITEMS: NavItem[] = [
   {
     icon: LayoutDashboard,
@@ -61,43 +59,19 @@ const NAV_ITEMS: NavItem[] = [
     icon: UserCheck,
     label: "Participants",
     href: "/participants",
-    roles: ["admin", "formateur", "prestataire"],
+    roles: ["admin"],
   },
   {
-    icon: ClipboardCheck,
-    label: "Emargements",
-    href: "/attendance",
-    roles: ["admin", "formateur", "prestataire"],
-  },
-  {
-    icon: FileText,
-    label: "Documents",
-    href: "/documents",
-    roles: ["admin", "formateur", "prestataire"],
-  },
-  {
-    icon: Receipt,
-    label: "Factures",
-    href: "/invoices",
-    roles: ["admin", "prestataire"],
-  },
-  {
-    icon: BarChart3,
-    label: "Rapports",
-    href: "/reports",
+    icon: UserCog,
+    label: "Utilisateurs",
+    href: "/users",
     roles: ["admin"],
   },
   {
     icon: Settings,
-    label: "Parametres",
+    label: "Paramètres",
     href: "/settings",
-    roles: ["admin", "formateur", "prestataire"],
-  },
-  {
-    icon: HelpCircle,
-    label: "Aide",
-    href: "/help",
-    roles: ["admin", "formateur", "prestataire"],
+    roles: ["admin"],
   },
 ];
 

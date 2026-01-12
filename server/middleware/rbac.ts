@@ -87,41 +87,35 @@ export function requirePermission(permission: Permission) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       // Check if user is authenticated
-      const user = req.user as any;
-      if (!user || !user.claims?.sub) {
+      const user = req.user;
+      if (!user || !user.id) {
         return res.status(401).json({ message: 'Non authentifié' });
       }
 
-      // Get user details from database
-      const userDetails = await storage.getUser(user.claims.sub);
-      if (!userDetails) {
-        return res.status(401).json({ message: 'Utilisateur non trouvé' });
-      }
-
-      // Check if user is active
-      if (userDetails.isActive === false) {
-        return res.status(403).json({ message: 'Compte désactivé' });
+      // Check if user is active (status from session)
+      if (user.status !== 'ACTIF') {
+        return res.status(403).json({ message: 'Compte désactivé ou supprimé' });
       }
 
       // Check if user's role has the required permission
       const allowedRoles = permissions[permission];
-      if (!allowedRoles.includes(userDetails.role as UserRole)) {
+      if (!allowedRoles.includes(user.role as UserRole)) {
         return res.status(403).json({
           message: 'Accès refusé',
           requiredPermission: permission,
-          userRole: userDetails.role
+          userRole: user.role
         });
       }
 
       // Attach user info to request for use in route handlers
-      req.userRole = userDetails.role as UserRole;
-      req.userId = userDetails.id;
+      req.userRole = user.role as UserRole;
+      req.userId = user.id;
       req.userDetails = {
-        id: userDetails.id,
-        email: userDetails.email,
-        firstName: userDetails.firstName,
-        lastName: userDetails.lastName,
-        role: userDetails.role as UserRole,
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role as UserRole,
       };
 
       next();
@@ -139,36 +133,31 @@ export function requirePermission(permission: Permission) {
 export function requireRole(...roles: UserRole[]) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const user = req.user as any;
-      if (!user || !user.claims?.sub) {
+      const user = req.user;
+      if (!user || !user.id) {
         return res.status(401).json({ message: 'Non authentifié' });
       }
 
-      const userDetails = await storage.getUser(user.claims.sub);
-      if (!userDetails) {
-        return res.status(401).json({ message: 'Utilisateur non trouvé' });
+      if (user.status !== 'ACTIF') {
+        return res.status(403).json({ message: 'Compte désactivé ou supprimé' });
       }
 
-      if (userDetails.isActive === false) {
-        return res.status(403).json({ message: 'Compte désactivé' });
-      }
-
-      if (!roles.includes(userDetails.role as UserRole)) {
+      if (!roles.includes(user.role as UserRole)) {
         return res.status(403).json({
           message: 'Accès refusé',
           requiredRoles: roles,
-          userRole: userDetails.role
+          userRole: user.role
         });
       }
 
-      req.userRole = userDetails.role as UserRole;
-      req.userId = userDetails.id;
+      req.userRole = user.role as UserRole;
+      req.userId = user.id;
       req.userDetails = {
-        id: userDetails.id,
-        email: userDetails.email,
-        firstName: userDetails.firstName,
-        lastName: userDetails.lastName,
-        role: userDetails.role as UserRole,
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role as UserRole,
       };
 
       next();

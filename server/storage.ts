@@ -1,15 +1,17 @@
 import {
-  users, projects, tasks, invoices, documents, messages,
-  clients, trainingPrograms, missions, missionSessions,
+  users, clients, trainingPrograms, missions, missionSteps, missionSessions,
   participants, missionParticipants, attendanceRecords, evaluations, auditLogs,
-  type User, type Project, type Task, type Invoice, type Document, type Message,
-  type Client, type TrainingProgram, type Mission, type MissionSession,
-  type Participant, type MissionParticipant, type AttendanceRecord, type Evaluation, type AuditLog,
-  type InsertClient, type InsertTrainingProgram, type InsertMission, type InsertMissionSession,
-  type InsertParticipant, type InsertMissionParticipant, type InsertAttendanceRecord,
-  type InsertEvaluation, type InsertInvoice, type InsertDocument, type InsertAuditLog,
-  type InsertMessage, type InsertProject, type InsertTask,
-  type MissionStatus, type InvoiceStatus
+  invoices, documents, messages,
+  type User, type Client, type TrainingProgram, type Mission, type MissionStep,
+  type MissionSession, type Participant, type MissionParticipant,
+  type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
+  type Document, type Message,
+  type InsertClient, type InsertTrainingProgram, type InsertMission,
+  type InsertMissionStep, type InsertMissionSession, type InsertParticipant,
+  type InsertMissionParticipant, type InsertAttendanceRecord,
+  type InsertEvaluation, type InsertInvoice, type InsertDocument,
+  type InsertAuditLog, type InsertMessage,
+  type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
 import { db } from "./db";
@@ -43,6 +45,11 @@ export interface IStorage {
   createMission(mission: InsertMission): Promise<Mission>;
   updateMission(id: number, data: Partial<Mission>): Promise<Mission | undefined>;
   updateMissionStatus(id: number, status: MissionStatus): Promise<Mission | undefined>;
+
+  // Mission Steps
+  getMissionSteps(missionId: number): Promise<MissionStep[]>;
+  createMissionStep(step: InsertMissionStep): Promise<MissionStep>;
+  updateMissionStep(id: number, data: Partial<MissionStep>): Promise<MissionStep | undefined>;
 
   // Mission Sessions
   getMissionSessions(missionId: number): Promise<MissionSession[]>;
@@ -105,13 +112,6 @@ export interface IStorage {
     pendingInvoices: number;
     averageRating: number;
   }>;
-
-  // Legacy
-  getProjects(): Promise<Project[]>;
-  createProject(project: InsertProject): Promise<Project>;
-  getProject(id: number): Promise<Project | undefined>;
-  getTasks(): Promise<Task[]>;
-  createTask(task: InsertTask): Promise<Task>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -247,6 +247,26 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  // ==================== MISSION STEPS ====================
+  async getMissionSteps(missionId: number): Promise<MissionStep[]> {
+    return await db.select().from(missionSteps)
+      .where(eq(missionSteps.missionId, missionId))
+      .orderBy(missionSteps.order);
+  }
+
+  async createMissionStep(step: InsertMissionStep): Promise<MissionStep> {
+    const [newStep] = await db.insert(missionSteps).values(step).returning();
+    return newStep;
+  }
+
+  async updateMissionStep(id: number, data: Partial<MissionStep>): Promise<MissionStep | undefined> {
+    const [updated] = await db.update(missionSteps)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(missionSteps.id, id))
+      .returning();
+    return updated;
+  }
+
   // ==================== MISSION SESSIONS ====================
   async getMissionSessions(missionId: number): Promise<MissionSession[]> {
     return await db.select().from(missionSessions)
@@ -268,7 +288,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMissionSession(id: number): Promise<boolean> {
-    const result = await db.delete(missionSessions).where(eq(missionSessions.id, id));
+    await db.delete(missionSessions).where(eq(missionSessions.id, id));
     return true;
   }
 
@@ -517,30 +537,6 @@ export class DatabaseStorage implements IStorage {
       pendingInvoices,
       averageRating: Math.round(averageRating * 10) / 10,
     };
-  }
-
-  // ==================== LEGACY ====================
-  async getProjects(): Promise<Project[]> {
-    return await db.select().from(projects);
-  }
-
-  async createProject(project: InsertProject): Promise<Project> {
-    const [newProject] = await db.insert(projects).values(project).returning();
-    return newProject;
-  }
-
-  async getProject(id: number): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project;
-  }
-
-  async getTasks(): Promise<Task[]> {
-    return await db.select().from(tasks);
-  }
-
-  async createTask(task: InsertTask): Promise<Task> {
-    const [newTask] = await db.insert(tasks).values(task).returning();
-    return newTask;
   }
 }
 

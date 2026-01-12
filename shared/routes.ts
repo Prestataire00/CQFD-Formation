@@ -69,6 +69,39 @@ export const api = {
     },
   },
 
+  // ==================== AUTH ====================
+  auth: {
+    login: {
+      method: 'POST' as const,
+      path: '/api/auth/login',
+      input: z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+      }),
+      responses: {
+        200: z.object({
+          user: z.custom<typeof users.$inferSelect>(),
+        }),
+        401: errorSchemas.unauthorized,
+      },
+    },
+    logout: {
+      method: 'POST' as const,
+      path: '/api/auth/logout',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    me: {
+      method: 'GET' as const,
+      path: '/api/auth/me',
+      responses: {
+        200: z.custom<typeof users.$inferSelect>(),
+        401: errorSchemas.unauthorized,
+      },
+    },
+  },
+
   // ==================== USERS ====================
   users: {
     list: {
@@ -93,22 +126,51 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    create: {
+      method: 'POST' as const,
+      path: '/api/users',
+      input: z.object({
+        email: z.string().email(),
+        firstName: z.string().min(1),
+        lastName: z.string().min(1),
+        password: z.string().min(8),
+        role: z.enum(['admin', 'formateur', 'prestataire']),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        siret: z.string().optional(),
+        specialties: z.array(z.string()).optional(),
+        dailyRate: z.number().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof users.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
     update: {
       method: 'PUT' as const,
       path: '/api/users/:id',
       input: z.object({
         firstName: z.string().optional(),
         lastName: z.string().optional(),
+        password: z.string().min(8).optional(),
         phone: z.string().optional(),
         address: z.string().optional(),
         siret: z.string().optional(),
         specialties: z.array(z.string()).optional(),
         dailyRate: z.number().optional(),
         role: z.enum(['admin', 'formateur', 'prestataire']).optional(),
-        isActive: z.boolean().optional(),
+        status: z.enum(['ACTIF', 'INACTIF', 'SUPPRIME']).optional(),
       }),
       responses: {
         200: z.custom<typeof users.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/users/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
         404: errorSchemas.notFound,
       },
     },

@@ -1,0 +1,163 @@
+1. Principe fondamental de conception
+
+L’objet central du CRM est la MISSION.
+
+Toutes les autres entités (clients, formations, participants, documents, factures, émargements, notifications) doivent être rattachées à une mission ou servir de référentiel alimentant les missions.
+
+Aucune information opérationnelle ne doit exister hors mission.
+
+2. Utilisateurs et rôles
+
+Le CRM comporte trois types d’utilisateurs :
+
+Administrateur CQFD
+
+Formateur salarié
+
+Prestataire indépendant
+
+L’administrateur peut :
+
+créer, modifier, supprimer des utilisateurs
+
+créer, modifier, supprimer des missions
+
+accéder à toutes les données
+
+paramétrer les rappels et échéances
+
+consulter une vue globale de pilotage
+
+Les formateurs (salariés ou prestataires) peuvent :
+
+accéder uniquement aux missions qui leur sont attribuées
+
+consulter et compléter les étapes
+
+déposer des documents
+
+recevoir des notifications et rappels
+
+Chaque utilisateur possède un statut : actif, inactif, supprimé.
+
+3. Mission (objet cœur du CRM)
+
+Une mission représente une réalisation concrète de formation pour un ou plusieurs clients.
+
+Chaque mission constitue un dossier administratif et opérationnel complet.
+
+3.1 Données obligatoires d’une mission
+
+Client(s)
+
+Formation (issue du catalogue Formations)
+
+Typologie : Intra / Inter / Conseil / Conférence
+
+Formateur assigné
+
+Dates de formation (non consécutives possibles)
+
+Lieu
+
+Statut global : Brouillon / En cours / Terminée
+
+Les missions non attribuées restent invisibles pour les formateurs.
+
+4. Suivi par étapes (exigence clé CQFD)
+
+Chaque mission comporte une série d’étapes chronologiques inspirées d’un suivi Excel.
+
+Chaque étape possède un statut :
+
+À faire
+
+Prioritaire
+
+En retard
+
+Terminé
+
+Sans objet
+
+Aucune étape ne doit être bloquante.
+Toutes les étapes doivent être visibles à tout moment.
+
+Les statuts doivent être visuellement identifiables afin de faciliter le pilotage.
+
+5. Gestion documentaire (intégrée à la mission)
+
+Tous les documents sont rattachés exclusivement à une mission.
+
+Types de documents possibles :
+
+Programme
+
+Séquençage
+
+Compte rendu
+
+Livret et annexes
+
+Contrat
+
+Questionnaires (préparation, positionnement, satisfaction)
+
+Bilan de formation
+
+Synthèse des évaluations
+
+Feuilles de présence / émargements
+
+Factures
+
+Autres documents libres
+
+Les documents n’existent pas en tant qu’entité autonome dans le menu principal.
+
+Confidentialité
+
+Si plusieurs formateurs interviennent sur une même prestation :
+
+la mission est dupliquée
+
+chaque formateur accède uniquement à sa copie
+
+aucun document n’est partagé entre formateurs
+
+Documents automatiques
+
+Selon le statut du formateur :
+
+Salarié : consignes formateurs
+
+Prestataire : cahier des charges + bonnes pratiques
+
+Les documents joints automatiquement doivent toujours correspondre à la dernière version stockée.
+
+6. Notifications et rappels
+
+Le CRM doit gérer deux types d’automatisations :
+
+Notifications événementielles
+
+Un email est envoyé lorsqu’il y a :
+
+ajout ou modification d’informations
+
+ajout de documents
+
+commentaire
+
+L’autre partie est systématiquement notifiée.
+L’administrateur reçoit une copie de toutes les alertes.
+
+Rappels temporels
+
+Rappels automatiques paramétrables (J-30, J-7, J-1)
+
+Paramétrage accessible via interface, sans modification de code
+
+Échéances modifiables manuellement par l’administrateur
+
+Rappel automatique à l’administrateur J-2 avant chaque formation (formateur, client, lieu, dates)

@@ -1,0 +1,149 @@
+7. Formation (référentiel pédagogique)
+
+La section Formation constitue le catalogue pédagogique CQFD.
+
+Une formation est un modèle réutilisable, jamais une réalisation concrète.
+
+Données contenues dans une formation
+
+Intitulé
+
+Code formation
+
+Type (Intra, Inter, Conseil, Conférence)
+
+Description et objectifs pédagogiques
+
+Public cible
+
+Prérequis
+
+Compétences visées
+
+Modalités pédagogiques
+
+Durée standard
+
+Nombre de participants recommandé
+
+Contenus modèles
+
+Programme de référence
+
+Séquençage type
+
+Livret pédagogique générique
+
+Supports pédagogiques modèles
+
+Qualité et conformité
+
+Modalités d’évaluation
+
+Modalités de satisfaction
+
+Indicateurs qualité
+
+Mentions réglementaires
+
+Ressources humaines
+
+Formateurs habilités à délivrer la formation
+
+Automatisations
+
+Lors de la création d’une mission à partir d’une formation :
+
+étapes préchargées
+
+documents attendus générés
+
+questionnaires modèles associés
+
+Une formation peut être utilisée dans plusieurs missions.
+Une mission repose sur une seule formation.
+
+8. Participants (référentiel personnes formées)
+
+La section Participants recense les personnes physiques formées.
+
+Un participant n’est ni un client ni un formateur.
+
+Données d’un participant
+
+Nom
+
+Prénom
+
+Email
+
+Fonction
+
+Entreprise (client)
+
+Type de public
+
+Consentements RGPD
+
+Suivi
+
+Historique des missions suivies
+
+Statut par mission (inscrit, présent, absent, abandon)
+
+Présence par date
+
+Résultats d’évaluation
+
+Satisfaction
+
+Les données opérationnelles (émargements, questionnaires, résultats) sont toujours liées à la mission.
+
+9. Missions INTER (cas spécifique)
+
+Une mission INTER peut inclure :
+
+plusieurs clients
+
+plusieurs participants
+
+Le CRM doit permettre :
+
+l’ajout multiple de participants
+
+le suivi individualisé des documents envoyés et reçus
+
+la traçabilité par participant
+
+10. Pilotage et sécurité (administrateur)
+
+L’administrateur dispose :
+
+d’une vue globale des missions
+
+de filtres par client, formateur, typologie, statut, période
+
+d’un export automatique quotidien au format Excel contenant toutes les données de planification
+
+L’export sert de sauvegarde de sécurité.
+Les documents ne sont pas inclus dans l’export.
+
+11. Structure de menu recommandée
+
+Menus principaux :
+
+Tableau de bord
+
+Missions
+
+Clients
+
+Formations
+
+Participants
+
+Formateurs
+
+Paramètres
+
+Les sections Documents, Factures, Émargements et Rapports ne doivent pas exister comme menus autonomes.

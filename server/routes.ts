@@ -3,21 +3,22 @@ import { type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { setupAuth, isAuthenticated } from "./replit_integrations/auth";
+import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
+  // Setup local authentication
+  setupLocalAuth(app);
+  setupAuthRoutes(app);
 
   // ==================== STATS ====================
   app.get(api.stats.get.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
-      const stats = await storage.getStats(userDetails?.id, userDetails?.role);
+      const user = req.user!;
+      const stats = await storage.getStats(user.id, user.role);
       res.json(stats);
     } catch (error) {
       console.error('Stats error:', error);
@@ -25,15 +26,21 @@ export async function registerRoutes(
     }
   });
 
+  // Helper to strip passwordHash from user objects
+  const stripPassword = (user: any) => {
+    const { passwordHash, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  };
+
   // ==================== USERS ====================
   app.get(api.users.list.path, isAuthenticated, requirePermission('users:read'), async (req, res) => {
     const users = await storage.getUsers();
-    res.json(users);
+    res.json(users.map(stripPassword));
   });
 
   app.get(api.users.trainers.path, isAuthenticated, async (req, res) => {
     const trainers = await storage.getTrainers();
-    res.json(trainers);
+    res.json(trainers.map(stripPassword));
   });
 
   app.get(api.users.get.path, isAuthenticated, async (req, res) => {
@@ -42,23 +49,60 @@ export async function registerRoutes(
       res.status(404).json({ message: "Utilisateur non trouvé" });
       return;
     }
-    res.json(user);
+    res.json(stripPassword(user));
   });
 
-  app.put(api.users.update.path, isAuthenticated, requirePermission('users:update'), async (req, res) => {
+  app.post(api.users.create.path, isAuthenticated, requirePermission('users:create'), async (req, res) => {
     try {
-      const input = api.users.update.input.parse(req.body);
-      const user = await storage.updateUser(req.params.id, input);
-      if (!user) {
-        res.status(404).json({ message: "Utilisateur non trouvé" });
-        return;
-      }
-      res.json(user);
+      const input = api.users.create.input.parse(req.body);
+      const { password, ...userData } = input;
+      const user = await storage.createUser(userData, password);
+      // Remove passwordHash from response
+      const { passwordHash, ...userWithoutPassword } = user as any;
+      res.status(201).json(userWithoutPassword);
     } catch (err) {
       if (err instanceof z.ZodError) {
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
+      if ((err as any).code === '23505') {
+        res.status(400).json({ message: "Cet email est déjà utilisé" });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.users.update.path, isAuthenticated, requirePermission('users:update'), async (req, res) => {
+    try {
+      const input = api.users.update.input.parse(req.body);
+      const { password, ...updateData } = input;
+      const user = await storage.updateUserWithPassword(req.params.id, updateData, password);
+      if (!user) {
+        res.status(404).json({ message: "Utilisateur non trouvé" });
+        return;
+      }
+      // Remove passwordHash from response
+      const { passwordHash, ...userWithoutPassword } = user as any;
+      res.json(userWithoutPassword);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.users.delete.path, isAuthenticated, requirePermission('users:delete'), async (req, res) => {
+    try {
+      const success = await storage.softDeleteUser(req.params.id);
+      if (!success) {
+        res.status(404).json({ message: "Utilisateur non trouvé" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (err) {
       throw err;
     }
   });
@@ -160,14 +204,13 @@ export async function registerRoutes(
   // ==================== MISSIONS ====================
   app.get(api.missions.list.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
+      const user = req.user!;
 
       let missions;
-      if (userDetails?.role === 'admin') {
+      if (user.role === 'admin') {
         missions = await storage.getMissions();
       } else {
-        missions = await storage.getMissionsByTrainer(userDetails?.id || '');
+        missions = await storage.getMissionsByTrainer(user.id);
       }
       res.json(missions);
     } catch (error) {
@@ -423,14 +466,13 @@ export async function registerRoutes(
   // ==================== INVOICES ====================
   app.get(api.invoices.list.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
+      const user = req.user!;
 
       let invoices;
-      if (userDetails?.role === 'admin') {
+      if (user.role === 'admin') {
         invoices = await storage.getInvoices();
       } else {
-        invoices = await storage.getInvoicesByUser(userDetails?.id || '');
+        invoices = await storage.getInvoicesByUser(user.id);
       }
       res.json(invoices);
     } catch (error) {
@@ -450,13 +492,12 @@ export async function registerRoutes(
 
   app.post(api.invoices.create.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
+      const user = req.user!;
 
       const input = api.invoices.create.input.parse(req.body);
       const invoice = await storage.createInvoice({
         ...input,
-        userId: userDetails?.id,
+        userId: user.id,
         status: 'submitted',
       });
       res.status(201).json(invoice);
@@ -540,13 +581,12 @@ export async function registerRoutes(
 
   app.post(api.documents.create.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
+      const user = req.user!;
 
       const input = api.documents.create.input.parse(req.body);
       const doc = await storage.createDocument({
         ...input,
-        userId: userDetails?.id,
+        userId: user.id,
       });
       res.status(201).json(doc);
     } catch (err) {
@@ -571,13 +611,12 @@ export async function registerRoutes(
 
   app.post(api.messages.create.path, isAuthenticated, async (req, res) => {
     try {
-      const user = req.user as any;
-      const userDetails = await storage.getUser(user.claims.sub);
+      const user = req.user!;
 
       const input = api.messages.create.input.parse(req.body);
       const message = await storage.createMessage({
         ...input,
-        senderId: userDetails?.id,
+        senderId: user.id,
       });
       res.status(201).json(message);
     } catch (err) {
@@ -650,29 +689,26 @@ async function seedDatabase() {
     return; // Already seeded
   }
 
-  // Create admin user
-  const admin = await storage.upsertUser({
-    id: 'admin-001',
+  // Create admin user with password
+  const admin = await storage.createUser({
     email: 'admin@cqfd-formation.fr',
     firstName: 'Marie',
     lastName: 'Dupont',
     role: 'admin',
-  });
+  }, 'admin123');
 
-  // Create formateur
-  const formateur = await storage.upsertUser({
-    id: 'formateur-001',
+  // Create formateur with password
+  const formateur = await storage.createUser({
     email: 'formateur@cqfd-formation.fr',
     firstName: 'Pierre',
     lastName: 'Martin',
     role: 'formateur',
     phone: '06 12 34 56 78',
     specialties: ['Management', 'Communication'],
-  });
+  }, 'formateur123');
 
-  // Create prestataire
-  const prestataire = await storage.upsertUser({
-    id: 'prestataire-001',
+  // Create prestataire with password
+  const prestataire = await storage.createUser({
     email: 'prestataire@example.com',
     firstName: 'Jean',
     lastName: 'Bernard',
@@ -681,7 +717,7 @@ async function seedDatabase() {
     siret: '12345678901234',
     dailyRate: 50000, // 500€
     specialties: ['Sécurité', 'Gestion de projet'],
-  });
+  }, 'prestataire123');
 
   // Create clients
   const client1 = await storage.createClient({
