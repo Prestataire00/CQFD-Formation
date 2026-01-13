@@ -435,6 +435,10 @@ export const api = {
             convocationSentAt: z.date().nullable(),
             attendanceValidated: z.boolean().nullable(),
             certificateGeneratedAt: z.date().nullable(),
+            positioningQuestionnaireSentAt: z.date().nullable(),
+            positioningQuestionnaireReceivedAt: z.date().nullable(),
+            evaluationSentAt: z.date().nullable(),
+            evaluationReceivedAt: z.date().nullable(),
             participant: z.custom<typeof participants.$inferSelect>(),
           })),
         },
@@ -448,6 +452,24 @@ export const api = {
         responses: {
           201: z.custom<typeof missionParticipants.$inferSelect>(),
           400: errorSchemas.validation,
+        },
+      },
+      update: {
+        method: 'PATCH' as const,
+        path: '/api/missions/:missionId/participants/:participantId',
+        input: z.object({
+          status: z.string().optional(),
+          convocationSentAt: z.string().nullable().optional(),
+          attendanceValidated: z.boolean().optional(),
+          certificateGeneratedAt: z.string().nullable().optional(),
+          positioningQuestionnaireSentAt: z.string().nullable().optional(),
+          positioningQuestionnaireReceivedAt: z.string().nullable().optional(),
+          evaluationSentAt: z.string().nullable().optional(),
+          evaluationReceivedAt: z.string().nullable().optional(),
+        }),
+        responses: {
+          200: z.custom<typeof missionParticipants.$inferSelect>(),
+          404: errorSchemas.notFound,
         },
       },
       remove: {

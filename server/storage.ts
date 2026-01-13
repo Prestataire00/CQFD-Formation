@@ -774,6 +774,10 @@ export class DatabaseStorage implements IStorage {
       convocationSentAt: missionParticipants.convocationSentAt,
       attendanceValidated: missionParticipants.attendanceValidated,
       certificateGeneratedAt: missionParticipants.certificateGeneratedAt,
+      positioningQuestionnaireSentAt: missionParticipants.positioningQuestionnaireSentAt,
+      positioningQuestionnaireReceivedAt: missionParticipants.positioningQuestionnaireReceivedAt,
+      evaluationSentAt: missionParticipants.evaluationSentAt,
+      evaluationReceivedAt: missionParticipants.evaluationReceivedAt,
       participant: participants,
     })
       .from(missionParticipants)

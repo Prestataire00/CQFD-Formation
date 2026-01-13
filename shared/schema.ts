@@ -172,6 +172,11 @@ export const missionParticipants = pgTable("mission_participants", {
   convocationSentAt: timestamp("convocation_sent_at"),
   attendanceValidated: boolean("attendance_validated").default(false),
   certificateGeneratedAt: timestamp("certificate_generated_at"),
+  // Document tracking fields
+  positioningQuestionnaireSentAt: timestamp("positioning_questionnaire_sent_at"),
+  positioningQuestionnaireReceivedAt: timestamp("positioning_questionnaire_received_at"),
+  evaluationSentAt: timestamp("evaluation_sent_at"),
+  evaluationReceivedAt: timestamp("evaluation_received_at"),
 });
 
 export const attendanceRecords = pgTable("attendance_records", {

@@ -574,6 +574,40 @@ export async function registerRoutes(
     }
   });
 
+  app.patch(api.missions.participants.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const { missionId, participantId } = req.params;
+      const input = api.missions.participants.update.input.parse(req.body);
+      
+      // Get mission participant record first
+      const mps = await storage.getMissionParticipants(Number(missionId));
+      const mp = mps.find(p => p.participantId === Number(participantId));
+      
+      if (!mp) {
+        res.status(404).json({ message: "Participant non trouvé dans cette mission" });
+        return;
+      }
+
+      const updated = await storage.updateMissionParticipant(mp.id, {
+        ...input,
+        convocationSentAt: input.convocationSentAt ? new Date(input.convocationSentAt) : input.convocationSentAt === null ? null : undefined,
+        certificateGeneratedAt: input.certificateGeneratedAt ? new Date(input.certificateGeneratedAt) : input.certificateGeneratedAt === null ? null : undefined,
+        positioningQuestionnaireSentAt: input.positioningQuestionnaireSentAt ? new Date(input.positioningQuestionnaireSentAt) : input.positioningQuestionnaireSentAt === null ? null : undefined,
+        positioningQuestionnaireReceivedAt: input.positioningQuestionnaireReceivedAt ? new Date(input.positioningQuestionnaireReceivedAt) : input.positioningQuestionnaireReceivedAt === null ? null : undefined,
+        evaluationSentAt: input.evaluationSentAt ? new Date(input.evaluationSentAt) : input.evaluationSentAt === null ? null : undefined,
+        evaluationReceivedAt: input.evaluationReceivedAt ? new Date(input.evaluationReceivedAt) : input.evaluationReceivedAt === null ? null : undefined,
+      } as any);
+
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
   app.delete(api.missions.participants.remove.path, isAuthenticated, async (req, res) => {
     await storage.removeParticipantFromMission(
       Number(req.params.missionId),
