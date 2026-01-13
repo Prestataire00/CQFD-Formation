@@ -8,10 +8,12 @@ import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import Missions from "@/pages/Missions";
+import MissionDetail from "@/pages/MissionDetail";
 import Clients from "@/pages/Clients";
 import Participants from "@/pages/Participants";
 import Invoices from "@/pages/Invoices";
 import Users from "@/pages/Users";
+import DocumentTemplates from "@/pages/DocumentTemplates";
 import { Sidebar } from "@/components/Sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -77,7 +79,7 @@ function Router() {
         <ProtectedRoute component={Missions} />
       </Route>
       <Route path="/missions/:id">
-        <ProtectedRoute component={() => <PlaceholderPage title="Detail Mission" />} />
+        <ProtectedRoute component={MissionDetail} />
       </Route>
       <Route path="/clients">
         <ProtectedRoute component={Clients} />
@@ -89,9 +91,12 @@ function Router() {
         <ProtectedRoute component={Invoices} />
       </Route>
 
-      {/* Admin only route */}
+      {/* Admin only routes */}
       <Route path="/users">
         <ProtectedRoute component={Users} adminOnly />
+      </Route>
+      <Route path="/document-templates">
+        <ProtectedRoute component={DocumentTemplates} adminOnly />
       </Route>
 
       {/* Placeholder pages */}

@@ -64,7 +64,6 @@ function getStatusBadge(status: InvoiceStatus) {
   const styles: Record<InvoiceStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     draft: { label: "Brouillon", variant: "outline" },
     submitted: { label: "Soumise", variant: "secondary" },
-    approved: { label: "Approuvee", variant: "default" },
     rejected: { label: "Refusee", variant: "destructive" },
     paid: { label: "Payee", variant: "default" },
   };
@@ -358,7 +357,7 @@ export default function Invoices() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        {getStatusBadge(invoice.status)}
+                        {getStatusBadge(invoice.status as InvoiceStatus)}
                         {invoice.rejectionReason && (
                           <p className="text-xs text-destructive mt-1">{invoice.rejectionReason}</p>
                         )}

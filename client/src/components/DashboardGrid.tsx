@@ -3,17 +3,18 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
-interface GridCardProps {
+export interface GridCardProps {
   title: string;
   actionLabel: string;
   actionLink: string;
   children: ReactNode;
   colSpan?: "col-span-1" | "col-span-2";
+  className?: string;
 }
 
-export function GridCard({ title, actionLabel, actionLink, children, colSpan = "col-span-1" }: GridCardProps) {
+export function GridCard({ title, actionLabel, actionLink, children, colSpan = "col-span-1", className = "" }: GridCardProps) {
   return (
-    <div className={`bg-card rounded-2xl border border-border/50 shadow-sm flex flex-col ${colSpan} overflow-hidden hover:shadow-md transition-all duration-300`}>
+    <div className={`bg-card rounded-2xl border border-border/50 shadow-sm flex flex-col ${colSpan} overflow-hidden hover:shadow-md transition-all duration-300 ${className}`}>
       <div className="p-6 border-b border-border/50 flex items-center justify-between">
         <h3 className="font-semibold text-lg">{title}</h3>
       </div>

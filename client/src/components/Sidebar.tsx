@@ -7,6 +7,7 @@ import {
   Users,
   UserCheck,
   UserCog,
+  FileText,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -65,6 +66,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: UserCog,
     label: "Utilisateurs",
     href: "/users",
+    roles: ["admin"],
+  },
+  {
+    icon: FileText,
+    label: "Templates",
+    href: "/document-templates",
     roles: ["admin"],
   },
   {

@@ -46,7 +46,7 @@ export default function Participants() {
     email: "",
     phone: "",
     company: "",
-    jobTitle: "",
+    function: "",
   });
 
   const filteredParticipants = participants?.filter((participant: Participant) => {
@@ -70,7 +70,7 @@ export default function Participants() {
         email: "",
         phone: "",
         company: "",
-        jobTitle: "",
+        function: "",
       });
     } catch (error) {
       console.error("Failed to create participant:", error);
@@ -161,12 +161,12 @@ export default function Participants() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="jobTitle">Poste</Label>
+                      <Label htmlFor="function">Poste</Label>
                       <Input
-                        id="jobTitle"
+                        id="function"
                         placeholder="Chef de projet"
-                        value={newParticipant.jobTitle}
-                        onChange={(e) => setNewParticipant({ ...newParticipant, jobTitle: e.target.value })}
+                        value={newParticipant.function}
+                        onChange={(e) => setNewParticipant({ ...newParticipant, function: e.target.value })}
                       />
                     </div>
                   </div>
@@ -245,10 +245,10 @@ export default function Participants() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {participant.jobTitle && (
+                        {participant.function && (
                           <p className="text-sm flex items-center gap-1">
                             <Briefcase className="w-3 h-3 text-muted-foreground" />
-                            {participant.jobTitle}
+                            {participant.function}
                           </p>
                         )}
                       </TableCell>

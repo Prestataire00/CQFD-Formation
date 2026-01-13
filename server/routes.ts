@@ -1,10 +1,35 @@
 import type { Express } from "express";
+import express from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+// Configuration de multer pour l'upload de fichiers
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storageConfig = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + '-' + file.originalname);
+  }
+});
+
+const upload = multer({
+  storage: storageConfig,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -13,6 +38,15 @@ export async function registerRoutes(
   // Setup local authentication
   setupLocalAuth(app);
   setupAuthRoutes(app);
+
+  // Serve uploaded files statically
+  app.use('/uploads', (req, res, next) => {
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    next();
+  });
+  app.use('/uploads', express.static(uploadDir));
 
   // ==================== STATS ====================
   app.get(api.stats.get.path, isAuthenticated, async (req, res) => {
@@ -230,12 +264,19 @@ export async function registerRoutes(
 
   app.post(api.missions.create.path, isAuthenticated, requirePermission('missions:create'), async (req, res) => {
     try {
-      const input = api.missions.create.input.parse(req.body);
+      // Convert date strings to Date objects
+      const body = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      const input = api.missions.create.input.parse(body);
       const mission = await storage.createMission(input);
       res.status(201).json(mission);
     } catch (err) {
+      console.error('Mission creation error:', err);
       if (err instanceof z.ZodError) {
-        res.status(400).json({ message: err.errors[0].message });
+        res.status(400).json({ message: err.errors[0].message, errors: err.errors });
         return;
       }
       throw err;
@@ -244,7 +285,13 @@ export async function registerRoutes(
 
   app.put(api.missions.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
-      const input = api.missions.update.input.parse(req.body);
+      // Convert date strings to Date objects
+      const body = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      const input = api.missions.update.input.parse(body);
       const mission = await storage.updateMission(Number(req.params.id), input);
       if (!mission) {
         res.status(404).json({ message: "Mission non trouvée" });
@@ -252,8 +299,9 @@ export async function registerRoutes(
       }
       res.json(mission);
     } catch (err) {
+      console.error('Mission update error:', err);
       if (err instanceof z.ZodError) {
-        res.status(400).json({ message: err.errors[0].message });
+        res.status(400).json({ message: err.errors[0].message, errors: err.errors });
         return;
       }
       throw err;
@@ -276,6 +324,194 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  // Mission Clients (multi-clients support)
+  app.get('/api/missions/:id/clients', isAuthenticated, async (req, res) => {
+    const missionClients = await storage.getMissionClients(Number(req.params.id));
+    res.json(missionClients);
+  });
+
+  app.post('/api/missions/:id/clients', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { clientId, isPrimary } = req.body;
+      if (!clientId) {
+        res.status(400).json({ message: 'clientId is required' });
+        return;
+      }
+      const result = await storage.addClientToMission({
+        missionId: Number(req.params.id),
+        clientId: Number(clientId),
+        isPrimary: isPrimary || false,
+      });
+      res.status(201).json(result);
+    } catch (err: any) {
+      if (err.code === '23505') {
+        res.status(400).json({ message: 'Ce client est déjà associé à cette mission' });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete('/api/missions/:missionId/clients/:clientId', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.removeClientFromMission(
+      Number(req.params.missionId),
+      Number(req.params.clientId)
+    );
+    res.json({ success: true });
+  });
+
+  app.patch('/api/missions/:missionId/clients/:clientId/primary', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.setMissionPrimaryClient(
+      Number(req.params.missionId),
+      Number(req.params.clientId)
+    );
+    res.json({ success: true });
+  });
+
+  // Mission Trainers (multi-trainers support)
+  app.get('/api/missions/:id/trainers', isAuthenticated, async (req, res) => {
+    const missionTrainers = await storage.getMissionTrainers(Number(req.params.id));
+    // Strip password from trainer objects
+    const sanitized = missionTrainers.map(mt => ({
+      ...mt,
+      trainer: stripPassword(mt.trainer),
+    }));
+    res.json(sanitized);
+  });
+
+  app.post('/api/missions/:id/trainers', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { trainerId, isPrimary } = req.body;
+      if (!trainerId) {
+        res.status(400).json({ message: 'trainerId is required' });
+        return;
+      }
+      const result = await storage.addTrainerToMission({
+        missionId: Number(req.params.id),
+        trainerId: trainerId,
+        isPrimary: isPrimary || false,
+      });
+      res.status(201).json(result);
+    } catch (err: any) {
+      if (err.code === '23505') {
+        res.status(400).json({ message: 'Ce formateur est déjà associé à cette mission' });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete('/api/missions/:missionId/trainers/:trainerId', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.removeTrainerFromMission(
+      Number(req.params.missionId),
+      req.params.trainerId
+    );
+    res.json({ success: true });
+  });
+
+  app.patch('/api/missions/:missionId/trainers/:trainerId/primary', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.setMissionPrimaryTrainer(
+      Number(req.params.missionId),
+      req.params.trainerId
+    );
+    res.json({ success: true });
+  });
+
+  // Mission Steps (étapes chronologiques)
+  app.get(api.missions.steps.list.path, isAuthenticated, async (req, res) => {
+    const steps = await storage.getMissionSteps(Number(req.params.id));
+    res.json(steps);
+  });
+
+  app.post(api.missions.steps.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.missions.steps.create.input.parse(req.body);
+      const step = await storage.createMissionStep({
+        ...input,
+        missionId: Number(req.params.id),
+      });
+      res.status(201).json(step);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.missions.steps.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.missions.steps.update.input.parse(req.body);
+      const step = await storage.updateMissionStep(Number(req.params.stepId), {
+        ...input,
+        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+      });
+      if (!step) {
+        res.status(404).json({ message: "Étape non trouvée" });
+        return;
+      }
+      res.json(step);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.missions.steps.delete.path, isAuthenticated, async (req, res) => {
+    await storage.deleteMissionStep(Number(req.params.stepId));
+    res.json({ success: true });
+  });
+
+  // Step Tasks (taches des etapes)
+  app.get(api.missions.steps.tasks.list.path, isAuthenticated, async (req, res) => {
+    const tasks = await storage.getStepTasks(Number(req.params.stepId));
+    res.json(tasks);
+  });
+
+  app.post(api.missions.steps.tasks.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.missions.steps.tasks.create.input.parse(req.body);
+      const task = await storage.createStepTask({
+        ...input,
+        stepId: Number(req.params.stepId),
+      });
+      res.status(201).json(task);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.missions.steps.tasks.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.missions.steps.tasks.update.input.parse(req.body);
+      const task = await storage.updateStepTask(Number(req.params.taskId), input);
+      if (!task) {
+        res.status(404).json({ message: "Tache non trouvee" });
+        return;
+      }
+      res.json(task);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.missions.steps.tasks.delete.path, isAuthenticated, async (req, res) => {
+    await storage.deleteStepTask(Number(req.params.taskId));
+    res.json({ success: true });
   });
 
   // Mission Sessions
@@ -529,7 +765,7 @@ export async function registerRoutes(
   });
 
   app.patch(api.invoices.approve.path, isAuthenticated, requirePermission('invoices:approve'), async (req, res) => {
-    const invoice = await storage.updateInvoiceStatus(Number(req.params.id), 'approved');
+    const invoice = await storage.updateInvoiceStatus(Number(req.params.id), 'paid');
     if (!invoice) {
       res.status(404).json({ message: "Facture non trouvée" });
       return;
@@ -603,6 +839,49 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // Upload file for a document
+  app.post('/api/documents/:id/upload', isAuthenticated, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ message: 'No file uploaded' });
+        return;
+      }
+
+      const documentId = Number(req.params.id);
+      const fileUrl = `/uploads/${req.file.filename}`;
+
+      const updatedDoc = await storage.updateDocument(documentId, { url: fileUrl });
+      if (!updatedDoc) {
+        res.status(404).json({ message: "Document not found" });
+        return;
+      }
+
+      res.json(updatedDoc);
+    } catch (err) {
+      console.error('Upload error:', err);
+      res.status(500).json({ message: 'Upload failed' });
+    }
+  });
+
+  // Update document (title, etc.)
+  app.put('/api/documents/:id', isAuthenticated, async (req, res) => {
+    try {
+      const documentId = Number(req.params.id);
+      const { title, type } = req.body;
+
+      const updatedDoc = await storage.updateDocument(documentId, { title, type });
+      if (!updatedDoc) {
+        res.status(404).json({ message: "Document not found" });
+        return;
+      }
+
+      res.json(updatedDoc);
+    } catch (err) {
+      console.error('Update document error:', err);
+      res.status(500).json({ message: 'Update failed' });
+    }
+  });
+
   // ==================== MESSAGES ====================
   app.get(api.messages.list.path, isAuthenticated, async (req, res) => {
     const messages = await storage.getMessages();
@@ -673,6 +952,426 @@ export async function registerRoutes(
         return;
       }
       throw err;
+    }
+  });
+
+  // ==================== REMINDER SETTINGS ====================
+  app.get(api.reminderSettings.list.path, isAuthenticated, async (req, res) => {
+    const settings = await storage.getReminderSettings();
+    res.json(settings);
+  });
+
+  app.get(api.reminderSettings.get.path, isAuthenticated, async (req, res) => {
+    const setting = await storage.getReminderSetting(Number(req.params.id));
+    if (!setting) {
+      res.status(404).json({ message: "Parametre non trouve" });
+      return;
+    }
+    res.json(setting);
+  });
+
+  app.post(api.reminderSettings.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.reminderSettings.create.input.parse(req.body);
+      const setting = await storage.createReminderSetting(input);
+      res.status(201).json(setting);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.reminderSettings.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.reminderSettings.update.input.parse(req.body);
+      const setting = await storage.updateReminderSetting(Number(req.params.id), input);
+      if (!setting) {
+        res.status(404).json({ message: "Parametre non trouve" });
+        return;
+      }
+      res.json(setting);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.reminderSettings.delete.path, isAuthenticated, async (req, res) => {
+    await storage.deleteReminderSetting(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // ==================== REMINDERS ====================
+  app.get(api.reminders.list.path, isAuthenticated, async (req, res) => {
+    const reminders = await storage.getReminders();
+    res.json(reminders);
+  });
+
+  app.get(api.reminders.pending.path, isAuthenticated, async (req, res) => {
+    const reminders = await storage.getPendingReminders();
+    res.json(reminders);
+  });
+
+  app.get(api.reminders.byMission.path, isAuthenticated, async (req, res) => {
+    const reminders = await storage.getRemindersByMission(Number(req.params.id));
+    res.json(reminders);
+  });
+
+  app.post(api.reminders.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.reminders.create.input.parse(req.body);
+      const reminder = await storage.createReminder({
+        ...input,
+        scheduledDate: new Date(input.scheduledDate),
+      });
+      res.status(201).json(reminder);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.reminders.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.reminders.update.input.parse(req.body);
+      const updateData: any = { ...input };
+      if (input.scheduledDate) {
+        updateData.scheduledDate = new Date(input.scheduledDate);
+      }
+      if (input.sentAt) {
+        updateData.sentAt = new Date(input.sentAt);
+      }
+      const reminder = await storage.updateReminder(Number(req.params.id), updateData);
+      if (!reminder) {
+        res.status(404).json({ message: "Rappel non trouve" });
+        return;
+      }
+      res.json(reminder);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.reminders.delete.path, isAuthenticated, async (req, res) => {
+    await storage.deleteReminder(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Generate reminders for a mission based on active settings
+  app.post(api.reminders.generateForMission.path, isAuthenticated, async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const mission = await storage.getMission(missionId);
+      if (!mission || !mission.startDate) {
+        res.status(404).json({ message: "Mission non trouvee ou sans date de debut" });
+        return;
+      }
+
+      const settings = await storage.getReminderSettings();
+      const activeSettings = settings.filter(s => s.isActive);
+      let created = 0;
+
+      for (const setting of activeSettings) {
+        const missionDate = new Date(mission.startDate);
+        const scheduledDate = new Date(missionDate);
+        scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
+
+        // Skip if scheduled date is in the past
+        if (scheduledDate < new Date()) continue;
+
+        // Create reminders based on notification settings
+        const recipients: { type: string; email?: string; name?: string }[] = [];
+
+        if (setting.notifyAdmin) {
+          const admins = await storage.getUsers();
+          const adminUsers = admins.filter(u => u.role === 'admin');
+          for (const admin of adminUsers) {
+            recipients.push({
+              type: 'admin',
+              email: admin.email,
+              name: `${admin.firstName} ${admin.lastName}`,
+            });
+          }
+        }
+
+        if (setting.notifyTrainer && mission.trainerId) {
+          const trainer = await storage.getUser(mission.trainerId);
+          if (trainer) {
+            recipients.push({
+              type: 'trainer',
+              email: trainer.email,
+              name: `${trainer.firstName} ${trainer.lastName}`,
+            });
+          }
+        }
+
+        if (setting.notifyClient && mission.clientId) {
+          const client = await storage.getClient(mission.clientId);
+          if (client && client.contactEmail) {
+            recipients.push({
+              type: 'client',
+              email: client.contactEmail,
+              name: client.contactName || client.name,
+            });
+          }
+        }
+
+        for (const recipient of recipients) {
+          await storage.createReminder({
+            settingId: setting.id,
+            missionId,
+            scheduledDate,
+            recipientType: recipient.type,
+            recipientEmail: recipient.email,
+            recipientName: recipient.name,
+            status: 'pending',
+          });
+          created++;
+        }
+      }
+
+      res.json({ created });
+    } catch (err) {
+      console.error('Error generating reminders:', err);
+      res.status(500).json({ message: "Erreur lors de la generation des rappels" });
+    }
+  });
+
+  // Process pending reminders (to be called by cron job)
+  app.post(api.reminders.process.path, isAuthenticated, async (req, res) => {
+    try {
+      const pendingReminders = await storage.getPendingReminders();
+      const now = new Date();
+      let processed = 0;
+      let sent = 0;
+      let failed = 0;
+
+      for (const reminder of pendingReminders) {
+        if (new Date(reminder.scheduledDate) <= now) {
+          processed++;
+          try {
+            // Here you would send the actual email
+            // For now, we just mark it as sent
+            console.log(`[REMINDER] Would send email to ${reminder.recipientEmail} for mission ${reminder.missionId}`);
+
+            await storage.updateReminder(reminder.id, {
+              status: 'sent',
+              sentAt: now,
+            });
+            sent++;
+          } catch (err) {
+            await storage.updateReminder(reminder.id, {
+              status: 'failed',
+              errorMessage: err instanceof Error ? err.message : 'Unknown error',
+            });
+            failed++;
+          }
+        }
+      }
+
+      res.json({ processed, sent, failed });
+    } catch (err) {
+      console.error('Error processing reminders:', err);
+      res.status(500).json({ message: "Erreur lors du traitement des rappels" });
+    }
+  });
+
+  // ==================== DOCUMENT TEMPLATES ====================
+  app.get('/api/document-templates', isAuthenticated, requirePermission('admin'), async (req, res) => {
+    const templates = await storage.getDocumentTemplates();
+    res.json(templates);
+  });
+
+  app.get('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), async (req, res) => {
+    const template = await storage.getDocumentTemplate(Number(req.params.id));
+    if (!template) {
+      res.status(404).json({ message: "Template non trouvé" });
+      return;
+    }
+    res.json(template);
+  });
+
+  app.post('/api/document-templates', isAuthenticated, requirePermission('admin'), upload.single('file'), async (req, res) => {
+    try {
+      const { title, type, forRole, description } = req.body;
+
+      if (!title || !type || !forRole) {
+        res.status(400).json({ message: 'Champs manquants' });
+        return;
+      }
+
+      const fileUrl = req.file ? `/uploads/${req.file.filename}` : '';
+
+      const template = await storage.createDocumentTemplate({
+        title,
+        type,
+        forRole,
+        url: fileUrl,
+        description: description || null,
+        isActive: true,
+      });
+
+      res.status(201).json(template);
+    } catch (err) {
+      console.error('Template creation error:', err);
+      res.status(500).json({ message: 'Erreur lors de la création du template' });
+    }
+  });
+
+  app.put('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), upload.single('file'), async (req, res) => {
+    try {
+      const templateId = Number(req.params.id);
+      const { title, type, forRole, description, isActive, clientId, changeNotes } = req.body;
+      const user = req.user!;
+
+      const updateData: any = {};
+      if (title) updateData.title = title;
+      if (type) updateData.type = type;
+      if (forRole) updateData.forRole = forRole;
+      if (description !== undefined) updateData.description = description;
+      if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
+      if (clientId !== undefined) updateData.clientId = clientId ? Number(clientId) : null;
+      if (req.file) updateData.url = `/uploads/${req.file.filename}`;
+
+      // The storage method now handles versioning and notifications automatically
+      const updated = await storage.updateDocumentTemplate(
+        templateId,
+        updateData,
+        user.id,
+        changeNotes || undefined
+      );
+
+      if (!updated) {
+        res.status(404).json({ message: "Template non trouvé" });
+        return;
+      }
+
+      res.json(updated);
+    } catch (err) {
+      console.error('Template update error:', err);
+      res.status(500).json({ message: 'Erreur lors de la mise à jour du template' });
+    }
+  });
+
+  app.delete('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), async (req, res) => {
+    await storage.deleteDocumentTemplate(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Get template versions history
+  app.get('/api/document-templates/:id/versions', isAuthenticated, requirePermission('admin'), async (req, res) => {
+    const versions = await storage.getTemplateVersions(Number(req.params.id));
+    res.json(versions);
+  });
+
+  // Get unread notifications for current user
+  app.get('/api/notifications/templates', isAuthenticated, async (req, res) => {
+    const user = req.user!;
+    const notifications = await storage.getUnreadNotifications(user.id);
+    res.json(notifications);
+  });
+
+  // Mark notification as read
+  app.patch('/api/notifications/:id/read', isAuthenticated, async (req, res) => {
+    await storage.markNotificationAsRead(Number(req.params.id));
+    res.json({ success: true });
+  });
+
+  // Mark all notifications as read
+  app.patch('/api/notifications/read-all', isAuthenticated, async (req, res) => {
+    const user = req.user!;
+    await storage.markAllNotificationsAsRead(user.id);
+    res.json({ success: true });
+  });
+
+  // Duplicate mission for another trainer
+  app.post('/api/missions/:id/duplicate', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
+    try {
+      const { trainerId } = req.body;
+      if (!trainerId) {
+        res.status(400).json({ message: 'trainerId requis' });
+        return;
+      }
+
+      const duplicated = await storage.duplicateMissionForTrainer(Number(req.params.id), trainerId);
+      if (!duplicated) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+
+      res.status(201).json(duplicated);
+    } catch (err) {
+      console.error('Mission duplication error:', err);
+      res.status(500).json({ message: 'Erreur lors de la duplication de la mission' });
+    }
+  });
+
+  // ==================== MULTI-TRAINER DUPLICATION ====================
+  // Duplicate mission for multiple trainers at once
+  app.post('/api/missions/:id/duplicate-multi', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
+    try {
+      const { trainerIds } = req.body;
+      if (!trainerIds || !Array.isArray(trainerIds) || trainerIds.length === 0) {
+        res.status(400).json({ message: 'trainerIds requis (tableau non vide)' });
+        return;
+      }
+
+      const result = await storage.duplicateMissionForMultipleTrainers(Number(req.params.id), trainerIds);
+      res.status(201).json(result);
+    } catch (err) {
+      console.error('Multi-trainer duplication error:', err);
+      res.status(500).json({ message: err instanceof Error ? err.message : 'Erreur lors de la duplication' });
+    }
+  });
+
+  // Get child missions (copies) of a parent mission
+  app.get('/api/missions/:id/children', isAuthenticated, async (req, res) => {
+    try {
+      const children = await storage.getChildMissions(Number(req.params.id));
+      res.json(children);
+    } catch (err) {
+      console.error('Get children error:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Get parent mission of a copy
+  app.get('/api/missions/:id/parent', isAuthenticated, async (req, res) => {
+    try {
+      const parent = await storage.getParentMission(Number(req.params.id));
+      if (!parent) {
+        res.status(404).json({ message: 'Mission parente non trouvée' });
+        return;
+      }
+      res.json(parent);
+    } catch (err) {
+      console.error('Get parent error:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Sync parent mission info to all children
+  app.patch('/api/missions/:id/sync-children', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { fields } = req.body;
+      const synced = await storage.syncParentToChildren(Number(req.params.id), fields);
+      res.json({ synced });
+    } catch (err) {
+      console.error('Sync children error:', err);
+      res.status(500).json({ message: 'Erreur lors de la synchronisation' });
     }
   });
 

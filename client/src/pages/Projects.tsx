@@ -21,11 +21,9 @@ export default function Projects() {
   const form = useForm<InsertProject>({
     resolver: zodResolver(insertProjectSchema),
     defaultValues: {
-      title: "",
+      name: "",
       description: "",
       status: "active",
-      // userId would typically come from auth context
-      userId: 1, 
     },
   });
 
@@ -60,10 +58,10 @@ export default function Projects() {
                 </DialogHeader>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="title">Titre du projet</Label>
-                    <Input id="title" {...form.register("title")} placeholder="Ex: Refonte site web" />
-                    {form.formState.errors.title && (
-                      <p className="text-sm text-red-500">{form.formState.errors.title.message}</p>
+                    <Label htmlFor="name">Nom du projet</Label>
+                    <Input id="name" {...form.register("name")} placeholder="Ex: Refonte site web" />
+                    {form.formState.errors.name && (
+                      <p className="text-sm text-red-500">{form.formState.errors.name.message}</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -101,7 +99,7 @@ export default function Projects() {
                       {project.status === 'active' ? 'En cours' : 'Terminé'}
                     </span>
                   </div>
-                  <h3 className="text-xl font-bold mb-2">{project.title}</h3>
+                  <h3 className="text-xl font-bold mb-2">{project.name}</h3>
                   <p className="text-muted-foreground text-sm line-clamp-3 mb-4">
                     {project.description || "Aucune description fournie."}
                   </p>

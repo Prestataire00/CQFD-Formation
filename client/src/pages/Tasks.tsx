@@ -26,7 +26,6 @@ export default function Tasks() {
     defaultValues: {
       title: "",
       status: "pending",
-      assignedTo: 1, // Mock user ID
     },
   });
 
@@ -76,7 +75,7 @@ export default function Tasks() {
                       </SelectTrigger>
                       <SelectContent>
                         {projects?.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>{p.title}</SelectItem>
+                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -123,7 +122,7 @@ export default function Tasks() {
                   </div>
                   <div className="col-span-5 font-medium">{task.title}</div>
                   <div className="col-span-3 text-sm text-muted-foreground">
-                    {projects?.find(p => p.id === task.projectId)?.title || "—"}
+                    {projects?.find(p => p.id === task.projectId)?.name || "—"}
                   </div>
                   <div className="col-span-2 text-sm text-muted-foreground">
                     {task.dueDate ? format(new Date(task.dueDate), "dd MMM yyyy", { locale: fr }) : "—"}

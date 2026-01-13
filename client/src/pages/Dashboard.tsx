@@ -36,7 +36,6 @@ function getInvoiceStatusLabel(status: InvoiceStatus): { label: string; color: s
   const styles: Record<InvoiceStatus, { label: string; color: string }> = {
     draft: { label: "Brouillon", color: "text-gray-500" },
     submitted: { label: "Soumise", color: "text-orange-500" },
-    approved: { label: "Approuvee", color: "text-blue-500" },
     rejected: { label: "Refusee", color: "text-red-500" },
     paid: { label: "Payee", color: "text-green-600" },
   };
@@ -55,7 +54,11 @@ export default function Dashboard() {
   // Get upcoming missions (next 5)
   const upcomingMissions = missions
     ?.filter((m: Mission) => m.status === "confirmed" || m.status === "in_progress")
-    .sort((a: Mission, b: Mission) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    .sort((a: Mission, b: Mission) => {
+      const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return dateA - dateB;
+    })
     .slice(0, 5) || [];
 
   // Get recent invoices
@@ -128,7 +131,7 @@ export default function Dashboard() {
               <div className="space-y-4">
                 {upcomingMissions.length > 0 ? (
                   upcomingMissions.map((mission: Mission) => {
-                    const { label, color } = getMissionStatusLabel(mission.status);
+                    const { label, color } = getMissionStatusLabel(mission.status as MissionStatus);
                     return (
                       <Link key={mission.id} href={`/missions/${mission.id}`}>
                         <div className="group flex items-center justify-between p-4 rounded-xl hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50 cursor-pointer">
@@ -146,14 +149,16 @@ export default function Dashboard() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="w-3 h-3" />
-                                  {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                                </span>
-                                {mission.locationCity && (
+                                {mission.startDate && (
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
+                                  </span>
+                                )}
+                                {mission.location && (
                                   <span className="flex items-center gap-1">
                                     <MapPin className="w-3 h-3" />
-                                    {mission.locationCity}
+                                    {mission.location}
                                   </span>
                                 )}
                               </div>
@@ -182,7 +187,7 @@ export default function Dashboard() {
                 <div className="space-y-3">
                   {recentInvoices.length > 0 ? (
                     recentInvoices.map((invoice: Invoice) => {
-                      const { label, color } = getInvoiceStatusLabel(invoice.status);
+                      const { label, color } = getInvoiceStatusLabel(invoice.status as InvoiceStatus);
                       return (
                         <div
                           key={invoice.id}
@@ -194,9 +199,9 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <p className="text-sm font-medium font-mono">{invoice.invoiceNumber}</p>
-                              {invoice.invoiceDate && (
+                              {invoice.createdAt && (
                                 <p className="text-xs text-muted-foreground">
-                                  {format(new Date(invoice.invoiceDate), "d MMM yyyy", { locale: fr })}
+                                  {format(new Date(invoice.createdAt), "d MMM yyyy", { locale: fr })}
                                 </p>
                               )}
                             </div>

@@ -1,16 +1,21 @@
 import {
-  users, clients, trainingPrograms, missions, missionSteps, missionSessions,
+  users, clients, trainingPrograms, missions, missionClients, missionTrainers, missionSteps, stepTasks, missionSessions,
   participants, missionParticipants, attendanceRecords, evaluations, auditLogs,
-  invoices, documents, messages,
-  type User, type Client, type TrainingProgram, type Mission, type MissionStep,
-  type MissionSession, type Participant, type MissionParticipant,
+  invoices, documents, documentTemplates, documentTemplateVersions, templateNotifications,
+  messages, projects, tasks, reminderSettings, reminders,
+  type User, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
+  type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
-  type Document, type Message,
+  type Document, type DocumentTemplate, type DocumentTemplateVersion, type TemplateNotification,
+  type Message, type Project, type Task,
+  type ReminderSetting, type Reminder,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
-  type InsertMissionStep, type InsertMissionSession, type InsertParticipant,
+  type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
   type InsertMissionParticipant, type InsertAttendanceRecord,
-  type InsertEvaluation, type InsertInvoice, type InsertDocument,
-  type InsertAuditLog, type InsertMessage,
+  type InsertEvaluation, type InsertInvoice, type InsertDocument, type InsertDocumentTemplate,
+  type InsertDocumentTemplateVersion, type InsertTemplateNotification,
+  type InsertAuditLog, type InsertMessage, type InsertProject, type InsertTask,
+  type InsertReminderSetting, type InsertReminder,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
@@ -22,9 +27,21 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createUser(userData: Partial<User>, password: string): Promise<User>;
+  updateUserWithPassword(id: string, data: Partial<User>, password?: string): Promise<User | undefined>;
+  softDeleteUser(id: string): Promise<boolean>;
   getUsers(): Promise<User[]>;
   getTrainers(): Promise<User[]>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+
+  // Projects
+  getProjects(): Promise<Project[]>;
+  getProject(id: number): Promise<Project | undefined>;
+  createProject(project: InsertProject): Promise<Project>;
+
+  // Tasks
+  getTasks(): Promise<Task[]>;
+  createTask(task: InsertTask): Promise<Task>;
 
   // Clients
   getClients(): Promise<Client[]>;
@@ -45,11 +62,37 @@ export interface IStorage {
   createMission(mission: InsertMission): Promise<Mission>;
   updateMission(id: number, data: Partial<Mission>): Promise<Mission | undefined>;
   updateMissionStatus(id: number, status: MissionStatus): Promise<Mission | undefined>;
+  duplicateMissionForTrainer(originalMissionId: number, newTrainerId: string): Promise<Mission | undefined>;
+
+  // Multi-trainer duplication
+  duplicateMissionForMultipleTrainers(originalMissionId: number, trainerIds: string[]): Promise<{ created: Mission[]; errors: { trainerId: string; error: string }[] }>;
+  getChildMissions(parentMissionId: number): Promise<Mission[]>;
+  getParentMission(missionId: number): Promise<Mission | undefined>;
+  syncParentToChildren(parentMissionId: number, fields?: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[]): Promise<number>;
+
+  // Mission Clients
+  getMissionClients(missionId: number): Promise<(MissionClient & { client: Client })[]>;
+  addClientToMission(data: InsertMissionClient): Promise<MissionClient>;
+  removeClientFromMission(missionId: number, clientId: number): Promise<boolean>;
+  setMissionPrimaryClient(missionId: number, clientId: number): Promise<boolean>;
+
+  // Mission Trainers
+  getMissionTrainers(missionId: number): Promise<(MissionTrainer & { trainer: User })[]>;
+  addTrainerToMission(data: InsertMissionTrainer): Promise<MissionTrainer>;
+  removeTrainerFromMission(missionId: number, trainerId: string): Promise<boolean>;
+  setMissionPrimaryTrainer(missionId: number, trainerId: string): Promise<boolean>;
 
   // Mission Steps
   getMissionSteps(missionId: number): Promise<MissionStep[]>;
   createMissionStep(step: InsertMissionStep): Promise<MissionStep>;
   updateMissionStep(id: number, data: Partial<MissionStep>): Promise<MissionStep | undefined>;
+  deleteMissionStep(id: number): Promise<boolean>;
+
+  // Step Tasks
+  getStepTasks(stepId: number): Promise<StepTask[]>;
+  createStepTask(task: InsertStepTask): Promise<StepTask>;
+  updateStepTask(id: number, data: Partial<StepTask>): Promise<StepTask | undefined>;
+  deleteStepTask(id: number): Promise<boolean>;
 
   // Mission Sessions
   getMissionSessions(missionId: number): Promise<MissionSession[]>;
@@ -93,7 +136,28 @@ export interface IStorage {
   getDocumentsByMission(missionId: number): Promise<Document[]>;
   getDocument(id: number): Promise<Document | undefined>;
   createDocument(doc: InsertDocument): Promise<Document>;
+  updateDocument(id: number, data: Partial<Document>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
+  initializeMissionDocuments(missionId: number): Promise<void>;
+
+  // Document Templates
+  getDocumentTemplates(): Promise<DocumentTemplate[]>;
+  getActiveDocumentTemplatesByRole(role: string, clientId?: number): Promise<DocumentTemplate[]>;
+  getDocumentTemplate(id: number): Promise<DocumentTemplate | undefined>;
+  createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate>;
+  updateDocumentTemplate(id: number, data: Partial<DocumentTemplate>, uploadedBy?: string, changeNotes?: string): Promise<DocumentTemplate | undefined>;
+  deleteDocumentTemplate(id: number): Promise<boolean>;
+  attachTemplateDocumentsToMission(missionId: number, trainerId: string): Promise<void>;
+
+  // Template Versions
+  getTemplateVersions(templateId: number): Promise<DocumentTemplateVersion[]>;
+  createTemplateVersion(version: InsertDocumentTemplateVersion): Promise<DocumentTemplateVersion>;
+
+  // Template Notifications
+  getUnreadNotifications(userId: string): Promise<TemplateNotification[]>;
+  createNotificationForTemplate(templateId: number, userIds: string[]): Promise<void>;
+  markNotificationAsRead(notificationId: number): Promise<boolean>;
+  markAllNotificationsAsRead(userId: string): Promise<boolean>;
 
   // Audit Logs
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
@@ -112,6 +176,21 @@ export interface IStorage {
     pendingInvoices: number;
     averageRating: number;
   }>;
+
+  // Reminder Settings
+  getReminderSettings(): Promise<ReminderSetting[]>;
+  getReminderSetting(id: number): Promise<ReminderSetting | undefined>;
+  createReminderSetting(setting: InsertReminderSetting): Promise<ReminderSetting>;
+  updateReminderSetting(id: number, data: Partial<ReminderSetting>): Promise<ReminderSetting | undefined>;
+  deleteReminderSetting(id: number): Promise<boolean>;
+
+  // Reminders
+  getReminders(): Promise<Reminder[]>;
+  getRemindersByMission(missionId: number): Promise<Reminder[]>;
+  getPendingReminders(): Promise<Reminder[]>;
+  createReminder(reminder: InsertReminder): Promise<Reminder>;
+  updateReminder(id: number, data: Partial<Reminder>): Promise<Reminder | undefined>;
+  deleteReminder(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -160,6 +239,62 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return updated;
+  }
+
+  async createUser(userData: Partial<User>, password: string): Promise<User> {
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const [newUser] = await db.insert(users).values({
+      ...userData,
+      passwordHash,
+    } as any).returning();
+    return newUser;
+  }
+
+  async updateUserWithPassword(id: string, data: Partial<User>, password?: string): Promise<User | undefined> {
+    const updateData: any = { ...data, updatedAt: new Date() };
+    if (password) {
+      const bcrypt = await import('bcrypt');
+      updateData.passwordHash = await bcrypt.hash(password, 10);
+    }
+    const [updated] = await db.update(users)
+      .set(updateData)
+      .where(eq(users.id, id))
+      .returning();
+    return updated;
+  }
+
+  async softDeleteUser(id: string): Promise<boolean> {
+    const [updated] = await db.update(users)
+      .set({ status: 'SUPPRIME', updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return !!updated;
+  }
+
+  // ==================== PROJECTS ====================
+  async getProjects(): Promise<Project[]> {
+    return await db.select().from(projects).orderBy(desc(projects.createdAt));
+  }
+
+  async getProject(id: number): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
+  }
+
+  async createProject(project: InsertProject): Promise<Project> {
+    const [newProject] = await db.insert(projects).values(project).returning();
+    return newProject;
+  }
+
+  // ==================== TASKS ====================
+  async getTasks(): Promise<Task[]> {
+    return await db.select().from(tasks).orderBy(desc(tasks.createdAt));
+  }
+
+  async createTask(task: InsertTask): Promise<Task> {
+    const [newTask] = await db.insert(tasks).values(task).returning();
+    return newTask;
   }
 
   // ==================== CLIENTS ====================
@@ -228,6 +363,12 @@ export class DatabaseStorage implements IStorage {
 
   async createMission(mission: InsertMission): Promise<Mission> {
     const [newMission] = await db.insert(missions).values(mission).returning();
+
+    // Auto-attach template documents if trainer is assigned
+    if (newMission.trainerId) {
+      await this.attachTemplateDocumentsToMission(newMission.id, newMission.trainerId);
+    }
+
     return newMission;
   }
 
@@ -245,6 +386,250 @@ export class DatabaseStorage implements IStorage {
       .where(eq(missions.id, id))
       .returning();
     return updated;
+  }
+
+  async duplicateMissionForTrainer(originalMissionId: number, newTrainerId: string): Promise<Mission | undefined> {
+    // Get the original mission
+    const originalMission = await this.getMission(originalMissionId);
+    if (!originalMission) return undefined;
+
+    // Create a copy of the mission for the new trainer
+    const { id, createdAt, updatedAt, ...missionData } = originalMission;
+    const [duplicatedMission] = await db.insert(missions).values({
+      ...missionData,
+      trainerId: newTrainerId,
+      title: `${missionData.title} (Copie)`,
+    }).returning();
+
+    // Attach template documents for the new trainer
+    if (newTrainerId) {
+      await this.attachTemplateDocumentsToMission(duplicatedMission.id, newTrainerId);
+    }
+
+    // Copy steps (tâches)
+    const originalSteps = await this.getMissionSteps(originalMissionId);
+    for (const step of originalSteps) {
+      const { id, missionId, createdAt, updatedAt, ...stepData } = step;
+      await this.createMissionStep({
+        ...stepData,
+        missionId: duplicatedMission.id,
+      });
+    }
+
+    return duplicatedMission;
+  }
+
+  // ==================== MULTI-TRAINER DUPLICATION ====================
+  async duplicateMissionForMultipleTrainers(
+    originalMissionId: number,
+    trainerIds: string[]
+  ): Promise<{ created: Mission[]; errors: { trainerId: string; error: string }[] }> {
+    const created: Mission[] = [];
+    const errors: { trainerId: string; error: string }[] = [];
+
+    const originalMission = await this.getMission(originalMissionId);
+    if (!originalMission) {
+      throw new Error("Mission originale non trouvée");
+    }
+
+    // Mark original as original if not already
+    if (!originalMission.isOriginal) {
+      await this.updateMission(originalMissionId, { isOriginal: true });
+    }
+
+    for (const trainerId of trainerIds) {
+      try {
+        // Check if trainer already has a copy
+        const existingCopies = await db.select().from(missions)
+          .where(and(
+            eq(missions.parentMissionId, originalMissionId),
+            eq(missions.trainerId, trainerId)
+          ));
+
+        if (existingCopies.length > 0) {
+          errors.push({ trainerId, error: "Le formateur a déjà une copie de cette mission" });
+          continue;
+        }
+
+        // Get trainer to determine role
+        const trainer = await this.getUser(trainerId);
+        if (!trainer) {
+          errors.push({ trainerId, error: "Formateur non trouvé" });
+          continue;
+        }
+
+        // Create mission copy
+        const { id, createdAt, updatedAt, isOriginal, parentMissionId, ...missionData } = originalMission;
+
+        // Generate new reference with trainer suffix
+        const trainerSuffix = trainer.lastName?.toUpperCase().slice(0, 3) || trainerId.slice(0, 3);
+        const newReference = `${missionData.reference || 'MISS'}-${trainerSuffix}`;
+
+        const [newMission] = await db.insert(missions).values({
+          ...missionData,
+          reference: newReference,
+          trainerId,
+          parentMissionId: originalMissionId,
+          isOriginal: false,
+        }).returning();
+
+        // Copy all mission steps (tasks)
+        const originalSteps = await this.getMissionSteps(originalMissionId);
+        for (const step of originalSteps) {
+          const { id: stepId, missionId, createdAt: stepCreatedAt, updatedAt: stepUpdatedAt, ...stepData } = step;
+          await this.createMissionStep({
+            ...stepData,
+            missionId: newMission.id,
+            // Reset completion status for new trainer
+            isCompleted: false,
+            status: 'todo',
+          });
+        }
+
+        // Attach role-specific document templates
+        await this.attachTemplateDocumentsToMission(newMission.id, trainerId);
+
+        created.push(newMission);
+      } catch (err) {
+        errors.push({
+          trainerId,
+          error: err instanceof Error ? err.message : "Erreur inconnue"
+        });
+      }
+    }
+
+    return { created, errors };
+  }
+
+  async getChildMissions(parentMissionId: number): Promise<Mission[]> {
+    return await db.select().from(missions)
+      .where(eq(missions.parentMissionId, parentMissionId))
+      .orderBy(desc(missions.createdAt));
+  }
+
+  async getParentMission(missionId: number): Promise<Mission | undefined> {
+    const mission = await this.getMission(missionId);
+    if (!mission || !mission.parentMissionId) return undefined;
+    return await this.getMission(mission.parentMissionId);
+  }
+
+  async syncParentToChildren(
+    parentMissionId: number,
+    fields?: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[]
+  ): Promise<number> {
+    const parent = await this.getMission(parentMissionId);
+    if (!parent || !parent.isOriginal) {
+      return 0;
+    }
+
+    const defaultFields: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[] =
+      ['title', 'description', 'startDate', 'endDate', 'location', 'locationType'];
+    const fieldsToSync = fields || defaultFields;
+
+    // Build update object from parent
+    const updateData: Partial<Mission> = {};
+    for (const field of fieldsToSync) {
+      (updateData as any)[field] = (parent as any)[field];
+    }
+    updateData.updatedAt = new Date();
+
+    // Update all children
+    const result = await db.update(missions)
+      .set(updateData)
+      .where(eq(missions.parentMissionId, parentMissionId))
+      .returning();
+
+    return result.length;
+  }
+
+  // ==================== MISSION CLIENTS ====================
+  async getMissionClients(missionId: number): Promise<(MissionClient & { client: Client })[]> {
+    const results = await db.select({
+      id: missionClients.id,
+      missionId: missionClients.missionId,
+      clientId: missionClients.clientId,
+      isPrimary: missionClients.isPrimary,
+      createdAt: missionClients.createdAt,
+      client: clients,
+    })
+      .from(missionClients)
+      .innerJoin(clients, eq(missionClients.clientId, clients.id))
+      .where(eq(missionClients.missionId, missionId));
+    return results;
+  }
+
+  async addClientToMission(data: InsertMissionClient): Promise<MissionClient> {
+    const [newMissionClient] = await db.insert(missionClients).values(data).returning();
+    return newMissionClient;
+  }
+
+  async removeClientFromMission(missionId: number, clientId: number): Promise<boolean> {
+    const result = await db.delete(missionClients)
+      .where(and(
+        eq(missionClients.missionId, missionId),
+        eq(missionClients.clientId, clientId)
+      ));
+    return true;
+  }
+
+  async setMissionPrimaryClient(missionId: number, clientId: number): Promise<boolean> {
+    // Remove primary flag from all clients of this mission
+    await db.update(missionClients)
+      .set({ isPrimary: false })
+      .where(eq(missionClients.missionId, missionId));
+    // Set primary flag on the specified client
+    await db.update(missionClients)
+      .set({ isPrimary: true })
+      .where(and(
+        eq(missionClients.missionId, missionId),
+        eq(missionClients.clientId, clientId)
+      ));
+    return true;
+  }
+
+  // ==================== MISSION TRAINERS ====================
+  async getMissionTrainers(missionId: number): Promise<(MissionTrainer & { trainer: User })[]> {
+    const results = await db.select({
+      id: missionTrainers.id,
+      missionId: missionTrainers.missionId,
+      trainerId: missionTrainers.trainerId,
+      isPrimary: missionTrainers.isPrimary,
+      createdAt: missionTrainers.createdAt,
+      trainer: users,
+    })
+      .from(missionTrainers)
+      .innerJoin(users, eq(missionTrainers.trainerId, users.id))
+      .where(eq(missionTrainers.missionId, missionId));
+    return results;
+  }
+
+  async addTrainerToMission(data: InsertMissionTrainer): Promise<MissionTrainer> {
+    const [newMissionTrainer] = await db.insert(missionTrainers).values(data).returning();
+    return newMissionTrainer;
+  }
+
+  async removeTrainerFromMission(missionId: number, trainerId: string): Promise<boolean> {
+    await db.delete(missionTrainers)
+      .where(and(
+        eq(missionTrainers.missionId, missionId),
+        eq(missionTrainers.trainerId, trainerId)
+      ));
+    return true;
+  }
+
+  async setMissionPrimaryTrainer(missionId: number, trainerId: string): Promise<boolean> {
+    // Remove primary flag from all trainers of this mission
+    await db.update(missionTrainers)
+      .set({ isPrimary: false })
+      .where(eq(missionTrainers.missionId, missionId));
+    // Set primary flag on the specified trainer
+    await db.update(missionTrainers)
+      .set({ isPrimary: true })
+      .where(and(
+        eq(missionTrainers.missionId, missionId),
+        eq(missionTrainers.trainerId, trainerId)
+      ));
+    return true;
   }
 
   // ==================== MISSION STEPS ====================
@@ -265,6 +650,38 @@ export class DatabaseStorage implements IStorage {
       .where(eq(missionSteps.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteMissionStep(id: number): Promise<boolean> {
+    // First delete all tasks associated with this step
+    await db.delete(stepTasks).where(eq(stepTasks.stepId, id));
+    await db.delete(missionSteps).where(eq(missionSteps.id, id));
+    return true;
+  }
+
+  // ==================== STEP TASKS ====================
+  async getStepTasks(stepId: number): Promise<StepTask[]> {
+    return await db.select().from(stepTasks)
+      .where(eq(stepTasks.stepId, stepId))
+      .orderBy(stepTasks.order);
+  }
+
+  async createStepTask(task: InsertStepTask): Promise<StepTask> {
+    const [newTask] = await db.insert(stepTasks).values(task).returning();
+    return newTask;
+  }
+
+  async updateStepTask(id: number, data: Partial<StepTask>): Promise<StepTask | undefined> {
+    const [updated] = await db.update(stepTasks)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(stepTasks.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteStepTask(id: number): Promise<boolean> {
+    await db.delete(stepTasks).where(eq(stepTasks.id, id));
+    return true;
   }
 
   // ==================== MISSION SESSIONS ====================
@@ -462,8 +879,192 @@ export class DatabaseStorage implements IStorage {
     return newDoc;
   }
 
+  async updateDocument(id: number, data: Partial<Document>): Promise<Document | undefined> {
+    const [updated] = await db.update(documents)
+      .set(data)
+      .where(eq(documents.id, id))
+      .returning();
+    return updated;
+  }
+
   async deleteDocument(id: number): Promise<boolean> {
     await db.delete(documents).where(eq(documents.id, id));
+    return true;
+  }
+
+  // No longer used - keeping for reference
+  async initializeMissionDocuments(missionId: number): Promise<void> {
+    // Documents are now created on-demand by the user
+  }
+
+  // ==================== DOCUMENT TEMPLATES ====================
+  async getDocumentTemplates(): Promise<DocumentTemplate[]> {
+    return await db.select().from(documentTemplates).orderBy(desc(documentTemplates.createdAt));
+  }
+
+  async getActiveDocumentTemplatesByRole(role: string, clientId?: number): Promise<DocumentTemplate[]> {
+    // Get both global and client-specific templates
+    const conditions: any[] = [
+      eq(documentTemplates.isActive, true),
+      eq(documentTemplates.forRole, role)
+    ];
+
+    // If clientId is provided, get both global templates and templates for that client
+    if (clientId) {
+      return await db.select().from(documentTemplates)
+        .where(and(
+          eq(documentTemplates.isActive, true),
+          eq(documentTemplates.forRole, role),
+          sql`(${documentTemplates.clientId} IS NULL OR ${documentTemplates.clientId} = ${clientId})`
+        ));
+    }
+
+    // Otherwise, get only global templates (clientId is null)
+    return await db.select().from(documentTemplates)
+      .where(and(
+        eq(documentTemplates.isActive, true),
+        eq(documentTemplates.forRole, role),
+        sql`${documentTemplates.clientId} IS NULL`
+      ));
+  }
+
+  async getDocumentTemplate(id: number): Promise<DocumentTemplate | undefined> {
+    const [template] = await db.select().from(documentTemplates).where(eq(documentTemplates.id, id));
+    return template;
+  }
+
+  async createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate> {
+    const [newTemplate] = await db.insert(documentTemplates).values(template).returning();
+
+    // Create first version in history
+    if (newTemplate.url) {
+      await this.createTemplateVersion({
+        templateId: newTemplate.id,
+        version: 1,
+        url: newTemplate.url,
+        uploadedBy: null,
+        changeNotes: 'Version initiale',
+      });
+    }
+
+    return newTemplate;
+  }
+
+  async updateDocumentTemplate(id: number, data: Partial<DocumentTemplate>, uploadedBy?: string, changeNotes?: string): Promise<DocumentTemplate | undefined> {
+    const currentTemplate = await this.getDocumentTemplate(id);
+    if (!currentTemplate) return undefined;
+
+    // If URL is being updated, increment version and create a new version in history
+    if (data.url && data.url !== currentTemplate.url) {
+      const newVersion = (currentTemplate.version || 1) + 1;
+      data.version = newVersion;
+
+      // Save the new version to history
+      await this.createTemplateVersion({
+        templateId: id,
+        version: newVersion,
+        url: data.url,
+        uploadedBy: uploadedBy || null,
+        changeNotes: changeNotes || `Mise à jour vers version ${newVersion}`,
+      });
+
+      // Update all documents linked to this template with the new URL
+      const allDocuments = await this.getDocuments();
+      const linkedDocs = allDocuments.filter((doc: Document) => doc.templateId === id);
+
+      // Notify affected users
+      const affectedUserIds = linkedDocs.map((doc: Document) => doc.userId).filter(Boolean) as string[];
+      const uniqueUserIds = [...new Set(affectedUserIds)];
+      if (uniqueUserIds.length > 0) {
+        await this.createNotificationForTemplate(id, uniqueUserIds);
+      }
+
+      // Update the documents
+      for (const doc of linkedDocs) {
+        await this.updateDocument(doc.id, { url: data.url });
+      }
+    }
+
+    const [updated] = await db.update(documentTemplates)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(documentTemplates.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDocumentTemplate(id: number): Promise<boolean> {
+    await db.delete(documentTemplates).where(eq(documentTemplates.id, id));
+    return true;
+  }
+
+  async attachTemplateDocumentsToMission(missionId: number, trainerId: string): Promise<void> {
+    // Get trainer to determine their role
+    const trainer = await this.getUser(trainerId);
+    if (!trainer) return;
+
+    // Get the mission to check for client-specific templates
+    const mission = await this.getMission(missionId);
+    const clientId = mission?.clientId;
+
+    // Get appropriate templates based on trainer role and client
+    const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId);
+
+    // Attach each template document to the mission
+    for (const template of templates) {
+      await db.insert(documents).values({
+        title: template.title,
+        type: template.type,
+        url: template.url, // Reference to the latest version
+        missionId: missionId,
+        userId: trainerId,
+        templateId: template.id,
+      });
+    }
+  }
+
+  // ==================== TEMPLATE VERSIONS ====================
+  async getTemplateVersions(templateId: number): Promise<DocumentTemplateVersion[]> {
+    return await db.select().from(documentTemplateVersions)
+      .where(eq(documentTemplateVersions.templateId, templateId))
+      .orderBy(desc(documentTemplateVersions.version));
+  }
+
+  async createTemplateVersion(version: InsertDocumentTemplateVersion): Promise<DocumentTemplateVersion> {
+    const [newVersion] = await db.insert(documentTemplateVersions).values(version).returning();
+    return newVersion;
+  }
+
+  // ==================== TEMPLATE NOTIFICATIONS ====================
+  async getUnreadNotifications(userId: string): Promise<TemplateNotification[]> {
+    return await db.select().from(templateNotifications)
+      .where(and(
+        eq(templateNotifications.userId, userId),
+        eq(templateNotifications.isRead, false)
+      ))
+      .orderBy(desc(templateNotifications.createdAt));
+  }
+
+  async createNotificationForTemplate(templateId: number, userIds: string[]): Promise<void> {
+    for (const userId of userIds) {
+      await db.insert(templateNotifications).values({
+        templateId,
+        userId,
+        isRead: false,
+      });
+    }
+  }
+
+  async markNotificationAsRead(notificationId: number): Promise<boolean> {
+    await db.update(templateNotifications)
+      .set({ isRead: true })
+      .where(eq(templateNotifications.id, notificationId));
+    return true;
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<boolean> {
+    await db.update(templateNotifications)
+      .set({ isRead: true })
+      .where(eq(templateNotifications.userId, userId));
     return true;
   }
 
@@ -537,6 +1138,69 @@ export class DatabaseStorage implements IStorage {
       pendingInvoices,
       averageRating: Math.round(averageRating * 10) / 10,
     };
+  }
+
+  // ==================== REMINDER SETTINGS ====================
+  async getReminderSettings(): Promise<ReminderSetting[]> {
+    return await db.select().from(reminderSettings).orderBy(reminderSettings.daysBefore);
+  }
+
+  async getReminderSetting(id: number): Promise<ReminderSetting | undefined> {
+    const [setting] = await db.select().from(reminderSettings).where(eq(reminderSettings.id, id));
+    return setting;
+  }
+
+  async createReminderSetting(setting: InsertReminderSetting): Promise<ReminderSetting> {
+    const [newSetting] = await db.insert(reminderSettings).values(setting).returning();
+    return newSetting;
+  }
+
+  async updateReminderSetting(id: number, data: Partial<ReminderSetting>): Promise<ReminderSetting | undefined> {
+    const [updated] = await db.update(reminderSettings)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(reminderSettings.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteReminderSetting(id: number): Promise<boolean> {
+    await db.delete(reminderSettings).where(eq(reminderSettings.id, id));
+    return true;
+  }
+
+  // ==================== REMINDERS ====================
+  async getReminders(): Promise<Reminder[]> {
+    return await db.select().from(reminders).orderBy(desc(reminders.scheduledDate));
+  }
+
+  async getRemindersByMission(missionId: number): Promise<Reminder[]> {
+    return await db.select().from(reminders)
+      .where(eq(reminders.missionId, missionId))
+      .orderBy(reminders.scheduledDate);
+  }
+
+  async getPendingReminders(): Promise<Reminder[]> {
+    return await db.select().from(reminders)
+      .where(eq(reminders.status, 'pending'))
+      .orderBy(reminders.scheduledDate);
+  }
+
+  async createReminder(reminder: InsertReminder): Promise<Reminder> {
+    const [newReminder] = await db.insert(reminders).values(reminder).returning();
+    return newReminder;
+  }
+
+  async updateReminder(id: number, data: Partial<Reminder>): Promise<Reminder | undefined> {
+    const [updated] = await db.update(reminders)
+      .set(data)
+      .where(eq(reminders.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteReminder(id: number): Promise<boolean> {
+    await db.delete(reminders).where(eq(reminders.id, id));
+    return true;
   }
 }
 

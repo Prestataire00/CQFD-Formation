@@ -1,0 +1,1094 @@
+import { useState } from "react";
+import { useParams, Link } from "wouter";
+import { Sidebar } from "@/components/Sidebar";
+import { Header } from "@/components/Header";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  ArrowLeft,
+  Calendar,
+  MapPin,
+  User,
+  Building2,
+  Clock,
+  Edit,
+  Plus,
+  Trash2,
+  BookOpen,
+  Users,
+  Save,
+  X,
+  CheckCircle2,
+  Circle,
+  AlertTriangle,
+  AlertCircle,
+  MinusCircle,
+  ListTodo,
+  MessageSquare,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  Square,
+  CheckSquare,
+  FileText,
+  Upload,
+  Download,
+  ExternalLink,
+  Info,
+} from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  useMission,
+  useUpdateMission,
+  useClients,
+  useTrainers,
+  usePrograms,
+  useMissionSessions,
+  useMissionParticipants,
+  useMissionSteps,
+  useCreateMissionStep,
+  useUpdateMissionStep,
+  useDeleteMissionStep,
+  useMissionDocuments,
+} from "@/hooks/use-missions";
+import { useUsers } from "@/hooks/use-users";
+import { useAuth } from "@/hooks/use-auth";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import type { MissionStatus, LocationType } from "@shared/schema";
+
+function getStatusBadge(status: MissionStatus) {
+  const styles: Record<MissionStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+    draft: { label: "Brouillon", variant: "outline" },
+    confirmed: { label: "Confirmee", variant: "secondary" },
+    in_progress: { label: "En cours", variant: "default" },
+    completed: { label: "Terminee", variant: "secondary" },
+    cancelled: { label: "Annulee", variant: "destructive" },
+  };
+  const { label, variant } = styles[status] || styles.draft;
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+function getTypologyBadge(typology: string) {
+  const colors: Record<string, string> = {
+    Intra: "bg-blue-100 text-blue-800",
+    Inter: "bg-green-100 text-green-800",
+    Conseil: "bg-purple-100 text-purple-800",
+    Conference: "bg-orange-100 text-orange-800",
+  };
+  return (
+    <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[typology] || "bg-gray-100 text-gray-800"}`}>
+      {typology}
+    </span>
+  );
+}
+
+// Configuration des statuts d'étapes avec couleurs et icônes
+type StepStatus = 'todo' | 'priority' | 'late' | 'done' | 'na';
+
+const stepStatusConfig: Record<StepStatus, {
+  label: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+  icon: React.ReactNode;
+}> = {
+  todo: {
+    label: "A faire",
+    color: "text-slate-600",
+    bgColor: "bg-slate-50",
+    borderColor: "border-slate-200",
+    icon: <Circle className="w-5 h-5 text-slate-400" />,
+  },
+  priority: {
+    label: "Prioritaire",
+    color: "text-amber-700",
+    bgColor: "bg-amber-50",
+    borderColor: "border-amber-300",
+    icon: <AlertTriangle className="w-5 h-5 text-amber-500" />,
+  },
+  late: {
+    label: "En retard",
+    color: "text-red-700",
+    bgColor: "bg-red-50",
+    borderColor: "border-red-300",
+    icon: <AlertCircle className="w-5 h-5 text-red-500" />,
+  },
+  done: {
+    label: "Termine",
+    color: "text-green-700",
+    bgColor: "bg-green-50",
+    borderColor: "border-green-300",
+    icon: <CheckCircle2 className="w-5 h-5 text-green-500" />,
+  },
+  na: {
+    label: "Sans objet",
+    color: "text-gray-500",
+    bgColor: "bg-gray-50",
+    borderColor: "border-gray-200",
+    icon: <MinusCircle className="w-5 h-5 text-gray-400" />,
+  },
+};
+
+// Fonction pour calculer le statut automatique basé sur la deadline
+function getAutoStatus(task: any): StepStatus {
+  if (task.isCompleted) return 'done';
+  if (task.status === 'na') return 'na';
+
+  if (!task.dueDate) return 'todo';
+
+  const now = new Date();
+  const dueDate = new Date(task.dueDate);
+  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return 'late'; // En retard
+  if (diffDays <= 3) return 'priority'; // Dans les 3 jours = prioritaire
+  return 'todo';
+}
+
+// Composant pour afficher une tache avec case a cocher, deadline et commentaire
+interface TaskItemProps {
+  task: any;
+  missionId: number;
+  isAdmin: boolean;
+  users: any[];
+  currentUserId: string;
+  onUpdate: (taskId: number, data: any) => void;
+  onDelete: (taskId: number) => void;
+}
+
+function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, onDelete }: TaskItemProps) {
+  const [isEditingComment, setIsEditingComment] = useState(false);
+  const [comment, setComment] = useState(task.comment || "");
+  const [isEditingDeadline, setIsEditingDeadline] = useState(false);
+  const [deadline, setDeadline] = useState(task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd") : "");
+  const [isEditingAssignee, setIsEditingAssignee] = useState(false);
+
+  // Calcul du statut automatique
+  const autoStatus = getAutoStatus(task);
+  const config = stepStatusConfig[autoStatus] || stepStatusConfig.todo;
+
+  // Trouver l'assigné et l'auteur du commentaire
+  const assignee = users?.find((u: any) => u.id === task.assigneeId);
+  const commentAuthor = users?.find((u: any) => u.id === task.commentAuthorId);
+
+  const handleToggleComplete = () => {
+    onUpdate(task.id, { isCompleted: !task.isCompleted });
+  };
+
+  const handleSaveComment = () => {
+    onUpdate(task.id, {
+      comment: comment || null,
+      commentAuthorId: comment ? currentUserId : null,
+    });
+    setIsEditingComment(false);
+  };
+
+  const handleSaveDeadline = () => {
+    onUpdate(task.id, { dueDate: deadline || null });
+    setIsEditingDeadline(false);
+  };
+
+  const handleSaveAssignee = (assigneeId: string) => {
+    onUpdate(task.id, { assigneeId: assigneeId || null });
+    setIsEditingAssignee(false);
+  };
+
+  const handleMarkNA = () => {
+    onUpdate(task.id, { status: task.status === 'na' ? 'todo' : 'na' });
+  };
+
+  return (
+    <div className={`rounded-xl border-2 ${config.borderColor} ${config.bgColor} overflow-hidden`}>
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          {/* Case a cocher */}
+          <button
+            onClick={handleToggleComplete}
+            className="mt-0.5 flex-shrink-0"
+            disabled={task.status === 'na'}
+          >
+            {task.isCompleted ? (
+              <CheckSquare className="w-5 h-5 text-green-600" />
+            ) : (
+              <Square className={`w-5 h-5 ${task.status === 'na' ? 'text-gray-300' : 'text-gray-400 hover:text-gray-600'}`} />
+            )}
+          </button>
+
+          {/* Contenu principal */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {config.icon}
+              <h4 className={`font-medium ${task.isCompleted ? 'line-through text-green-700' : config.color}`}>
+                {task.title}
+              </h4>
+            </div>
+
+            {/* Ligne d'infos: Assigné + Deadline */}
+            <div className="mt-2 flex flex-wrap items-center gap-4">
+              {/* Assigné */}
+              {isEditingAssignee ? (
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={task.assigneeId || "unassigned"}
+                    onValueChange={(value) => handleSaveAssignee(value === "unassigned" ? "" : value)}
+                  >
+                    <SelectTrigger className="w-40 h-8 text-sm">
+                      <SelectValue placeholder="Assigner a..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Non assigne</SelectItem>
+                      {users?.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.firstName} {u.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="ghost" onClick={() => setIsEditingAssignee(false)}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsEditingAssignee(true)}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <User className="w-4 h-4" />
+                  {assignee ? (
+                    <span className="font-medium text-foreground">{assignee.firstName}</span>
+                  ) : (
+                    <span className="italic">Assigner</span>
+                  )}
+                </button>
+              )}
+
+              {/* Deadline */}
+              {isEditingDeadline ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={deadline}
+                    onChange={(e) => setDeadline(e.target.value)}
+                    className="w-40 h-8 text-sm"
+                  />
+                  <Button size="sm" variant="outline" onClick={handleSaveDeadline}>
+                    <Check className="w-3 h-3" />
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsEditingDeadline(false)}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setIsEditingDeadline(true)}
+                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  <Calendar className="w-4 h-4" />
+                  {task.dueDate ? (
+                    <span className={autoStatus === 'late' ? 'text-red-600 font-medium' : ''}>
+                      {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
+                    </span>
+                  ) : (
+                    <span className="italic">Deadline</span>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Commentaire */}
+            {task.comment && !isEditingComment && (
+              <div className="mt-3 bg-white/50 p-3 rounded-lg border border-gray-100">
+                <p className="text-sm text-gray-700">{task.comment}</p>
+                {commentAuthor && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    — {commentAuthor.firstName} {commentAuthor.lastName}
+                    {task.commentUpdatedAt && (
+                      <span className="ml-1">
+                        le {format(new Date(task.commentUpdatedAt), "d MMM yyyy", { locale: fr })}
+                      </span>
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+            {isEditingComment && (
+              <div className="mt-3 space-y-2">
+                <Textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Ajouter un commentaire..."
+                  className="text-sm"
+                  rows={2}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setIsEditingComment(false)}>
+                    Annuler
+                  </Button>
+                  <Button size="sm" onClick={handleSaveComment}>
+                    Enregistrer
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsEditingComment(!isEditingComment)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-white/50"
+              title="Commentaire"
+            >
+              <MessageSquare className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleMarkNA}
+              className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Marquer sans objet"
+            >
+              <MinusCircle className="w-4 h-4" />
+            </button>
+            {isAdmin && (
+              <button
+                onClick={() => onDelete(task.id)}
+                className="p-1.5 text-gray-400 hover:text-red-500 rounded hover:bg-white/50"
+                title="Supprimer"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function MissionDetail() {
+  const params = useParams<{ id: string }>();
+  const missionId = parseInt(params.id || "0");
+
+  const { user } = useAuth();
+  const { data: mission, isLoading } = useMission(missionId);
+  const { data: clients } = useClients();
+  const { data: trainers } = useTrainers();
+  const { data: programs } = usePrograms();
+  const { data: sessions } = useMissionSessions(missionId);
+  const { data: missionParticipants } = useMissionParticipants(missionId);
+  const { data: steps } = useMissionSteps(missionId);
+  const { data: documents } = useMissionDocuments(missionId);
+  const { data: allUsers } = useUsers();
+  const updateMission = useUpdateMission();
+  const createStep = useCreateMissionStep();
+  const updateStep = useUpdateMissionStep();
+  const deleteStep = useDeleteMissionStep();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isAddingStep, setIsAddingStep] = useState(false);
+  const [newStepTitle, setNewStepTitle] = useState("");
+  const [editForm, setEditForm] = useState({
+    title: "",
+    reference: "",
+    description: "",
+    clientId: "",
+    trainerId: "",
+    programId: "",
+    typology: "",
+    startDate: "",
+    endDate: "",
+    locationType: "",
+    location: "",
+    status: "",
+  });
+
+  const isAdmin = user?.role === "admin";
+
+  // Get related data
+  const client = clients?.find((c: any) => c.id === mission?.clientId);
+  const trainer = trainers?.find((t: any) => t.id === mission?.trainerId);
+  const program = programs?.find((p: any) => p.id === mission?.programId);
+
+  const startEdit = () => {
+    if (mission) {
+      setEditForm({
+        title: mission.title || "",
+        reference: mission.reference || "",
+        description: mission.description || "",
+        clientId: mission.clientId?.toString() || "",
+        trainerId: mission.trainerId || "",
+        programId: mission.programId?.toString() || "",
+        typology: mission.typology || "",
+        startDate: mission.startDate ? format(new Date(mission.startDate), "yyyy-MM-dd") : "",
+        endDate: mission.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : "",
+        locationType: mission.locationType || "presentiel",
+        location: mission.location || "",
+        status: mission.status || "draft",
+      });
+      setIsEditing(true);
+    }
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const saveChanges = async () => {
+    try {
+      await updateMission.mutateAsync({
+        id: missionId,
+        data: {
+          title: editForm.title,
+          reference: editForm.reference || null,
+          description: editForm.description || null,
+          clientId: editForm.clientId ? parseInt(editForm.clientId) : null,
+          trainerId: editForm.trainerId || null,
+          programId: editForm.programId ? parseInt(editForm.programId) : null,
+          typology: editForm.typology,
+          startDate: editForm.startDate,
+          endDate: editForm.endDate,
+          locationType: editForm.locationType,
+          location: editForm.location || null,
+          status: editForm.status,
+        } as any,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to update mission:", error);
+    }
+  };
+
+  // Gestion des étapes
+  const handleAddStep = async () => {
+    if (!newStepTitle.trim()) return;
+    try {
+      const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      await createStep.mutateAsync({
+        missionId,
+        data: {
+          title: newStepTitle.trim(),
+          status: "todo",
+          order: maxOrder + 1,
+        },
+      });
+      setNewStepTitle("");
+      setIsAddingStep(false);
+    } catch (error) {
+      console.error("Failed to create step:", error);
+    }
+  };
+
+  const handleUpdateStepStatus = async (stepId: number, newStatus: StepStatus) => {
+    try {
+      await updateStep.mutateAsync({
+        missionId,
+        stepId,
+        data: { status: newStatus },
+      });
+    } catch (error) {
+      console.error("Failed to update step:", error);
+    }
+  };
+
+  const handleDeleteStep = async (stepId: number) => {
+    try {
+      await deleteStep.mutateAsync({ missionId, stepId });
+    } catch (error) {
+      console.error("Failed to delete step:", error);
+    }
+  };
+
+  const handleUpdateTask = async (taskId: number, data: any) => {
+    try {
+      await updateStep.mutateAsync({
+        missionId,
+        stepId: taskId,
+        data,
+      });
+    } catch (error) {
+      console.error("Failed to update task:", error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex">
+        <Sidebar />
+        <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+          <Header title="Detail Mission" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!mission) {
+    return (
+      <div className="min-h-screen bg-background flex">
+        <Sidebar />
+        <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+          <Header title="Mission non trouvee" />
+          <div className="flex-1 p-6">
+            <Link href="/missions">
+              <Button variant="ghost">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour aux missions
+              </Button>
+            </Link>
+            <div className="mt-8 text-center text-muted-foreground">
+              Cette mission n'existe pas ou a ete supprimee.
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      <Sidebar />
+      <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
+        <Header title="Detail Mission" />
+
+        <div className="flex-1 p-6 space-y-6">
+          {/* Back button and actions */}
+          <div className="flex items-center justify-between">
+            <Link href="/missions">
+              <Button variant="ghost">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour aux missions
+              </Button>
+            </Link>
+            {isAdmin && !isEditing && (
+              <Button onClick={startEdit}>
+                <Edit className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            )}
+            {isEditing && (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={cancelEdit}>
+                  <X className="w-4 h-4 mr-2" />
+                  Annuler
+                </Button>
+                <Button onClick={saveChanges} disabled={updateMission.isPending}>
+                  <Save className="w-4 h-4 mr-2" />
+                  {updateMission.isPending ? "Enregistrement..." : "Enregistrer"}
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Mission header */}
+          <div className="bg-card rounded-xl border border-border p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <Input
+                      value={editForm.reference}
+                      onChange={(e) => setEditForm({ ...editForm, reference: e.target.value })}
+                      placeholder="Reference"
+                      className="font-mono text-sm w-48"
+                    />
+                    <Input
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      placeholder="Titre de la mission"
+                      className="text-2xl font-bold"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {mission.reference && (
+                      <p className="text-sm text-muted-foreground font-mono mb-1">
+                        {mission.reference}
+                      </p>
+                    )}
+                    <h1 className="text-2xl font-bold">{mission.title}</h1>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {isEditing ? (
+                  <Select
+                    value={editForm.status}
+                    onValueChange={(value) => setEditForm({ ...editForm, status: value })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Brouillon</SelectItem>
+                      <SelectItem value="confirmed">Confirmee</SelectItem>
+                      <SelectItem value="in_progress">En cours</SelectItem>
+                      <SelectItem value="completed">Terminee</SelectItem>
+                      <SelectItem value="cancelled">Annulee</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  getStatusBadge(mission.status as MissionStatus)
+                )}
+              </div>
+            </div>
+
+            {isEditing ? (
+              <Select
+                value={editForm.typology}
+                onValueChange={(value) => setEditForm({ ...editForm, typology: value })}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Typologie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Intra">Intra</SelectItem>
+                  <SelectItem value="Inter">Inter</SelectItem>
+                  <SelectItem value="Conseil">Conseil</SelectItem>
+                  <SelectItem value="Conference">Conference</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              mission.typology && getTypologyBadge(mission.typology)
+            )}
+          </div>
+
+          {/* Taches de la mission - Section principale */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <ListTodo className="w-5 h-5" />
+                    Taches
+                  </CardTitle>
+                  <CardDescription>
+                    Liste des taches avec deadline et suivi automatique des statuts
+                  </CardDescription>
+                </div>
+                {isAdmin && (
+                  <div>
+                    {isAddingStep ? (
+                      <div className="flex gap-2">
+                        <Input
+                          value={newStepTitle}
+                          onChange={(e) => setNewStepTitle(e.target.value)}
+                          placeholder="Titre de la tache..."
+                          className="w-64"
+                          onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
+                        />
+                        <Button size="sm" onClick={handleAddStep} disabled={createStep.isPending}>
+                          Ajouter
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setIsAddingStep(false)}>
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => setIsAddingStep(true)}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Ajouter une tache
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {/* Resume des statuts (calcule automatiquement) */}
+              {steps && steps.length > 0 && (
+                <div className="mb-4 p-3 bg-muted/30 rounded-lg">
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                      <span>{steps.filter((s: any) => getAutoStatus(s) === 'todo').length} A faire</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                      <span>{steps.filter((s: any) => getAutoStatus(s) === 'priority').length} Prioritaire</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span>{steps.filter((s: any) => getAutoStatus(s) === 'late').length} En retard</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span>{steps.filter((s: any) => getAutoStatus(s) === 'done').length} Termine</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                      <span>{steps.filter((s: any) => getAutoStatus(s) === 'na').length} Sans objet</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {steps && steps.length > 0 ? (
+                <div className="space-y-4">
+                  {steps.map((task: any) => (
+                    <TaskItem
+                      key={task.id}
+                      task={task}
+                      missionId={missionId}
+                      isAdmin={isAdmin}
+                      users={allUsers || []}
+                      currentUserId={user?.id || ""}
+                      onUpdate={(taskId, data) => handleUpdateTask(taskId, data)}
+                      onDelete={handleDeleteStep}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">
+                  Aucune tache definie. Ajoutez des taches pour suivre l'avancement de la mission.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Main content grid */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Client */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="w-4 h-4" />
+                  Client
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isEditing ? (
+                  <Select
+                    value={editForm.clientId}
+                    onValueChange={(value) => setEditForm({ ...editForm, clientId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectionner un client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients?.map((c: any) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="font-medium">{client?.name || "Non defini"}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Formation */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  Formation (catalogue)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isEditing ? (
+                  <Select
+                    value={editForm.programId}
+                    onValueChange={(value) => setEditForm({ ...editForm, programId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectionner une formation" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {programs?.map((p: any) => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          {p.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="font-medium">{program?.title || "Non defini"}</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Formateur */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  Formateur assigne
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isEditing ? (
+                  <Select
+                    value={editForm.trainerId}
+                    onValueChange={(value) => setEditForm({ ...editForm, trainerId: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selectionner un formateur" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trainers?.map((t: any) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.firstName} {t.lastName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="font-medium">
+                    {trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigne"}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Dates */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="w-4 h-4" />
+                  Dates
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isEditing ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">Debut</Label>
+                      <Input
+                        type="date"
+                        value={editForm.startDate}
+                        onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Fin</Label>
+                      <Input
+                        type="date"
+                        value={editForm.endDate}
+                        onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="font-medium">
+                    {mission.startDate
+                      ? format(new Date(mission.startDate), "d MMMM yyyy", { locale: fr })
+                      : "Non defini"}
+                    {mission.endDate && mission.startDate !== mission.endDate && (
+                      <> - {format(new Date(mission.endDate), "d MMMM yyyy", { locale: fr })}</>
+                    )}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Lieu et Modalite */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Lieu et Modalite
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {isEditing ? (
+                  <>
+                    <div>
+                      <Label className="text-xs">Modalite</Label>
+                      <Select
+                        value={editForm.locationType}
+                        onValueChange={(value) => setEditForm({ ...editForm, locationType: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="presentiel">Presentiel</SelectItem>
+                          <SelectItem value="distanciel">Distanciel</SelectItem>
+                          <SelectItem value="hybride">Hybride</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editForm.locationType !== "distanciel" && (
+                      <div>
+                        <Label className="text-xs">Adresse</Label>
+                        <Input
+                          value={editForm.location}
+                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                          placeholder="Adresse du lieu"
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Badge variant="outline">
+                      {mission.locationType === "presentiel" && "Presentiel"}
+                      {mission.locationType === "distanciel" && "Distanciel"}
+                      {mission.locationType === "hybride" && "Hybride"}
+                    </Badge>
+                    {mission.location && (
+                      <p className="text-sm text-muted-foreground">{mission.location}</p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Heures totales */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Duree
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="font-medium">
+                  {mission.totalHours ? `${mission.totalHours} heures` : "Non defini"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sessions (dates non consecutives) */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5" />
+                    Sessions de formation
+                  </CardTitle>
+                  <CardDescription>
+                    Dates de sessions (peuvent etre non consecutives)
+                  </CardDescription>
+                </div>
+                {isAdmin && (
+                  <Button variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter une session
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {sessions && sessions.length > 0 ? (
+                <div className="space-y-2">
+                  {sessions.map((session: any) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium">
+                          {format(new Date(session.sessionDate), "EEEE d MMMM yyyy", { locale: fr })}
+                        </span>
+                        {session.startTime && session.endTime && (
+                          <span className="text-sm text-muted-foreground">
+                            {session.startTime} - {session.endTime}
+                          </span>
+                        )}
+                        {session.location && (
+                          <span className="text-sm text-muted-foreground flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            {session.location}
+                          </span>
+                        )}
+                      </div>
+                      {isAdmin && (
+                        <Button variant="ghost" size="sm">
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Aucune session definie. Les dates de debut et fin servent de reference.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Participants */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    Participants
+                  </CardTitle>
+                  <CardDescription>
+                    {missionParticipants?.length || 0} participant(s) inscrit(s)
+                  </CardDescription>
+                </div>
+                {isAdmin && (
+                  <Button variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter un participant
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {missionParticipants && missionParticipants.length > 0 ? (
+                <div className="space-y-2">
+                  {missionParticipants.map((mp: any) => (
+                    <div
+                      key={mp.id}
+                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                    >
+                      <div className="flex items-center gap-4">
+                        <User className="w-4 h-4 text-muted-foreground" />
+                        <div>
+                          <span className="font-medium">
+                            {mp.participant?.firstName} {mp.participant?.lastName}
+                          </span>
+                          <span className="text-sm text-muted-foreground ml-2">
+                            {mp.participant?.email}
+                          </span>
+                        </div>
+                      </div>
+                      <Badge variant="outline">{mp.status || "inscrit"}</Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  Aucun participant inscrit pour cette mission.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    </div>
+  );
+}

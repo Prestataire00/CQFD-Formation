@@ -41,15 +41,15 @@ import { fr } from "date-fns/locale";
 import type { Mission, MissionStatus, LocationType } from "@shared/schema";
 
 function getStatusBadge(status: MissionStatus) {
-  const styles: Record<MissionStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    draft: { label: "Brouillon", variant: "outline" },
-    confirmed: { label: "Confirmee", variant: "secondary" },
-    in_progress: { label: "En cours", variant: "default" },
-    completed: { label: "Terminee", variant: "secondary" },
-    cancelled: { label: "Annulee", variant: "destructive" },
+  const styles: Record<MissionStatus, { label: string; className: string }> = {
+    draft: { label: "Brouillon", className: "bg-slate-100 text-slate-600 border border-slate-300" },
+    confirmed: { label: "Confirmée", className: "bg-blue-100 text-blue-700 border border-blue-300" },
+    in_progress: { label: "En cours", className: "bg-orange-100 text-orange-700 border border-orange-300" },
+    completed: { label: "Terminée", className: "bg-green-100 text-green-700 border border-green-300" },
+    cancelled: { label: "Annulée", className: "bg-red-100 text-red-700 border border-red-300" },
   };
-  const { label, variant } = styles[status] || styles.draft;
-  return <Badge variant={variant}>{label}</Badge>;
+  const { label, className } = styles[status] || styles.draft;
+  return <Badge className={className}>{label}</Badge>;
 }
 
 function getLocationBadge(type: LocationType) {
@@ -88,8 +88,8 @@ export default function Missions() {
     startDate: "",
     endDate: "",
     locationType: "presentiel" as LocationType,
-    locationAddress: "",
-    locationCity: "",
+    location: "",
+    typology: "Intra" as string,
   });
 
   const isAdmin = user?.role === "admin";
@@ -98,30 +98,39 @@ export default function Missions() {
   const filteredMissions = missions?.filter((mission: Mission) => {
     const matchesSearch =
       mission.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mission.reference.toLowerCase().includes(searchTerm.toLowerCase());
+      (mission.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === "all" || mission.status === statusFilter;
     return matchesSearch && matchesStatus;
   }) || [];
 
   const handleCreateMission = async () => {
-    if (!newMission.title || !newMission.clientId || !newMission.startDate || !newMission.endDate) {
+    if (!newMission.title || !newMission.clientId || !newMission.startDate || !newMission.endDate || !newMission.typology) {
+      console.error("Champs requis manquants:", {
+        title: newMission.title,
+        clientId: newMission.clientId,
+        startDate: newMission.startDate,
+        endDate: newMission.endDate,
+        typology: newMission.typology
+      });
       return;
     }
 
     try {
-      await createMission.mutateAsync({
+      const missionData = {
         reference: newMission.reference || `MIS-${Date.now()}`,
         title: newMission.title,
         clientId: parseInt(newMission.clientId),
-        trainerId: newMission.trainerId || undefined,
-        programId: newMission.programId ? parseInt(newMission.programId) : undefined,
-        startDate: new Date(newMission.startDate),
-        endDate: new Date(newMission.endDate),
+        trainerId: newMission.trainerId || null,
+        programId: newMission.programId ? parseInt(newMission.programId) : null,
+        startDate: newMission.startDate,
+        endDate: newMission.endDate,
         locationType: newMission.locationType,
-        locationAddress: newMission.locationAddress || undefined,
-        locationCity: newMission.locationCity || undefined,
+        location: newMission.location || null,
+        typology: newMission.typology,
         status: "draft",
-      });
+      };
+      console.log("Creating mission with data:", missionData);
+      await createMission.mutateAsync(missionData as any);
       setIsCreateOpen(false);
       setNewMission({
         reference: "",
@@ -132,8 +141,8 @@ export default function Missions() {
         startDate: "",
         endDate: "",
         locationType: "presentiel",
-        locationAddress: "",
-        locationCity: "",
+        location: "",
+        typology: "Intra",
       });
     } catch (error) {
       console.error("Failed to create mission:", error);
@@ -251,13 +260,13 @@ export default function Missions() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="program">Programme</Label>
+                        <Label htmlFor="program">Formation (catalogue) *</Label>
                         <Select
                           value={newMission.programId}
                           onValueChange={(value) => setNewMission({ ...newMission, programId: value })}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Selectionner un programme" />
+                            <SelectValue placeholder="Selectionner une formation" />
                           </SelectTrigger>
                           <SelectContent>
                             {programs?.map((program: any) => (
@@ -268,6 +277,25 @@ export default function Missions() {
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="typology">Typologie *</Label>
+                        <Select
+                          value={newMission.typology}
+                          onValueChange={(value) => setNewMission({ ...newMission, typology: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selectionner une typologie" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Intra">Intra</SelectItem>
+                            <SelectItem value="Inter">Inter</SelectItem>
+                            <SelectItem value="Conseil">Conseil</SelectItem>
+                            <SelectItem value="Conference">Conference</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="locationType">Modalite</Label>
                         <Select
@@ -308,21 +336,12 @@ export default function Missions() {
                     {newMission.locationType !== "distanciel" && (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="locationAddress">Adresse</Label>
+                          <Label htmlFor="location">Lieu</Label>
                           <Input
-                            id="locationAddress"
-                            placeholder="15 rue de la Formation"
-                            value={newMission.locationAddress}
-                            onChange={(e) => setNewMission({ ...newMission, locationAddress: e.target.value })}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="locationCity">Ville</Label>
-                          <Input
-                            id="locationCity"
-                            placeholder="Paris"
-                            value={newMission.locationCity}
-                            onChange={(e) => setNewMission({ ...newMission, locationCity: e.target.value })}
+                            id="location"
+                            placeholder="15 rue de la Formation, Paris"
+                            value={newMission.location}
+                            onChange={(e) => setNewMission({ ...newMission, location: e.target.value })}
                           />
                         </div>
                       </div>
@@ -363,31 +382,60 @@ export default function Missions() {
                   <div className="group bg-card rounded-xl border border-border p-5 hover:border-primary/50 hover:shadow-lg transition-all duration-200 cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="text-xs text-muted-foreground font-mono">
-                          {mission.reference}
-                        </p>
+                        {mission.reference && (
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {mission.reference}
+                          </p>
+                        )}
                         <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-1">
                           {mission.title}
                         </h3>
                       </div>
-                      {getStatusBadge(mission.status)}
+                      {getStatusBadge(mission.status as MissionStatus)}
                     </div>
 
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Calendar className="w-4 h-4" />
-                        <span>
-                          {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                          {mission.endDate && mission.startDate !== mission.endDate && (
-                            <> - {format(new Date(mission.endDate), "d MMM yyyy", { locale: fr })}</>
-                          )}
-                        </span>
-                      </div>
+                      {mission.typology && (
+                        <Badge variant="outline" className="mb-2">
+                          {mission.typology}
+                        </Badge>
+                      )}
 
-                      {mission.locationCity && (
+                      {mission.clientId && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Building2 className="w-4 h-4" />
+                          <span>{clients?.find((c: any) => c.id === mission.clientId)?.name || "Client"}</span>
+                        </div>
+                      )}
+
+                      {mission.trainerId && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <User className="w-4 h-4" />
+                          <span>
+                            {(() => {
+                              const trainer = trainers?.find((t: any) => t.id === mission.trainerId);
+                              return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Formateur";
+                            })()}
+                          </span>
+                        </div>
+                      )}
+
+                      {mission.startDate && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Calendar className="w-4 h-4" />
+                          <span>
+                            {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
+                            {mission.endDate && mission.startDate !== mission.endDate && (
+                              <> - {format(new Date(mission.endDate), "d MMM yyyy", { locale: fr })}</>
+                            )}
+                          </span>
+                        </div>
+                      )}
+
+                      {mission.location && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <MapPin className="w-4 h-4" />
-                          <span>{mission.locationCity}</span>
+                          <span>{mission.location}</span>
                         </div>
                       )}
 
@@ -400,7 +448,7 @@ export default function Missions() {
                     </div>
 
                     <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                      {getLocationBadge(mission.locationType)}
+                      {mission.locationType && getLocationBadge(mission.locationType as LocationType)}
                       <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
                         <Eye className="w-4 h-4 mr-1" />
                         Voir

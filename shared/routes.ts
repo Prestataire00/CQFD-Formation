@@ -3,6 +3,8 @@ import {
   insertClientSchema,
   insertTrainingProgramSchema,
   insertMissionSchema,
+  insertMissionStepSchema,
+  insertStepTaskSchema,
   insertMissionSessionSchema,
   insertParticipantSchema,
   insertMissionParticipantSchema,
@@ -13,9 +15,13 @@ import {
   insertMessageSchema,
   insertProjectSchema,
   insertTaskSchema,
+  insertReminderSettingSchema,
+  insertReminderSchema,
   clients,
   trainingPrograms,
   missions,
+  missionSteps,
+  stepTasks,
   missionSessions,
   participants,
   missionParticipants,
@@ -26,8 +32,15 @@ import {
   messages,
   projects,
   tasks,
+  reminderSettings,
+  reminders,
   users,
+  type InsertProject,
+  type InsertTask,
 } from './schema';
+
+// Re-export types for client use
+export type { InsertProject, InsertTask };
 
 export const errorSchemas = {
   validation: z.object({
@@ -294,6 +307,90 @@ export const api = {
       responses: {
         200: z.custom<typeof missions.$inferSelect>(),
         404: errorSchemas.notFound,
+      },
+    },
+    // Mission Steps (étapes chronologiques)
+    steps: {
+      list: {
+        method: 'GET' as const,
+        path: '/api/missions/:id/steps',
+        responses: {
+          200: z.array(z.custom<typeof missionSteps.$inferSelect>()),
+        },
+      },
+      create: {
+        method: 'POST' as const,
+        path: '/api/missions/:id/steps',
+        input: insertMissionStepSchema.omit({ missionId: true }),
+        responses: {
+          201: z.custom<typeof missionSteps.$inferSelect>(),
+          400: errorSchemas.validation,
+        },
+      },
+      update: {
+        method: 'PUT' as const,
+        path: '/api/missions/:missionId/steps/:stepId',
+        input: z.object({
+          title: z.string().optional(),
+          status: z.enum(['todo', 'priority', 'late', 'done', 'na']).optional(),
+          isCompleted: z.boolean().optional(),
+          order: z.number().optional(),
+          dueDate: z.string().nullable().optional(),
+          assigneeId: z.string().nullable().optional(),
+          comment: z.string().nullable().optional(),
+          commentAuthorId: z.string().nullable().optional(),
+        }),
+        responses: {
+          200: z.custom<typeof missionSteps.$inferSelect>(),
+          404: errorSchemas.notFound,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/missions/:missionId/steps/:stepId',
+        responses: {
+          200: z.object({ success: z.boolean() }),
+        },
+      },
+      // Step Tasks (taches des etapes)
+      tasks: {
+        list: {
+          method: 'GET' as const,
+          path: '/api/steps/:stepId/tasks',
+          responses: {
+            200: z.array(z.custom<typeof stepTasks.$inferSelect>()),
+          },
+        },
+        create: {
+          method: 'POST' as const,
+          path: '/api/steps/:stepId/tasks',
+          input: insertStepTaskSchema.omit({ stepId: true }),
+          responses: {
+            201: z.custom<typeof stepTasks.$inferSelect>(),
+            400: errorSchemas.validation,
+          },
+        },
+        update: {
+          method: 'PUT' as const,
+          path: '/api/steps/:stepId/tasks/:taskId',
+          input: z.object({
+            title: z.string().optional(),
+            isCompleted: z.boolean().optional(),
+            comment: z.string().nullable().optional(),
+            order: z.number().optional(),
+          }),
+          responses: {
+            200: z.custom<typeof stepTasks.$inferSelect>(),
+            404: errorSchemas.notFound,
+          },
+        },
+        delete: {
+          method: 'DELETE' as const,
+          path: '/api/steps/:stepId/tasks/:taskId',
+          responses: {
+            200: z.object({ success: z.boolean() }),
+          },
+        },
       },
     },
     // Mission Sessions
@@ -638,6 +735,155 @@ export const api = {
       responses: {
         201: z.custom<typeof tasks.$inferSelect>(),
         400: errorSchemas.validation,
+      },
+    },
+  },
+
+  // ==================== REMINDER SETTINGS ====================
+  reminderSettings: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/reminder-settings',
+      responses: {
+        200: z.array(z.custom<typeof reminderSettings.$inferSelect>()),
+      },
+    },
+    get: {
+      method: 'GET' as const,
+      path: '/api/reminder-settings/:id',
+      responses: {
+        200: z.custom<typeof reminderSettings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/reminder-settings',
+      input: z.object({
+        name: z.string().min(1),
+        reminderType: z.enum(['mission_start', 'task_deadline', 'admin_summary']),
+        daysBefore: z.number().min(0),
+        isActive: z.boolean().optional(),
+        emailSubject: z.string().optional(),
+        emailTemplate: z.string().optional(),
+        notifyAdmin: z.boolean().optional(),
+        notifyTrainer: z.boolean().optional(),
+        notifyClient: z.boolean().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof reminderSettings.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/reminder-settings/:id',
+      input: z.object({
+        name: z.string().optional(),
+        reminderType: z.enum(['mission_start', 'task_deadline', 'admin_summary']).optional(),
+        daysBefore: z.number().min(0).optional(),
+        isActive: z.boolean().optional(),
+        emailSubject: z.string().nullable().optional(),
+        emailTemplate: z.string().nullable().optional(),
+        notifyAdmin: z.boolean().optional(),
+        notifyTrainer: z.boolean().optional(),
+        notifyClient: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof reminderSettings.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/reminder-settings/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+  },
+
+  // ==================== REMINDERS ====================
+  reminders: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/reminders',
+      responses: {
+        200: z.array(z.custom<typeof reminders.$inferSelect>()),
+      },
+    },
+    pending: {
+      method: 'GET' as const,
+      path: '/api/reminders/pending',
+      responses: {
+        200: z.array(z.custom<typeof reminders.$inferSelect>()),
+      },
+    },
+    byMission: {
+      method: 'GET' as const,
+      path: '/api/missions/:id/reminders',
+      responses: {
+        200: z.array(z.custom<typeof reminders.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/reminders',
+      input: z.object({
+        settingId: z.number().optional(),
+        missionId: z.number().optional(),
+        taskId: z.number().optional(),
+        scheduledDate: z.string(),
+        recipientType: z.enum(['admin', 'trainer', 'client']),
+        recipientEmail: z.string().optional(),
+        recipientName: z.string().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof reminders.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/reminders/:id',
+      input: z.object({
+        scheduledDate: z.string().optional(),
+        status: z.enum(['pending', 'sent', 'failed', 'cancelled']).optional(),
+        sentAt: z.string().nullable().optional(),
+        errorMessage: z.string().nullable().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof reminders.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/reminders/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+    // Process pending reminders (cron endpoint)
+    process: {
+      method: 'POST' as const,
+      path: '/api/reminders/process',
+      responses: {
+        200: z.object({
+          processed: z.number(),
+          sent: z.number(),
+          failed: z.number(),
+        }),
+      },
+    },
+    // Generate reminders for a mission
+    generateForMission: {
+      method: 'POST' as const,
+      path: '/api/missions/:id/generate-reminders',
+      responses: {
+        200: z.object({
+          created: z.number(),
+        }),
       },
     },
   },

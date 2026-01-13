@@ -53,7 +53,11 @@ export function useCreateMission() {
         credentials: 'include',
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create mission");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("Server error:", errorData);
+        throw new Error(errorData.message || "Failed to create mission");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -140,6 +144,292 @@ export function useAddParticipantToMission() {
   });
 }
 
+// Mission Trainers (multi-trainers support)
+export function useMissionTrainers(missionId: number) {
+  return useQuery({
+    queryKey: ['mission-trainers', missionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/missions/${missionId}/trainers`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch mission trainers");
+      return res.json();
+    },
+    enabled: !!missionId,
+  });
+}
+
+export function useAddTrainerToMission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, trainerId, isPrimary }: { missionId: number; trainerId: string; isPrimary?: boolean }) => {
+      const res = await fetch(`/api/missions/${missionId}/trainers`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ trainerId, isPrimary }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to add trainer");
+      }
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mission-trainers', missionId] });
+    },
+  });
+}
+
+export function useRemoveTrainerFromMission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, trainerId }: { missionId: number; trainerId: string }) => {
+      const res = await fetch(`/api/missions/${missionId}/trainers/${trainerId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to remove trainer");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mission-trainers', missionId] });
+    },
+  });
+}
+
+export function useSetMissionPrimaryTrainer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, trainerId }: { missionId: number; trainerId: string }) => {
+      const res = await fetch(`/api/missions/${missionId}/trainers/${trainerId}/primary`, {
+        method: 'PATCH',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to set primary trainer");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mission-trainers', missionId] });
+    },
+  });
+}
+
+// ==========================================
+// Multi-Trainer Duplication
+// ==========================================
+export function useDuplicateMissionMulti() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, trainerIds }: { missionId: number; trainerIds: string[] }) => {
+      const res = await fetch(`/api/missions/${missionId}/duplicate-multi`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ trainerIds }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to duplicate mission");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
+    },
+  });
+}
+
+export function useChildMissions(parentMissionId: number) {
+  return useQuery({
+    queryKey: ['mission-children', parentMissionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/missions/${parentMissionId}/children`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch child missions");
+      return res.json();
+    },
+    enabled: !!parentMissionId,
+  });
+}
+
+export function useParentMission(missionId: number, hasParent: boolean) {
+  return useQuery({
+    queryKey: ['mission-parent', missionId],
+    queryFn: async () => {
+      const res = await fetch(`/api/missions/${missionId}/parent`, { credentials: 'include' });
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error("Failed to fetch parent mission");
+      }
+      return res.json();
+    },
+    enabled: !!missionId && hasParent,
+  });
+}
+
+export function useSyncMissionChildren() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, fields }: { missionId: number; fields?: string[] }) => {
+      const res = await fetch(`/api/missions/${missionId}/sync-children`, {
+        method: 'PATCH',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ fields }),
+      });
+      if (!res.ok) throw new Error("Failed to sync missions");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mission-children', missionId] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+    },
+  });
+}
+
+// Mission Steps (étapes chronologiques)
+export function useMissionSteps(missionId: number) {
+  return useQuery({
+    queryKey: [api.missions.steps.list.path, missionId],
+    queryFn: async () => {
+      const url = buildUrl(api.missions.steps.list.path, { id: missionId });
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch mission steps");
+      return res.json();
+    },
+    enabled: !!missionId,
+  });
+}
+
+export function useCreateMissionStep() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null } }) => {
+      const url = buildUrl(api.missions.steps.create.path, { id: missionId });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create step");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.list.path, missionId] });
+    },
+  });
+}
+
+export function useUpdateMissionStep() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, stepId, data }: { missionId: number; stepId: number; data: { title?: string; status?: string; order?: number; dueDate?: string | null } }) => {
+      const url = buildUrl(api.missions.steps.update.path, { missionId, stepId });
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update step");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.list.path, missionId] });
+    },
+  });
+}
+
+export function useDeleteMissionStep() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, stepId }: { missionId: number; stepId: number }) => {
+      const url = buildUrl(api.missions.steps.delete.path, { missionId, stepId });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to delete step");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.list.path, missionId] });
+    },
+  });
+}
+
+// Step Tasks (taches des etapes)
+export function useStepTasks(stepId: number) {
+  return useQuery({
+    queryKey: [api.missions.steps.tasks.list.path, stepId],
+    queryFn: async () => {
+      const url = buildUrl(api.missions.steps.tasks.list.path, { stepId });
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch step tasks");
+      return res.json();
+    },
+    enabled: !!stepId,
+  });
+}
+
+export function useCreateStepTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stepId, data }: { stepId: number; data: { title: string; order: number; comment?: string | null } }) => {
+      const url = buildUrl(api.missions.steps.tasks.create.path, { stepId });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create task");
+      return res.json();
+    },
+    onSuccess: (_, { stepId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.tasks.list.path, stepId] });
+    },
+  });
+}
+
+export function useUpdateStepTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stepId, taskId, data }: { stepId: number; taskId: number; data: { title?: string; isCompleted?: boolean; comment?: string | null; order?: number } }) => {
+      const url = buildUrl(api.missions.steps.tasks.update.path, { stepId, taskId });
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update task");
+      return res.json();
+    },
+    onSuccess: (_, { stepId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.tasks.list.path, stepId] });
+    },
+  });
+}
+
+export function useDeleteStepTask() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ stepId, taskId }: { stepId: number; taskId: number }) => {
+      const url = buildUrl(api.missions.steps.tasks.delete.path, { stepId, taskId });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to delete task");
+      return res.json();
+    },
+    onSuccess: (_, { stepId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.tasks.list.path, stepId] });
+    },
+  });
+}
+
 // Mission Sessions
 export function useMissionSessions(missionId: number) {
   return useQuery({
@@ -165,6 +455,105 @@ export function useMissionAttendance(missionId: number) {
       return res.json();
     },
     enabled: !!missionId,
+  });
+}
+
+// Mission Documents
+export function useMissionDocuments(missionId: number) {
+  return useQuery({
+    queryKey: [api.missions.documents.list.path, missionId],
+    queryFn: async () => {
+      const url = buildUrl(api.missions.documents.list.path, { id: missionId });
+      const res = await fetch(url, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch mission documents");
+      return res.json();
+    },
+    enabled: !!missionId,
+  });
+}
+
+export function useCreateDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, data }: { missionId: number; data: any }) => {
+      const res = await fetch(api.documents.create.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ ...data, missionId }),
+      });
+      if (!res.ok) throw new Error("Failed to create document");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [api.missions.documents.list.path, variables.missionId]
+      });
+    },
+  });
+}
+
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, missionId }: { id: number; missionId: number }) => {
+      const url = buildUrl(api.documents.delete.path, { id });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to delete document");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [api.missions.documents.list.path, variables.missionId]
+      });
+    },
+  });
+}
+
+export function useUploadDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file, missionId }: { id: number; file: File; missionId: number }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch(`/api/documents/${id}/upload`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Failed to upload file");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [api.missions.documents.list.path, variables.missionId]
+      });
+    },
+  });
+}
+
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data, missionId }: { id: number; data: any; missionId: number }) => {
+      const res = await fetch(`/api/documents/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update document");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [api.missions.documents.list.path, variables.missionId]
+      });
+    },
   });
 }
 
@@ -389,18 +778,5 @@ export function useDocuments() {
       if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json();
     },
-  });
-}
-
-export function useMissionDocuments(missionId: number) {
-  return useQuery({
-    queryKey: [api.missions.documents.list.path, missionId],
-    queryFn: async () => {
-      const url = buildUrl(api.missions.documents.list.path, { id: missionId });
-      const res = await fetch(url, { credentials: 'include' });
-      if (!res.ok) throw new Error("Failed to fetch mission documents");
-      return res.json();
-    },
-    enabled: !!missionId,
   });
 }
