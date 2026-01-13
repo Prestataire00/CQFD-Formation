@@ -39,6 +39,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { Mission, MissionStatus, LocationType } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
 
 function getStatusBadge(status: MissionStatus) {
   const styles: Record<MissionStatus, { label: string; className: string }> = {
@@ -78,11 +79,21 @@ export default function Missions() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  // Form state for new mission
-  const [newMission, setNewMission] = useState({
+  const [newMission, setNewMission] = useState<{
+    reference: string;
+    title: string;
+    clientIds: string[];
+    trainerId: string;
+    programId: string;
+    startDate: string;
+    endDate: string;
+    locationType: LocationType;
+    location: string;
+    typology: string;
+  }>({
     reference: "",
     title: "",
-    clientId: "",
+    clientIds: [],
     trainerId: "",
     programId: "",
     startDate: "",
@@ -104,10 +115,10 @@ export default function Missions() {
   }) || [];
 
   const handleCreateMission = async () => {
-    if (!newMission.title || !newMission.clientId || !newMission.startDate || !newMission.endDate || !newMission.typology) {
+    if (!newMission.title || newMission.clientIds.length === 0 || !newMission.startDate || !newMission.endDate || !newMission.typology) {
       console.error("Champs requis manquants:", {
         title: newMission.title,
-        clientId: newMission.clientId,
+        clientIds: newMission.clientIds,
         startDate: newMission.startDate,
         endDate: newMission.endDate,
         typology: newMission.typology
@@ -119,7 +130,7 @@ export default function Missions() {
       const missionData = {
         reference: newMission.reference || `MIS-${Date.now()}`,
         title: newMission.title,
-        clientId: parseInt(newMission.clientId),
+        clientId: parseInt(newMission.clientIds[0]), // Legacy support for schema (primary client)
         trainerId: newMission.trainerId || null,
         programId: newMission.programId ? parseInt(newMission.programId) : null,
         startDate: newMission.startDate,
@@ -129,13 +140,25 @@ export default function Missions() {
         typology: newMission.typology,
         status: "draft",
       };
-      console.log("Creating mission with data:", missionData);
-      await createMission.mutateAsync(missionData as any);
+      
+      const createdMission = await createMission.mutateAsync(missionData as any);
+      
+      // If multiple clients for INTER
+      if (newMission.typology === "Inter" && newMission.clientIds.length > 1) {
+        // Add additional clients
+        for (let i = 1; i < newMission.clientIds.length; i++) {
+          await apiRequest("POST", `/api/missions/${createdMission.id}/clients`, {
+            clientId: parseInt(newMission.clientIds[i]),
+            isPrimary: false
+          });
+        }
+      }
+
       setIsCreateOpen(false);
       setNewMission({
         reference: "",
         title: "",
-        clientId: "",
+        clientIds: [],
         trainerId: "",
         programId: "",
         startDate: "",
@@ -222,22 +245,61 @@ export default function Missions() {
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="client">Client *</Label>
-                        <Select
-                          value={newMission.clientId}
-                          onValueChange={(value) => setNewMission({ ...newMission, clientId: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selectionner un client" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {clients?.map((client: any) => (
-                              <SelectItem key={client.id} value={client.id.toString()}>
-                                {client.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="client">{newMission.typology === "Inter" ? "Clients *" : "Client *"}</Label>
+                        {newMission.typology === "Inter" ? (
+                          <div className="space-y-2">
+                            <Select
+                              onValueChange={(value) => {
+                                if (!newMission.clientIds.includes(value)) {
+                                  setNewMission({ ...newMission, clientIds: [...newMission.clientIds, value] });
+                                }
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Ajouter des clients" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {clients?.map((client: any) => (
+                                  <SelectItem key={client.id} value={client.id.toString()}>
+                                    {client.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="flex flex-wrap gap-2">
+                              {newMission.clientIds.map(id => {
+                                const client = clients?.find((c: any) => c.id.toString() === id);
+                                return (
+                                  <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                                    {client?.name}
+                                    <button 
+                                      onClick={() => setNewMission({ ...newMission, clientIds: newMission.clientIds.filter(cid => cid !== id) })}
+                                      className="ml-1 hover:text-destructive"
+                                    >
+                                      ×
+                                    </button>
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <Select
+                            value={newMission.clientIds[0] || ""}
+                            onValueChange={(value) => setNewMission({ ...newMission, clientIds: [value] })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selectionner un client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {clients?.map((client: any) => (
+                                <SelectItem key={client.id} value={client.id.toString()}>
+                                  {client.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="trainer">Formateur</Label>
