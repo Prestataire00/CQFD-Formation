@@ -61,6 +61,7 @@ export interface IStorage {
   getMission(id: number): Promise<Mission | undefined>;
   createMission(mission: InsertMission): Promise<Mission>;
   updateMission(id: number, data: Partial<Mission>): Promise<Mission | undefined>;
+  deleteMission(id: number): Promise<boolean>;
   updateMissionStatus(id: number, status: MissionStatus): Promise<Mission | undefined>;
   duplicateMissionForTrainer(originalMissionId: number, newTrainerId: string): Promise<Mission | undefined>;
 
@@ -540,6 +541,36 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return result.length;
+  }
+
+  async deleteMission(id: number): Promise<boolean> {
+    // We should delete related records first or ensure they have CASCADE
+    // Based on the schema, many tables have references to missions.id
+    // mission_clients, mission_trainers, mission_steps -> step_tasks, mission_sessions, mission_participants, attendance_records, evaluations, invoices, documents, messages, reminders
+    
+    // In a real app, we might use a soft delete or rely on DB cascades if configured.
+    // Since I can't easily check all foreign key constraints for ON DELETE CASCADE right now, 
+    // I'll perform manual deletion of related records to be safe.
+
+    await db.delete(missionClients).where(eq(missionClients.missionId, id));
+    await db.delete(missionTrainers).where(eq(missionTrainers.missionId, id));
+    
+    const steps = await this.getMissionSteps(id);
+    for (const step of steps) {
+      await db.delete(stepTasks).where(eq(stepTasks.stepId, step.id));
+    }
+    await db.delete(missionSteps).where(eq(missionSteps.missionId, id));
+    await db.delete(missionSessions).where(eq(missionSessions.missionId, id));
+    await db.delete(missionParticipants).where(eq(missionParticipants.missionId, id));
+    await db.delete(attendanceRecords).where(eq(attendanceRecords.missionId, id));
+    await db.delete(evaluations).where(eq(evaluations.missionId, id));
+    await db.delete(invoices).where(eq(invoices.missionId, id));
+    await db.delete(documents).where(eq(documents.missionId, id));
+    await db.delete(messages).where(eq(messages.missionId, id));
+    await db.delete(reminders).where(eq(reminders.missionId, id));
+
+    const [deleted] = await db.delete(missions).where(eq(missions.id, id)).returning();
+    return !!deleted;
   }
 
   // ==================== MISSION CLIENTS ====================

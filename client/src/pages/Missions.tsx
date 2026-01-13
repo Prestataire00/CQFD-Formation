@@ -33,13 +33,25 @@ import {
   Eye,
   Search,
   Filter,
+  Trash2,
 } from "lucide-react";
 import { useMissions, useClients, useTrainers, usePrograms, useCreateMission } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { Mission, MissionStatus, LocationType } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function getStatusBadge(status: MissionStatus) {
   const styles: Record<MissionStatus, { label: string; className: string }> = {
@@ -69,6 +81,7 @@ function getLocationBadge(type: LocationType) {
 
 export default function Missions() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const { data: missions, isLoading } = useMissions();
   const { data: clients } = useClients();
   const { data: trainers } = useTrainers();
@@ -78,6 +91,7 @@ export default function Missions() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [missionToDelete, setMissionToDelete] = useState<number | null>(null);
 
   const [newMission, setNewMission] = useState<{
     reference: string;
@@ -169,6 +183,27 @@ export default function Missions() {
       });
     } catch (error) {
       console.error("Failed to create mission:", error);
+    }
+  };
+
+  const handleDeleteMission = async () => {
+    if (!missionToDelete) return;
+
+    try {
+      await apiRequest("DELETE", `/api/missions/${missionToDelete}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/missions"] });
+      toast({
+        title: "Mission supprimee",
+        description: "La mission a ete supprimee avec succes.",
+      });
+      setMissionToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete mission:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la mission.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -440,8 +475,8 @@ export default function Missions() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredMissions.map((mission: Mission) => (
-                <Link key={mission.id} href={`/missions/${mission.id}`}>
-                  <div className="group bg-card rounded-xl border border-border p-5 hover:border-primary/50 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                <div key={mission.id} className="group relative bg-card rounded-xl border border-border p-5 hover:border-primary/50 hover:shadow-lg transition-all duration-200">
+                  <Link href={`/missions/${mission.id}`} className="block cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         {mission.reference && (
@@ -508,20 +543,54 @@ export default function Missions() {
                         </div>
                       )}
                     </div>
+                  </Link>
 
-                    <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                      {mission.locationType && getLocationBadge(mission.locationType as LocationType)}
-                      <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Eye className="w-4 h-4 mr-1" />
-                        Voir
-                      </Button>
+                  <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
+                    {mission.locationType && getLocationBadge(mission.locationType as LocationType)}
+                    <div className="flex items-center gap-2">
+                      <Link href={`/missions/${mission.id}`}>
+                        <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Eye className="w-4 h-4 mr-1" />
+                          Voir
+                        </Button>
+                      </Link>
+                      {isAdmin && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setMissionToDelete(mission.id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
-                </Link>
+                </div>
               ))}
             </div>
           )}
         </div>
+
+        <AlertDialog open={missionToDelete !== null} onOpenChange={(open) => !open && setMissionToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Etes-vous sur ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action est irreversible. Cela supprimera definitivement la mission ainsi que toutes les donnees associees (etapes, documents, messages, etc.).
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteMission} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Supprimer
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </div>
   );

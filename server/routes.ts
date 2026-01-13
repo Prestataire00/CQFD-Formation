@@ -326,6 +326,20 @@ export async function registerRoutes(
     }
   });
 
+  app.delete(api.missions.delete.path, isAuthenticated, requirePermission('missions:delete'), async (req, res) => {
+    try {
+      const success = await storage.deleteMission(Number(req.params.id));
+      if (!success) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Mission deletion error:', err);
+      res.status(500).json({ message: 'Erreur lors de la suppression de la mission' });
+    }
+  });
+
   // Mission Clients (multi-clients support)
   app.get('/api/missions/:id/clients', isAuthenticated, async (req, res) => {
     const missionClients = await storage.getMissionClients(Number(req.params.id));
