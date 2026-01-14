@@ -720,9 +720,9 @@ export default function MissionDetail() {
     }
   };
 
-  // Liste des formateurs disponibles (pas encore assignés à la mission)
+  // Liste des formateurs disponibles (pas encore assignés à la mission et actifs)
   const availableTrainers = trainers?.filter(
-    (t: any) => !missionTrainers?.some((mt: any) => mt.trainerId === t.id)
+    (t: any) => t.isActive !== false && !missionTrainers?.some((mt: any) => mt.trainerId === t.id)
   ) || [];
 
   // Liste des formateurs de la mission pour l'assignation des tâches
@@ -759,8 +759,9 @@ export default function MissionDetail() {
     }
   };
 
-  // Formateurs disponibles pour la duplication (exclut ceux qui ont déjà une copie)
+  // Formateurs disponibles pour la duplication (exclut ceux qui ont déjà une copie et actifs)
   const trainersForDuplication = trainers?.filter((t: any) => {
+    if (t.isActive === false) return false;
     // Exclure les formateurs qui ont déjà une copie de cette mission
     const hasChildCopy = childMissions?.some((child: any) => child.trainerId === t.id);
     return !hasChildCopy;
