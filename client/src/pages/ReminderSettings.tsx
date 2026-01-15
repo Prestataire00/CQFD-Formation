@@ -36,6 +36,8 @@ import {
   GraduationCap,
   Check,
   X,
+  RefreshCw,
+  Send,
 } from "lucide-react";
 import { api, buildUrl } from "@shared/routes";
 import { format } from "date-fns";
@@ -271,16 +273,33 @@ export default function ReminderSettings() {
                 Configurez les rappels envoyes automatiquement avant les formations
               </p>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) resetForm();
-            }}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau rappel
-                </Button>
-              </DialogTrigger>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => generateAllReminders.mutate()}
+                disabled={generateAllReminders.isPending}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${generateAllReminders.isPending ? 'animate-spin' : ''}`} />
+                {generateAllReminders.isPending ? 'Generation...' : 'Generer les rappels'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => processReminders.mutate()}
+                disabled={processReminders.isPending || !pendingReminders?.length}
+              >
+                <Mail className={`w-4 h-4 mr-2 ${processReminders.isPending ? 'animate-pulse' : ''}`} />
+                {processReminders.isPending ? 'Envoi...' : 'Envoyer maintenant'}
+              </Button>
+              <Dialog open={isDialogOpen} onOpenChange={(open) => {
+                setIsDialogOpen(open);
+                if (!open) resetForm();
+              }}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Nouveau rappel
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>
