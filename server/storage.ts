@@ -230,7 +230,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTrainers(): Promise<User[]> {
     return await db.select().from(users)
-      .where(sql`${users.role} IN ('formateur', 'prestataire')`)
+      .where(sql`${users.role} IN ('formateur', 'prestataire') AND ${users.status} = 'ACTIF'`)
       .orderBy(users.lastName);
   }
 
@@ -636,6 +636,10 @@ export class DatabaseStorage implements IStorage {
 
   async addTrainerToMission(data: InsertMissionTrainer): Promise<MissionTrainer> {
     const [newMissionTrainer] = await db.insert(missionTrainers).values(data).returning();
+
+    // Auto-attach template documents to the new trainer
+    await this.attachTemplateDocumentsToMission(data.missionId, data.trainerId);
+
     return newMissionTrainer;
   }
 
