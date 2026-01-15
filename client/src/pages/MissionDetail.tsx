@@ -1227,7 +1227,7 @@ export default function MissionDetail() {
                       </div>
                       {isAdmin && (
                         <div className="flex gap-1">
-                          {mission?.typology === "inter" && (
+                          {mission?.typology === "intra" && (
                             <Button
                               size="sm"
                               variant="ghost"
