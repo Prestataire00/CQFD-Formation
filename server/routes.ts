@@ -1474,12 +1474,12 @@ export async function registerRoutes(
   });
 
   // ==================== DOCUMENT TEMPLATES ====================
-  app.get('/api/document-templates', isAuthenticated, requirePermission('admin'), async (req, res) => {
+  app.get('/api/document-templates', isAuthenticated, requireRole('admin'), async (req, res) => {
     const templates = await storage.getDocumentTemplates();
     res.json(templates);
   });
 
-  app.get('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), async (req, res) => {
+  app.get('/api/document-templates/:id', isAuthenticated, requireRole('admin'), async (req, res) => {
     const template = await storage.getDocumentTemplate(Number(req.params.id));
     if (!template) {
       res.status(404).json({ message: "Template non trouvé" });
@@ -1488,7 +1488,7 @@ export async function registerRoutes(
     res.json(template);
   });
 
-  app.post('/api/document-templates', isAuthenticated, requirePermission('admin'), upload.single('file'), async (req, res) => {
+  app.post('/api/document-templates', isAuthenticated, requireRole('admin'), upload.single('file'), async (req, res) => {
     try {
       const { title, type, forRole, description } = req.body;
 
@@ -1515,7 +1515,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), upload.single('file'), async (req, res) => {
+  app.put('/api/document-templates/:id', isAuthenticated, requireRole('admin'), upload.single('file'), async (req, res) => {
     try {
       const templateId = Number(req.params.id);
       const { title, type, forRole, description, isActive, clientId, changeNotes } = req.body;
@@ -1550,13 +1550,13 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/document-templates/:id', isAuthenticated, requirePermission('admin'), async (req, res) => {
+  app.delete('/api/document-templates/:id', isAuthenticated, requireRole('admin'), async (req, res) => {
     await storage.deleteDocumentTemplate(Number(req.params.id));
     res.json({ success: true });
   });
 
   // Get template versions history
-  app.get('/api/document-templates/:id/versions', isAuthenticated, requirePermission('admin'), async (req, res) => {
+  app.get('/api/document-templates/:id/versions', isAuthenticated, requireRole('admin'), async (req, res) => {
     const versions = await storage.getTemplateVersions(Number(req.params.id));
     res.json(versions);
   });
