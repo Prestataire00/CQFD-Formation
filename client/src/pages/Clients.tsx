@@ -69,13 +69,15 @@ export default function Clients() {
     contactName: "",
     contactEmail: "",
     contactPhone: "",
+    demand: "",
   });
 
   const filteredClients = clients?.filter((client: Client) => {
     const matchesSearch =
       client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.city?.toLowerCase().includes(searchTerm.toLowerCase());
+      client.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      client.demand?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === "all" || client.type === typeFilter;
     return matchesSearch && matchesType;
   }) || [];
@@ -96,6 +98,7 @@ export default function Clients() {
         contactName: "",
         contactEmail: "",
         contactPhone: "",
+        demand: "",
       });
     } catch (error) {
       console.error("Failed to create client:", error);
@@ -248,6 +251,15 @@ export default function Clients() {
                       />
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="demand">Demande</Label>
+                    <Input
+                      id="demand"
+                      placeholder="Détails de la demande..."
+                      value={newClient.demand}
+                      onChange={(e) => setNewClient({ ...newClient, demand: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -282,6 +294,7 @@ export default function Clients() {
                     <TableHead>Client</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Contact</TableHead>
+                    <TableHead>Demande</TableHead>
                     <TableHead>Localisation</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -315,6 +328,11 @@ export default function Clients() {
                             </p>
                           )}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <p className="text-sm truncate max-w-[200px]" title={client.demand || ""}>
+                          {client.demand || "-"}
+                        </p>
                       </TableCell>
                       <TableCell>
                         {client.city && (
