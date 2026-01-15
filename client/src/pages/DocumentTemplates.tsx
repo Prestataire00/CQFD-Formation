@@ -383,15 +383,15 @@ export default function DocumentTemplates() {
             <div className="space-y-2">
               <Label htmlFor="clientId">Client (optionnel)</Label>
               <Select
-                value={formData.clientId}
-                onValueChange={(value) => setFormData({ ...formData, clientId: value })}
+                value={formData.clientId || "_global_"}
+                onValueChange={(value) => setFormData({ ...formData, clientId: value === "_global_" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Global (tous les clients)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Global</SelectItem>
-                  {clients?.map((client) => (
+                  <SelectItem value="_global_">Global</SelectItem>
+                  {clients?.map((client: { id: number; name: string }) => (
                     <SelectItem key={client.id} value={client.id.toString()}>
                       {client.name}
                     </SelectItem>
@@ -479,15 +479,15 @@ export default function DocumentTemplates() {
             <div className="space-y-2">
               <Label htmlFor="edit-clientId">Client</Label>
               <Select
-                value={formData.clientId}
-                onValueChange={(value) => setFormData({ ...formData, clientId: value })}
+                value={formData.clientId || "_global_"}
+                onValueChange={(value) => setFormData({ ...formData, clientId: value === "_global_" ? "" : value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Global (tous les clients)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Global</SelectItem>
-                  {clients?.map((client) => (
+                  <SelectItem value="_global_">Global</SelectItem>
+                  {clients?.map((client: { id: number; name: string }) => (
                     <SelectItem key={client.id} value={client.id.toString()}>
                       {client.name}
                     </SelectItem>
