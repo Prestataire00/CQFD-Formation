@@ -406,6 +406,7 @@ export default function ReminderSettings() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
 
           {/* Summary */}

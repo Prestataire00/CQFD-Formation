@@ -203,14 +203,8 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
 
   // Construire le lieu
   let locationInfo = mission.location || '';
-  if (mission.locationCity) {
-    locationInfo += locationInfo ? `, ${mission.locationCity}` : mission.locationCity;
-  }
   if (mission.locationType === 'distanciel') {
     locationInfo = 'Formation à distance';
-    if (mission.visioLink) {
-      locationInfo += ` (${mission.visioLink})`;
-    }
   }
   locationInfo = locationInfo || 'À définir';
 
@@ -342,15 +336,8 @@ export async function sendAdminFormationReminderEmail(
   let locationInfo = '';
   if (mission.locationType === 'distanciel') {
     locationInfo = 'Formation à distance';
-    if (mission.visioLink) {
-      locationInfo += `<br><a href="${mission.visioLink}">${mission.visioLink}</a>`;
-    }
   } else {
-    const parts = [];
-    if (mission.locationAddress) parts.push(mission.locationAddress);
-    if (mission.locationCity) parts.push(mission.locationCity);
-    if (mission.locationPostalCode) parts.push(mission.locationPostalCode);
-    locationInfo = parts.join(', ') || mission.location || 'À définir';
+    locationInfo = mission.location || 'À définir';
   }
 
   const html = `
