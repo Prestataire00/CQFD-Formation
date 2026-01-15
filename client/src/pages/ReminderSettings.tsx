@@ -172,10 +172,12 @@ const reminderTypeColors: Record<string, string> = {
 
 export default function ReminderSettings() {
   const { data: settings, isLoading } = useReminderSettings();
-  const { data: pendingReminders } = usePendingReminders();
+  const { data: pendingReminders, refetch: refetchPending } = usePendingReminders();
   const createSetting = useCreateReminderSetting();
   const updateSetting = useUpdateReminderSetting();
   const deleteSetting = useDeleteReminderSetting();
+  const generateAllReminders = useGenerateAllReminders();
+  const processReminders = useProcessReminders();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);

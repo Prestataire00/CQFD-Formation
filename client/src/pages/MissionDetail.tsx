@@ -1226,14 +1226,26 @@ export default function MissionDetail() {
                         <span>Formateurs</span>
                       </div>
                       {isAdmin && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setIsAddingTrainer(true)}
-                          className="h-6 px-2"
-                        >
-                          <UserPlus className="w-3 h-3" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setIsDuplicateDialogOpen(true)}
+                            className="h-6 px-2 text-violet-600 hover:text-violet-700 hover:bg-violet-50"
+                            title="Assigner à plusieurs formateurs"
+                          >
+                            <UserPlus className="w-3 h-3 mr-1" />
+                            <span className="text-[10px]">Multi</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setIsAddingTrainer(true)}
+                            className="h-6 px-2"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
                       )}
                     </div>
 
