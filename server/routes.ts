@@ -6,6 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
+import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail } from "./email";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -272,6 +273,17 @@ export async function registerRoutes(
       };
       const input = api.missions.create.input.parse(body);
       const mission = await storage.createMission(input);
+
+      // Envoyer un email au formateur si assigné à la création
+      if (mission.trainerId) {
+        const trainer = await storage.getUser(mission.trainerId);
+        if (trainer && trainer.email) {
+          const documents = await storage.getDocumentsByMission(mission.id);
+          const trainerDocuments = documents.filter(doc => doc.userId === mission.trainerId);
+          await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+        }
+      }
+
       res.status(201).json(mission);
     } catch (err) {
       console.error('Mission creation error:', err);
@@ -402,11 +414,23 @@ export async function registerRoutes(
         res.status(400).json({ message: 'trainerId is required' });
         return;
       }
+      const missionId = Number(req.params.id);
       const result = await storage.addTrainerToMission({
-        missionId: Number(req.params.id),
+        missionId,
         trainerId: trainerId,
         isPrimary: isPrimary || false,
       });
+
+      // Envoyer un email au formateur avec les détails de la mission et les documents
+      const trainer = await storage.getUser(trainerId);
+      const mission = await storage.getMission(missionId);
+      if (trainer && mission && trainer.email) {
+        const documents = await storage.getDocumentsByMission(missionId);
+        // Filtrer les documents appartenant à ce formateur
+        const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+        await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+      }
+
       res.status(201).json(result);
     } catch (err: any) {
       if (err.code === '23505') {
@@ -414,6 +438,61 @@ export async function registerRoutes(
         return;
       }
       throw err;
+    }
+  });
+
+  // Assigner plusieurs formateurs à une mission (sans créer de copies)
+  app.post('/api/missions/:id/assign-trainers', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { trainerIds } = req.body;
+      if (!trainerIds || !Array.isArray(trainerIds) || trainerIds.length === 0) {
+        res.status(400).json({ message: 'trainerIds est requis et doit être un tableau non vide' });
+        return;
+      }
+
+      const missionId = Number(req.params.id);
+      const mission = await storage.getMission(missionId);
+      if (!mission) {
+        res.status(404).json({ message: 'Mission non trouvée' });
+        return;
+      }
+
+      const results = {
+        assigned: [] as string[],
+        errors: [] as { trainerId: string; error: string }[],
+      };
+
+      for (const trainerId of trainerIds) {
+        try {
+          // Ajouter le formateur à la mission (cela attache aussi les documents)
+          await storage.addTrainerToMission({
+            missionId,
+            trainerId,
+            isPrimary: false,
+          });
+
+          // Envoyer un email au formateur
+          const trainer = await storage.getUser(trainerId);
+          if (trainer && trainer.email) {
+            const documents = await storage.getDocumentsByMission(missionId);
+            const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+            await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+          }
+
+          results.assigned.push(trainerId);
+        } catch (err: any) {
+          if (err.code === '23505') {
+            results.errors.push({ trainerId, error: 'Ce formateur est déjà assigné à cette mission' });
+          } else {
+            results.errors.push({ trainerId, error: err.message || 'Erreur inconnue' });
+          }
+        }
+      }
+
+      res.status(200).json(results);
+    } catch (err: any) {
+      console.error('Error assigning trainers:', err);
+      res.status(500).json({ message: 'Erreur lors de l\'assignation des formateurs' });
     }
   });
 
@@ -1211,15 +1290,40 @@ export async function registerRoutes(
         if (new Date(reminder.scheduledDate) <= now) {
           processed++;
           try {
-            // Here you would send the actual email
-            // For now, we just mark it as sent
-            console.log(`[REMINDER] Would send email to ${reminder.recipientEmail} for mission ${reminder.missionId}`);
+            // Récupérer les informations nécessaires pour l'email
+            const mission = reminder.missionId ? await storage.getMission(reminder.missionId) : null;
+            if (!mission) {
+              throw new Error('Mission non trouvée');
+            }
 
-            await storage.updateReminder(reminder.id, {
-              status: 'sent',
-              sentAt: now,
+            const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+            const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+            // Récupérer le setting pour avoir les jours avant
+            const setting = reminder.settingId ? await storage.getReminderSetting(reminder.settingId) : null;
+            const daysBefore = setting?.daysBefore || 0;
+
+            // Envoyer l'email
+            const emailSent = await sendReminderEmail({
+              recipientEmail: reminder.recipientEmail || '',
+              recipientName: reminder.recipientName || 'Destinataire',
+              recipientType: (reminder.recipientType as 'admin' | 'trainer' | 'client') || 'admin',
+              mission,
+              trainer,
+              client,
+              daysBefore,
+              customSubject: setting?.emailSubject || undefined,
             });
-            sent++;
+
+            if (emailSent) {
+              await storage.updateReminder(reminder.id, {
+                status: 'sent',
+                sentAt: now,
+              });
+              sent++;
+            } else {
+              throw new Error('Échec de l\'envoi de l\'email');
+            }
           } catch (err) {
             await storage.updateReminder(reminder.id, {
               status: 'failed',
@@ -1234,6 +1338,138 @@ export async function registerRoutes(
     } catch (err) {
       console.error('Error processing reminders:', err);
       res.status(500).json({ message: "Erreur lors du traitement des rappels" });
+    }
+  });
+
+  // Generate reminders for ALL active missions based on settings
+  app.post('/api/reminders/generate-all', isAuthenticated, async (req, res) => {
+    try {
+      const missions = await storage.getMissions();
+      const settings = await storage.getReminderSettings();
+      const activeSettings = settings.filter(s => s.isActive);
+      const admins = (await storage.getUsers()).filter(u => u.role === 'admin' && u.status === 'ACTIF');
+
+      let created = 0;
+      let skipped = 0;
+
+      // Filtrer les missions actives (pas annulées, pas terminées, avec une date de début future)
+      const activeMissions = missions.filter(m =>
+        m.status !== 'cancelled' &&
+        m.status !== 'completed' &&
+        m.startDate &&
+        new Date(m.startDate) > new Date()
+      );
+
+      for (const mission of activeMissions) {
+        for (const setting of activeSettings) {
+          // Calculer la date d'envoi
+          const missionStartDate = new Date(mission.startDate!);
+          const scheduledDate = new Date(missionStartDate);
+          scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
+
+          // Ignorer si la date est dans le passé
+          if (scheduledDate < new Date()) {
+            skipped++;
+            continue;
+          }
+
+          // Récupérer les infos du formateur et client
+          const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+          const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+          // Créer les rappels pour chaque destinataire
+          const recipients: { type: string; email?: string; name?: string }[] = [];
+
+          if (setting.notifyAdmin) {
+            for (const admin of admins) {
+              if (admin.email) {
+                recipients.push({
+                  type: 'admin',
+                  email: admin.email,
+                  name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin',
+                });
+              }
+            }
+          }
+
+          if (setting.notifyTrainer && trainer?.email) {
+            recipients.push({
+              type: 'trainer',
+              email: trainer.email,
+              name: `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur',
+            });
+          }
+
+          if (setting.notifyClient && client?.contactEmail) {
+            recipients.push({
+              type: 'client',
+              email: client.contactEmail,
+              name: client.contactName || client.name || 'Client',
+            });
+          }
+
+          for (const recipient of recipients) {
+            // Vérifier si ce rappel existe déjà
+            const existingReminders = await storage.getRemindersByMission(mission.id);
+            const alreadyExists = existingReminders.some(r =>
+              r.settingId === setting.id &&
+              r.recipientEmail === recipient.email &&
+              r.status === 'pending'
+            );
+
+            if (!alreadyExists) {
+              await storage.createReminder({
+                settingId: setting.id,
+                missionId: mission.id,
+                scheduledDate,
+                status: 'pending',
+                recipientEmail: recipient.email,
+                recipientName: recipient.name,
+                recipientType: recipient.type,
+              });
+              created++;
+            } else {
+              skipped++;
+            }
+          }
+        }
+
+        // Ajouter le rappel admin J-2 systématique (si pas déjà créé)
+        const j2Date = new Date(mission.startDate!);
+        j2Date.setDate(j2Date.getDate() - 2);
+
+        if (j2Date > new Date()) {
+          for (const admin of admins) {
+            if (admin.email) {
+              const existingReminders = await storage.getRemindersByMission(mission.id);
+              const j2Exists = existingReminders.some(r =>
+                r.recipientEmail === admin.email &&
+                r.recipientType === 'admin' &&
+                r.status === 'pending' &&
+                Math.abs(new Date(r.scheduledDate).getTime() - j2Date.getTime()) < 86400000 // Même jour
+              );
+
+              if (!j2Exists) {
+                await storage.createReminder({
+                  settingId: null,
+                  missionId: mission.id,
+                  scheduledDate: j2Date,
+                  status: 'pending',
+                  recipientEmail: admin.email,
+                  recipientName: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin',
+                  recipientType: 'admin',
+                });
+                created++;
+              }
+            }
+          }
+        }
+      }
+
+      res.json({ created, skipped, missionsProcessed: activeMissions.length });
+    } catch (err) {
+      console.error('Error generating all reminders:', err);
+      res.status(500).json({ message: "Erreur lors de la génération des rappels" });
     }
   });
 

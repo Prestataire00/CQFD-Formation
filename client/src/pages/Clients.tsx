@@ -303,10 +303,10 @@ export default function Clients() {
                             <p className="text-sm">{client.contactName}</p>
                           )}
                           {client.contactEmail && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <a href={`mailto:${client.contactEmail}`} className="text-xs flex items-center gap-1 text-primary hover:underline">
                               <Mail className="w-3 h-3" />
                               {client.contactEmail}
-                            </p>
+                            </a>
                           )}
                           {client.contactPhone && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1">

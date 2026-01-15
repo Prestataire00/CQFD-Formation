@@ -214,7 +214,33 @@ export function useSetMissionPrimaryTrainer() {
 }
 
 // ==========================================
-// Multi-Trainer Duplication
+// Multi-Trainer Assignment (sans duplication)
+// ==========================================
+export function useAssignMultipleTrainers() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, trainerIds }: { missionId: number; trainerIds: string[] }) => {
+      const res = await fetch(`/api/missions/${missionId}/assign-trainers`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ trainerIds }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to assign trainers");
+      }
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: ['mission-trainers', missionId] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+    },
+  });
+}
+
+// ==========================================
+// Multi-Trainer Duplication (legacy)
 // ==========================================
 export function useDuplicateMissionMulti() {
   const queryClient = useQueryClient();

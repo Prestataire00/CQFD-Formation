@@ -224,10 +224,10 @@ export default function Participants() {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          <p className="text-sm flex items-center gap-1">
-                            <Mail className="w-3 h-3 text-muted-foreground" />
+                          <a href={`mailto:${participant.email}`} className="text-sm flex items-center gap-1 text-primary hover:underline">
+                            <Mail className="w-3 h-3" />
                             {participant.email}
-                          </p>
+                          </a>
                           {participant.phone && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1">
                               <Phone className="w-3 h-3" />

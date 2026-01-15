@@ -122,6 +122,42 @@ function usePendingReminders() {
   });
 }
 
+// Generate all reminders
+function useGenerateAllReminders() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/reminders/generate-all', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to generate reminders");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.reminders.pending.path] });
+    },
+  });
+}
+
+// Process pending reminders (send emails)
+function useProcessReminders() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(api.reminders.process.path, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to process reminders");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.reminders.pending.path] });
+    },
+  });
+}
+
 const reminderTypeLabels: Record<string, string> = {
   mission_start: "Debut de formation",
   task_deadline: "Deadline de tache",

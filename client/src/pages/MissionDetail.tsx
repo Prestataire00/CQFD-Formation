@@ -73,7 +73,7 @@ import {
   useAddTrainerToMission,
   useRemoveTrainerFromMission,
   useSetMissionPrimaryTrainer,
-  useDuplicateMissionMulti,
+  useAssignMultipleTrainers,
   useChildMissions,
   useParentMission,
   useSyncMissionChildren,
@@ -467,8 +467,8 @@ export default function MissionDetail() {
   const removeTrainer = useRemoveTrainerFromMission();
   const setPrimaryTrainer = useSetMissionPrimaryTrainer();
 
-  // Multi-trainer duplication
-  const duplicateMissionMulti = useDuplicateMissionMulti();
+  // Multi-trainer assignment (sans duplication)
+  const assignMultipleTrainers = useAssignMultipleTrainers();
   const { data: childMissions } = useChildMissions(missionId);
   const { data: parentMission } = useParentMission(missionId, !!mission?.parentMissionId);
   const syncChildren = useSyncMissionChildren();
@@ -737,17 +737,17 @@ export default function MissionDetail() {
     );
   };
 
-  const handleDuplicateForTrainers = async () => {
+  const handleAssignTrainers = async () => {
     if (selectedTrainerIds.length === 0) return;
     try {
-      await duplicateMissionMulti.mutateAsync({
+      await assignMultipleTrainers.mutateAsync({
         missionId,
         trainerIds: selectedTrainerIds,
       });
       setSelectedTrainerIds([]);
       setIsDuplicateDialogOpen(false);
     } catch (error) {
-      console.error("Failed to duplicate mission:", error);
+      console.error("Failed to assign trainers:", error);
     }
   };
 
@@ -759,12 +759,14 @@ export default function MissionDetail() {
     }
   };
 
-  // Formateurs disponibles pour la duplication (exclut ceux qui ont déjà une copie et actifs)
-  const trainersForDuplication = trainers?.filter((t: any) => {
-    if (t.isActive === false) return false;
-    // Exclure les formateurs qui ont déjà une copie de cette mission
-    const hasChildCopy = childMissions?.some((child: any) => child.trainerId === t.id);
-    return !hasChildCopy;
+  // Formateurs disponibles pour l'assignation (exclut ceux déjà assignés via missionTrainers)
+  const trainersForAssignment = trainers?.filter((t: any) => {
+    if (t.status !== 'ACTIF') return false;
+    // Exclure les formateurs déjà assignés à cette mission via missionTrainers
+    const isAlreadyAssigned = missionTrainers?.some((mt: any) => mt.trainerId === t.id);
+    // Exclure aussi le formateur principal (trainerId de la mission)
+    const isMainTrainer = mission?.trainerId === t.id;
+    return !isAlreadyAssigned && !isMainTrainer;
   }) || [];
 
   if (isLoading) {
@@ -820,12 +822,12 @@ export default function MissionDetail() {
             </Link>
             {isAdmin && !isEditing && (
               <div className="flex gap-2">
-                {/* Bouton de duplication multi-formateurs - visible uniquement pour les missions originales */}
+                {/* Bouton d'assignation multi-formateurs */}
                 {mission.isOriginal !== false && (
                   <Dialog open={isDuplicateDialogOpen} onOpenChange={setIsDuplicateDialogOpen}>
                     <DialogTrigger asChild>
                       <Button variant="outline">
-                        <Copy className="w-4 h-4 mr-2" />
+                        <UserPlus className="w-4 h-4 mr-2" />
                         Assigner à plusieurs formateurs
                       </Button>
                     </DialogTrigger>
@@ -833,7 +835,7 @@ export default function MissionDetail() {
                       <DialogHeader>
                         <DialogTitle>Assigner à plusieurs formateurs</DialogTitle>
                         <DialogDescription>
-                          Chaque formateur sélectionné recevra sa propre copie de la mission avec les tâches dupliquées et les documents appropriés selon son statut.
+                          Chaque formateur sélectionné sera assigné à cette mission et recevra par email les documents appropriés selon son statut. La mission apparaîtra dans leur espace formateur.
                         </DialogDescription>
                       </DialogHeader>
                       <div className="py-4 space-y-4">
@@ -841,8 +843,8 @@ export default function MissionDetail() {
                           Sélectionnez les formateurs:
                         </div>
                         <div className="max-h-64 overflow-y-auto space-y-2">
-                          {trainersForDuplication.length > 0 ? (
-                            trainersForDuplication.map((trainer: any) => (
+                          {trainersForAssignment.length > 0 ? (
+                            trainersForAssignment.map((trainer: any) => (
                               <div
                                 key={trainer.id}
                                 className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -891,12 +893,12 @@ export default function MissionDetail() {
                           Annuler
                         </Button>
                         <Button
-                          onClick={handleDuplicateForTrainers}
-                          disabled={selectedTrainerIds.length === 0 || duplicateMissionMulti.isPending}
+                          onClick={handleAssignTrainers}
+                          disabled={selectedTrainerIds.length === 0 || assignMultipleTrainers.isPending}
                         >
-                          {duplicateMissionMulti.isPending
-                            ? "Création en cours..."
-                            : `Créer ${selectedTrainerIds.length} copie(s)`}
+                          {assignMultipleTrainers.isPending
+                            ? "Assignation en cours..."
+                            : `Assigner ${selectedTrainerIds.length} formateur(s)`}
                         </Button>
                       </DialogFooter>
                     </DialogContent>

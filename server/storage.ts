@@ -352,9 +352,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMissionsByTrainer(trainerId: string): Promise<Mission[]> {
-    return await db.select().from(missions)
-      .where(eq(missions.trainerId, trainerId))
-      .orderBy(desc(missions.startDate));
+    // Récupérer les missions où le formateur est assigné directement (trainerId)
+    // OU via la table missionTrainers (multi-formateurs)
+    const directMissions = await db.select().from(missions)
+      .where(eq(missions.trainerId, trainerId));
+
+    const linkedMissions = await db.select({ mission: missions })
+      .from(missionTrainers)
+      .innerJoin(missions, eq(missionTrainers.missionId, missions.id))
+      .where(eq(missionTrainers.trainerId, trainerId));
+
+    // Combiner et dédupliquer les missions
+    const allMissions = [
+      ...directMissions,
+      ...linkedMissions.map(m => m.mission)
+    ];
+
+    // Dédupliquer par ID
+    const uniqueMissions = Array.from(
+      new Map(allMissions.map(m => [m.id, m])).values()
+    );
+
+    // Trier par date de début (plus récent en premier)
+    return uniqueMissions.sort((a, b) => {
+      const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return dateB - dateA;
+    });
   }
 
   async getMission(id: number): Promise<Mission | undefined> {
