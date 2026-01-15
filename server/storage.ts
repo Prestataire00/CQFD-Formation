@@ -1037,7 +1037,7 @@ export class DatabaseStorage implements IStorage {
 
       // Notify affected users
       const affectedUserIds = linkedDocs.map((doc: Document) => doc.userId).filter(Boolean) as string[];
-      const uniqueUserIds = [...new Set(affectedUserIds)];
+      const uniqueUserIds = Array.from(new Set(affectedUserIds));
       if (uniqueUserIds.length > 0) {
         await this.createNotificationForTemplate(id, uniqueUserIds);
       }
@@ -1070,7 +1070,7 @@ export class DatabaseStorage implements IStorage {
     const clientId = mission?.clientId;
 
     // Get appropriate templates based on trainer role and client
-    const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId);
+    const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId || undefined);
 
     // Attach each template document to the mission
     for (const template of templates) {
