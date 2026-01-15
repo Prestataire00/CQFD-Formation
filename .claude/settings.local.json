@@ -16,7 +16,8 @@
       "Bash(fuser:*)",
       "Bash(npm install:*)",
       "Bash(find:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

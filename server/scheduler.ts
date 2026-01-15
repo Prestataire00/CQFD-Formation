@@ -173,8 +173,8 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             reminder.recipientEmail || '',
             reminder.recipientName || 'Admin',
             mission,
-            trainer,
-            client
+            trainer ?? null,
+            client ?? null
           );
         } else {
           // Utiliser le template standard
