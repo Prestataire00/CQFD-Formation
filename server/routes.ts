@@ -110,6 +110,18 @@ export async function registerRoutes(
 
   app.put(api.users.update.path, isAuthenticated, requirePermission('users:update'), async (req, res) => {
     try {
+      const targetUserId = req.params.id;
+      // Empêcher la désactivation ou le changement de rôle de l'admin principal
+      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || targetUserId === 'admin-001') {
+        const input = req.body;
+        if (input.status && input.status !== 'ACTIF') {
+          return res.status(403).json({ message: "L'administrateur principal ne peut pas être désactivé" });
+        }
+        if (input.role && input.role !== 'admin') {
+          return res.status(403).json({ message: "Le rôle de l'administrateur principal ne peut pas être modifié" });
+        }
+      }
+
       const input = api.users.update.input.parse(req.body);
       const { password, ...updateData } = input;
       const user = await storage.updateUserWithPassword(req.params.id, updateData, password);
@@ -131,6 +143,12 @@ export async function registerRoutes(
 
   app.delete(api.users.delete.path, isAuthenticated, requirePermission('users:delete'), async (req, res) => {
     try {
+      const targetUserId = req.params.id;
+      // Empêcher la suppression de l'admin principal
+      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || targetUserId === 'admin-001') {
+        return res.status(403).json({ message: "L'administrateur principal ne peut pas être supprimé" });
+      }
+
       const success = await storage.softDeleteUser(req.params.id);
       if (!success) {
         res.status(404).json({ message: "Utilisateur non trouvé" });
