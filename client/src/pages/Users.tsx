@@ -379,7 +379,17 @@ export default function Users() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           {(user.id === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || user.id === 'admin-001') ? (
-                            <Badge variant="secondary" className="text-xs">Système</Badge>
+                            <>
+                              <Badge variant="secondary" className="text-xs">Système</Badge>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(user)}
+                                title="Modifier le mot de passe"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </>
                           ) : (
                             <>
                               {user.status === 'ACTIF' ? (
