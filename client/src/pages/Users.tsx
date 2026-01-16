@@ -378,42 +378,48 @@ export default function Users() {
                       <TableCell>{user.phone || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          {user.status === 'ACTIF' ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleStatusChange(user.id, 'INACTIF')}
-                              title="Désactiver"
-                            >
-                              <UserX className="h-4 w-4" />
-                            </Button>
-                          ) : user.status === 'INACTIF' ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleStatusChange(user.id, 'ACTIF')}
-                              title="Activer"
-                            >
-                              <UserCheck className="h-4 w-4" />
-                            </Button>
-                          ) : null}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(user)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {(user.id === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || user.id === 'admin-001') ? (
+                            <Badge variant="secondary" className="text-xs">Système</Badge>
+                          ) : (
+                            <>
+                              {user.status === 'ACTIF' ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleStatusChange(user.id, 'INACTIF')}
+                                  title="Désactiver"
+                                >
+                                  <UserX className="h-4 w-4" />
+                                </Button>
+                              ) : user.status === 'INACTIF' ? (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleStatusChange(user.id, 'ACTIF')}
+                                  title="Activer"
+                                >
+                                  <UserCheck className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openEditDialog(user)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setIsDeleteOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
