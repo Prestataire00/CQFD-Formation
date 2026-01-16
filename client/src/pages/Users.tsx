@@ -194,6 +194,7 @@ export default function Users() {
   };
 
   const filteredUsers = users?.filter(user => {
+    if (user.status === 'SUPPRIME') return false;
     if (filterRole !== 'all' && user.role !== filterRole) return false;
     if (filterStatus !== 'all' && user.status !== filterStatus) return false;
     return true;
