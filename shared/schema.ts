@@ -31,16 +31,31 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Password reset tokens
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  token: varchar("token").notNull().unique(),
+  expiresAt: timestamp("expires_at").notNull(),
+  used: boolean("used").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // --- CRM MODELS ---
 export type MissionStatus = 'draft' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
 export type InvoiceStatus = 'draft' | 'submitted' | 'paid' | 'rejected';
 export type StepStatus = 'todo' | 'priority' | 'late' | 'done' | 'na';
 export type LocationType = 'presentiel' | 'distanciel' | 'hybride';
 
+export type ClientContractStatus = 'negotiation' | 'acquired';
+
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").default("entreprise").notNull(), // entreprise, opco, particulier, institution
+  contractStatus: text("contract_status").default("negotiation").notNull(), // negotiation, acquired
+  contractAmount: integer("contract_amount").default(0), // Montant du contrat en centimes
+  assignedTrainerId: text("assigned_trainer_id"), // Formateur assigné à ce client
   siret: text("siret"),
   email: text("email"),
   phone: text("phone"),
@@ -360,6 +375,7 @@ export const insertReminderSchema = createInsertSchema(reminders).omit({ id: tru
 
 // --- TYPES ---
 export type User = typeof users.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Client = typeof clients.$inferSelect;
 export type TrainingProgram = typeof trainingPrograms.$inferSelect;
 export type Mission = typeof missions.$inferSelect;

@@ -2,8 +2,8 @@ import {
   users, clients, trainingPrograms, missions, missionClients, missionTrainers, missionSteps, stepTasks, missionSessions,
   participants, missionParticipants, attendanceRecords, evaluations, auditLogs,
   invoices, documents, documentTemplates, documentTemplateVersions, templateNotifications,
-  messages, projects, tasks, reminderSettings, reminders,
-  type User, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
+  messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
+  type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
   type Document, type DocumentTemplate, type DocumentTemplateVersion, type TemplateNotification,
@@ -33,6 +33,12 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getTrainers(): Promise<User[]>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
+
+  // Password Reset Tokens
+  createPasswordResetToken(userId: string): Promise<PasswordResetToken>;
+  getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
+  markTokenAsUsed(token: string): Promise<void>;
+  deleteExpiredTokens(): Promise<void>;
 
   // Projects
   getProjects(): Promise<Project[]>;
@@ -271,6 +277,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return !!updated;
+  }
+
+  // ==================== PASSWORD RESET TOKENS ====================
+  async createPasswordResetToken(userId: string): Promise<PasswordResetToken> {
+    const crypto = await import('crypto');
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+    // Delete any existing tokens for this user
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
+
+    const [newToken] = await db.insert(passwordResetTokens).values({
+      userId,
+      token,
+      expiresAt,
+    }).returning();
+
+    return newToken;
+  }
+
+  async getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined> {
+    const [resetToken] = await db.select()
+      .from(passwordResetTokens)
+      .where(eq(passwordResetTokens.token, token));
+    return resetToken;
+  }
+
+  async markTokenAsUsed(token: string): Promise<void> {
+    await db.update(passwordResetTokens)
+      .set({ used: true })
+      .where(eq(passwordResetTokens.token, token));
+  }
+
+  async deleteExpiredTokens(): Promise<void> {
+    await db.delete(passwordResetTokens)
+      .where(sql`${passwordResetTokens.expiresAt} < NOW() OR ${passwordResetTokens.used} = true`);
   }
 
   // ==================== PROJECTS ====================

@@ -191,8 +191,11 @@ export async function registerRoutes(
 
   app.put(api.clients.update.path, isAuthenticated, requirePermission('clients:update'), async (req, res) => {
     try {
+      console.log('[SERVER] Client update - Raw body:', req.body);
       const input = api.clients.update.input.parse(req.body);
+      console.log('[SERVER] Client update - Parsed input:', input);
       const client = await storage.updateClient(Number(req.params.id), input);
+      console.log('[SERVER] Client update - Result:', client);
       if (!client) {
         res.status(404).json({ message: "Client non trouvé" });
         return;

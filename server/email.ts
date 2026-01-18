@@ -444,3 +444,84 @@ export async function sendAdminFormationReminderEmail(
     html,
   });
 }
+
+// ==================== PASSWORD RESET EMAIL ====================
+
+export async function sendPasswordResetEmail(
+  email: string,
+  userName: string,
+  resetToken: string,
+  baseUrl: string
+): Promise<boolean> {
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center; }
+        h1 { margin: 0; font-size: 24px; }
+        .btn { display: inline-block; background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+        .btn:hover { background-color: #1d4ed8; }
+        .warning { background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 15px 0; color: #92400e; }
+        .link-text { word-break: break-all; background-color: #f3f4f6; padding: 10px; border-radius: 4px; font-size: 12px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Reinitialisation du mot de passe</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour ${userName},</p>
+          <p>Vous avez demande la reinitialisation de votre mot de passe pour votre compte CQFD Formation.</p>
+
+          <p style="text-align: center;">
+            <a href="${resetUrl}" class="btn">Reinitialiser mon mot de passe</a>
+          </p>
+
+          <div class="warning">
+            <strong>Important:</strong> Ce lien est valable pendant <strong>1 heure</strong>.
+            Si vous n'avez pas fait cette demande, vous pouvez ignorer cet email.
+          </div>
+
+          <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur:</p>
+          <p class="link-text">${resetUrl}</p>
+        </div>
+        <div class="footer">
+          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+          <p>CQFD Formation - Gestion des formations</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+Bonjour ${userName},
+
+Vous avez demande la reinitialisation de votre mot de passe pour votre compte CQFD Formation.
+
+Pour reinitialiser votre mot de passe, cliquez sur le lien suivant:
+${resetUrl}
+
+Ce lien est valable pendant 1 heure.
+
+Si vous n'avez pas fait cette demande, vous pouvez ignorer cet email.
+
+CQFD Formation
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: 'Reinitialisation de votre mot de passe - CQFD Formation',
+    html,
+    text,
+  });
+}

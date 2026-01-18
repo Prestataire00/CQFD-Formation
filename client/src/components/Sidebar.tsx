@@ -10,6 +10,8 @@ import {
   FileText,
   Settings,
   LogOut,
+  Calendar,
+  UserCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,6 +39,18 @@ const NAV_ITEMS: NavItem[] = [
     label: "Missions",
     href: "/missions",
     roles: ["admin", "formateur", "prestataire"],
+  },
+  {
+    icon: Calendar,
+    label: "Calendrier",
+    href: "/calendar",
+    roles: ["admin"],
+  },
+  {
+    icon: UserCircle,
+    label: "Mon Espace",
+    href: "/my-space",
+    roles: ["formateur", "prestataire"],
   },
   {
     icon: Building2,

@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
 import Login from "@/pages/Login";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import Dashboard from "@/pages/Dashboard";
 import Missions from "@/pages/Missions";
 import MissionDetail from "@/pages/MissionDetail";
@@ -14,6 +16,8 @@ import Participants from "@/pages/Participants";
 import Invoices from "@/pages/Invoices";
 import Users from "@/pages/Users";
 import DocumentTemplates from "@/pages/DocumentTemplates";
+import Calendar from "@/pages/Calendar";
+import TrainerSpace from "@/pages/TrainerSpace";
 import { Sidebar } from "@/components/Sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -31,8 +35,17 @@ const PlaceholderPage = ({ title }: { title: string }) => (
 );
 
 // Protected route wrapper
-function ProtectedRoute({ component: Component, adminOnly = false }: { component: React.ComponentType; adminOnly?: boolean }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+function ProtectedRoute({
+  component: Component,
+  adminOnly = false,
+  trainerOnly = false,
+}: {
+  component: React.ComponentType;
+  adminOnly?: boolean;
+  trainerOnly?: boolean;
+}) {
+  const { isAuthenticated, isLoading, isAdmin, user } = useAuth();
+  const isTrainerOrPrestataire = user?.role === "formateur" || user?.role === "prestataire";
 
   if (isLoading) {
     return (
@@ -47,6 +60,10 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
   }
 
   if (adminOnly && !isAdmin) {
+    return <Redirect to="/" />;
+  }
+
+  if (trainerOnly && !isTrainerOrPrestataire) {
     return <Redirect to="/" />;
   }
 
@@ -66,9 +83,15 @@ function Router() {
 
   return (
     <Switch>
-      {/* Public route */}
+      {/* Public routes */}
       <Route path="/login">
         {isAuthenticated ? <Redirect to="/" /> : <Login />}
+      </Route>
+      <Route path="/forgot-password">
+        {isAuthenticated ? <Redirect to="/" /> : <ForgotPassword />}
+      </Route>
+      <Route path="/reset-password">
+        {isAuthenticated ? <Redirect to="/" /> : <ResetPassword />}
       </Route>
 
       {/* Protected routes */}
@@ -97,6 +120,14 @@ function Router() {
       </Route>
       <Route path="/document-templates">
         <ProtectedRoute component={DocumentTemplates} adminOnly />
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute component={Calendar} adminOnly />
+      </Route>
+
+      {/* Trainer/Prestataire only routes */}
+      <Route path="/my-space">
+        <ProtectedRoute component={TrainerSpace} trainerOnly />
       </Route>
 
       {/* Placeholder pages */}

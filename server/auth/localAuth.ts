@@ -185,4 +185,114 @@ export function setupAuthRoutes(app: Express) {
       return res.status(500).json({ message: 'Erreur serveur' });
     }
   });
+
+  // Forgot password - request reset token
+  app.post('/api/auth/forgot-password', async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: 'Email requis' });
+      }
+
+      const user = await storage.getUserByEmail(email);
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        console.log(`[Auth] Password reset requested for unknown email: ${email}`);
+        return res.json({ message: 'Si cette adresse existe, un email de reinitialisation a ete envoye.' });
+      }
+
+      // Create reset token
+      const resetToken = await storage.createPasswordResetToken(user.id);
+
+      // Send email
+      const { sendPasswordResetEmail } = await import('../email');
+      const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Utilisateur';
+
+      await sendPasswordResetEmail(user.email!, userName, resetToken.token, baseUrl);
+
+      console.log(`[Auth] Password reset email sent to: ${email}`);
+      return res.json({ message: 'Si cette adresse existe, un email de reinitialisation a ete envoye.' });
+    } catch (error) {
+      console.error('[Auth] Error in forgot-password:', error);
+      return res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Reset password - verify token and set new password
+  app.post('/api/auth/reset-password', async (req: Request, res: Response) => {
+    try {
+      const { token, password } = req.body;
+
+      if (!token || !password) {
+        return res.status(400).json({ message: 'Token et mot de passe requis' });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ message: 'Le mot de passe doit contenir au moins 6 caracteres' });
+      }
+
+      // Get and validate token
+      const resetToken = await storage.getPasswordResetToken(token);
+
+      if (!resetToken) {
+        return res.status(400).json({ message: 'Lien invalide ou expire' });
+      }
+
+      if (resetToken.used) {
+        return res.status(400).json({ message: 'Ce lien a deja ete utilise' });
+      }
+
+      if (new Date() > new Date(resetToken.expiresAt)) {
+        return res.status(400).json({ message: 'Ce lien a expire' });
+      }
+
+      // Update password
+      const bcrypt = await import('bcrypt');
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      await storage.updateUser(resetToken.userId, { passwordHash } as any);
+
+      // Mark token as used
+      await storage.markTokenAsUsed(token);
+
+      console.log(`[Auth] Password reset successful for user: ${resetToken.userId}`);
+      return res.json({ message: 'Mot de passe reinitialise avec succes' });
+    } catch (error) {
+      console.error('[Auth] Error in reset-password:', error);
+      return res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Verify reset token (check if valid before showing form)
+  app.get('/api/auth/verify-reset-token', async (req: Request, res: Response) => {
+    try {
+      const { token } = req.query;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ valid: false, message: 'Token requis' });
+      }
+
+      const resetToken = await storage.getPasswordResetToken(token);
+
+      if (!resetToken) {
+        return res.json({ valid: false, message: 'Lien invalide ou expire' });
+      }
+
+      if (resetToken.used) {
+        return res.json({ valid: false, message: 'Ce lien a deja ete utilise' });
+      }
+
+      if (new Date() > new Date(resetToken.expiresAt)) {
+        return res.json({ valid: false, message: 'Ce lien a expire' });
+      }
+
+      return res.json({ valid: true });
+    } catch (error) {
+      console.error('[Auth] Error in verify-reset-token:', error);
+      return res.status(500).json({ valid: false, message: 'Erreur serveur' });
+    }
+  });
 }
