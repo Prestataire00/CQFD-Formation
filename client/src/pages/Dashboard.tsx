@@ -6,7 +6,7 @@ import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
 import { useStats, useMissions, useInvoices } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
-import { GamificationWidget, AchievementUnlockedModal } from "@/components/gamification";
+import { GamificationWidget, AchievementUnlockedModal, LevelBadge } from "@/components/gamification";
 import {
   Briefcase,
   CheckCircle2,

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { triggerConfetti, XPPopup, useXPPopup, LevelUpModal, AchievementUnlockedModal } from "@/components/gamification";
+import { triggerConfetti, XPPopup, useXPPopup, LevelUpModal, AchievementUnlockedModal, LevelBadge } from "@/components/gamification";
 import { useAwardXP } from "@/hooks/use-gamification";
 import {
   Select,

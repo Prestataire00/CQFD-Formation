@@ -1,4 +1,67 @@
 import { Zap, Trophy, Star, ChevronRight, Award } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+
+export function GamificationWidget({ user }: { user: any }) {
+  const level = user.level || 1;
+  const xp = user.xp || 0;
+  const nextLevelXp = level * 1000;
+  const progress = (xp / nextLevelXp) * 100;
+
+  return (
+    <Card className="hover-elevate">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium flex items-center justify-between">
+          <span>Niveau {level}</span>
+          <Trophy className="h-4 w-4 text-yellow-500" />
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>{xp} XP</span>
+            <span>{nextLevelXp} XP</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+          <div className="pt-2 flex flex-wrap gap-1">
+            {user.badges?.slice(0, 3).map((badge: any, i: number) => (
+              <Badge key={i} variant="secondary" className="text-[10px] px-1 capitalize">
+                {badge.name}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AchievementUnlockedModal({ badge, isOpen, onClose }: any) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in duration-300">
+      <Card className="w-80 animate-in zoom-in duration-300">
+        <CardHeader className="text-center">
+          <div className="mx-auto bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+            <Star className="h-10 w-10 text-primary animate-bounce" />
+          </div>
+          <CardTitle>Badge Débloqué !</CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          <p className="font-bold text-lg">{badge?.name}</p>
+          <p className="text-sm text-muted-foreground mt-2">{badge?.description}</p>
+          <button 
+            onClick={onClose}
+            className="mt-6 w-full bg-primary text-primary-foreground py-2 rounded-md hover:opacity-90 transition-opacity"
+          >
+            Génial !
+          </button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export function XPPopup({ xp, action }: { xp: number; action: string }) {
   return (
@@ -49,9 +112,16 @@ export function LevelUpModal({ level, isOpen, onClose }: any) {
   );
 }
 
+export function LevelBadge({ level }: { level: number }) {
+  return (
+    <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 font-bold gap-1">
+      <Star className="h-3 w-3 fill-primary" />
+      Niv. {level}
+    </Badge>
+  );
+}
+
 export function triggerConfetti() {
   // Simple implementation or use a library if available
   console.log("Confetti triggered!");
 }
-
-export { GamificationWidget, AchievementUnlockedModal } from "./index";
