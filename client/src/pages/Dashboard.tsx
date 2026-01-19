@@ -6,6 +6,7 @@ import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
 import { useStats, useMissions, useInvoices } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
+import { GamificationWidget, AchievementUnlockedModal } from "@/components/gamification";
 import {
   Briefcase,
   CheckCircle2,
@@ -72,17 +73,27 @@ export default function Dashboard() {
 
         <div className="p-6 lg:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-          {/* Welcome message */}
-          <div className="bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
-            <h2 className="text-2xl font-bold text-foreground mb-2">
-              Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
-            </h2>
-            <p className="text-muted-foreground">
-              {isAdmin
-                ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
-                : "Consultez vos missions assignees et suivez votre activite."}
-            </p>
+          {/* Welcome message with Gamification */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
+              </h2>
+              <p className="text-muted-foreground">
+                {isAdmin
+                  ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
+                  : "Consultez vos missions assignees et suivez votre activite."}
+              </p>
+            </div>
+            {!isAdmin && (
+              <GamificationWidget compact />
+            )}
           </div>
+
+          {/* Full Gamification Widget for trainers */}
+          {!isAdmin && (
+            <GamificationWidget />
+          )}
 
           {/* Stats Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -328,6 +339,8 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
+      {/* Gamification celebration modals */}
+      <AchievementUnlockedModal />
     </div>
   );
 }

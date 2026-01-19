@@ -33,6 +33,15 @@
   --ring: 262 83% 58%;
 
   --radius: 0.75rem;
+
+  /* Fun/Gamification Colors */
+  --fun-pink: 330 90% 65%;
+  --fun-cyan: 180 85% 55%;
+  --fun-orange: 25 95% 55%;
+  --fun-green: 145 80% 45%;
+  --fun-amber: 45 96% 60%;
+  --xp-gradient: linear-gradient(90deg, #10b981, #7c3aed);
+  --level-glow: 0 0 15px rgba(139, 92, 246, 0.6);
 }
 
 @layer base {

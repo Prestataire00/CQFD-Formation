@@ -21,7 +21,8 @@
       "Bash(npx tsx:*)",
       "Bash(curl:*)",
       "Bash(netstat:*)",
-      "Bash(ss:*)"
+      "Bash(ss:*)",
+      "Bash(ls:*)"
     ]
   }
 }

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMissions, useClients } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
+import { useGamificationProfile } from "@/hooks/use-gamification";
+import { GamificationWidget, BadgeGallery, AchievementUnlockedModal, StreakIndicator, AnimatedCounter } from "@/components/gamification";
 import {
   Loader2,
   UserCircle,
@@ -18,6 +20,9 @@ import {
   Mail,
   Phone,
   ArrowRight,
+  Trophy,
+  Zap,
+  Target,
 } from "lucide-react";
 import type { Mission, MissionStatus, Client } from "@shared/schema";
 
@@ -54,6 +59,7 @@ export default function TrainerSpace() {
   const [, setLocation] = useLocation();
   const { data: allMissions, isLoading: missionsLoading } = useMissions();
   const { data: allClients, isLoading: clientsLoading } = useClients();
+  const { data: gamificationProfile } = useGamificationProfile();
   const [view, setView] = useState<CalendarView>("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -122,6 +128,46 @@ export default function TrainerSpace() {
             </div>
           ) : (
             <>
+              {/* Gamification Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <GamificationWidget className="lg:col-span-2" />
+                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Trophy className="w-5 h-5 text-amber-500" />
+                      Statistiques Rapides
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {gamificationProfile && (
+                      <>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
+                          <div className="flex items-center gap-2">
+                            <Zap className="w-5 h-5 text-emerald-500" />
+                            <span className="text-sm text-muted-foreground">XP Total</span>
+                          </div>
+                          <AnimatedCounter value={gamificationProfile.totalXP} className="text-lg text-emerald-600" />
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
+                          <div className="flex items-center gap-2">
+                            <Target className="w-5 h-5 text-blue-500" />
+                            <span className="text-sm text-muted-foreground">Missions terminees</span>
+                          </div>
+                          <AnimatedCounter value={gamificationProfile.stats.completedMissions} className="text-lg text-blue-600" />
+                        </div>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-5 h-5 text-purple-500" />
+                            <span className="text-sm text-muted-foreground">Badges obtenus</span>
+                          </div>
+                          <AnimatedCounter value={gamificationProfile.badges.length} className="text-lg text-purple-600" />
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
               {/* Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <StatCard
@@ -215,6 +261,19 @@ export default function TrainerSpace() {
                 </Card>
               )}
 
+              {/* Badges Gallery */}
+              <Card className="mb-6 border-violet-200 bg-gradient-to-br from-violet-50/50 to-fuchsia-50/50">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-amber-500" />
+                    Mes Succes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <BadgeGallery showLocked />
+                </CardContent>
+              </Card>
+
               {/* Calendar */}
               <Card>
                 <CardHeader className="pb-2">
@@ -239,6 +298,8 @@ export default function TrainerSpace() {
           )}
         </div>
       </main>
+      {/* Gamification celebration modals */}
+      <AchievementUnlockedModal />
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail } from "./email";
+import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1680,8 +1681,129 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== GAMIFICATION ====================
+  // Get gamification profile for current user
+  app.get('/api/gamification/profile', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const profile = await gamificationService.getUserProfile(user.id);
+      res.json(profile);
+    } catch (err) {
+      console.error('Gamification profile error:', err);
+      res.status(500).json({ message: 'Erreur lors de la récupération du profil' });
+    }
+  });
+
+  // Get gamification profile for specific user (admin only)
+  app.get('/api/gamification/profile/:userId', isAuthenticated, async (req, res) => {
+    try {
+      const profile = await gamificationService.getUserProfile(req.params.userId);
+      res.json(profile);
+    } catch (err) {
+      console.error('Gamification profile error:', err);
+      res.status(500).json({ message: 'Erreur lors de la récupération du profil' });
+    }
+  });
+
+  // Get all badges
+  app.get('/api/gamification/badges', isAuthenticated, async (req, res) => {
+    try {
+      const badges = await storage.getBadges();
+      res.json(badges);
+    } catch (err) {
+      console.error('Get badges error:', err);
+      res.status(500).json({ message: 'Erreur lors de la récupération des badges' });
+    }
+  });
+
+  // Get user badges
+  app.get('/api/gamification/user-badges', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const userBadges = await storage.getUserBadges(user.id);
+      res.json(userBadges);
+    } catch (err) {
+      console.error('Get user badges error:', err);
+      res.status(500).json({ message: 'Erreur lors de la récupération des badges' });
+    }
+  });
+
+  // Get unnotified badges (for celebration modals)
+  app.get('/api/gamification/unnotified-badges', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const badges = await gamificationService.getUnnotifiedBadges(user.id);
+      res.json(badges);
+    } catch (err) {
+      console.error('Get unnotified badges error:', err);
+      res.status(500).json({ message: 'Erreur' });
+    }
+  });
+
+  // Mark badge as notified
+  app.patch('/api/gamification/badges/:id/notified', isAuthenticated, async (req, res) => {
+    try {
+      await gamificationService.markBadgeNotified(Number(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Mark badge notified error:', err);
+      res.status(500).json({ message: 'Erreur' });
+    }
+  });
+
+  // Award XP (internal use or admin)
+  app.post('/api/gamification/award-xp', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { userId, amount, actionType, reason, entityType, entityId } = req.body;
+
+      // Only allow awarding XP to self or if admin
+      const targetUserId = userId || user.id;
+      if (targetUserId !== user.id && user.role !== 'admin') {
+        res.status(403).json({ message: 'Non autorisé' });
+        return;
+      }
+
+      const result = await gamificationService.awardXP(
+        targetUserId,
+        amount,
+        actionType,
+        reason,
+        entityType,
+        entityId
+      );
+      res.json(result);
+    } catch (err) {
+      console.error('Award XP error:', err);
+      res.status(500).json({ message: 'Erreur lors de l\'attribution des XP' });
+    }
+  });
+
+  // Get XP transactions for current user
+  app.get('/api/gamification/xp-history', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const transactions = await storage.getXPTransactions(user.id);
+      res.json(transactions);
+    } catch (err) {
+      console.error('Get XP history error:', err);
+      res.status(500).json({ message: 'Erreur' });
+    }
+  });
+
+  // Get level configuration
+  app.get('/api/gamification/levels', isAuthenticated, async (req, res) => {
+    res.json(LEVELS);
+  });
+
+  // Get XP configuration
+  app.get('/api/gamification/xp-config', isAuthenticated, async (req, res) => {
+    res.json(XP_CONFIG);
+  });
+
   // Seed Data
   await seedDatabase();
+  await seedBadges();
 
   return httpServer;
 }
@@ -1864,4 +1986,22 @@ async function seedDatabase() {
   });
 
   console.log('Database seeded with CQFD Formation demo data');
+}
+
+// Seed default badges for gamification
+async function seedBadges() {
+  try {
+    const existingBadges = await storage.getBadges();
+    if (existingBadges.length > 0) {
+      return; // Already seeded
+    }
+
+    console.log('Seeding default badges...');
+    for (const badge of DEFAULT_BADGES) {
+      await storage.createBadge(badge);
+    }
+    console.log(`Seeded ${DEFAULT_BADGES.length} badges`);
+  } catch (err) {
+    console.error('Error seeding badges:', err);
+  }
 }

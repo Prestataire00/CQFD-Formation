@@ -27,6 +27,11 @@ export const users = pgTable("users", {
   siret: varchar("siret"), // For prestataires (subcontractors)
   specialties: jsonb("specialties").$type<string[]>(), // Training domains
   dailyRate: integer("daily_rate"), // in cents, for prestataires
+  // Gamification fields
+  currentLevel: integer("current_level").default(1),
+  totalXP: integer("total_xp").default(0),
+  streakDays: integer("streak_days").default(0),
+  lastActivityDate: timestamp("last_activity_date"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -293,6 +298,44 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// --- GAMIFICATION TABLES ---
+export type BadgeRarity = 'common' | 'rare' | 'epic' | 'legendary';
+export type XPActionType = 'task_completed' | 'mission_completed' | 'five_star_evaluation' | 'document_uploaded' | 'streak_7' | 'streak_30' | 'badge_unlock' | 'bonus';
+
+export const xpTransactions = pgTable("xp_transactions", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  amount: integer("amount").notNull(),
+  actionType: text("action_type").notNull(), // task_completed, mission_completed, etc.
+  reason: text("reason").notNull(),
+  entityType: text("entity_type"), // mission, task, document, etc.
+  entityId: integer("entity_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const badges = pgTable("badges", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(), // Emoji or icon name
+  category: text("category").notNull(), // missions, tasks, quality, streaks, special
+  rarity: text("rarity").default("common").notNull(), // common, rare, epic, legendary
+  condition: text("condition").notNull(), // Description of how to unlock
+  conditionType: text("condition_type").notNull(), // missions_count, tasks_count, streak_days, etc.
+  conditionValue: integer("condition_value").notNull(), // Threshold value
+  xpReward: integer("xp_reward").default(0), // XP awarded when unlocked
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  badgeId: integer("badge_id").notNull().references(() => badges.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow(),
+  notified: boolean("notified").default(false).notNull(), // Has user seen the unlock notification?
+});
+
 // --- LEGACY MODELS (for backward compatibility) ---
 export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
@@ -372,6 +415,9 @@ export const insertProjectSchema = createInsertSchema(projects).omit({ id: true,
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReminderSettingSchema = createInsertSchema(reminderSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true, createdAt: true });
+export const insertXPTransactionSchema = createInsertSchema(xpTransactions).omit({ id: true, createdAt: true });
+export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true, createdAt: true });
+export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({ id: true, unlockedAt: true });
 
 // --- TYPES ---
 export type User = typeof users.$inferSelect;
@@ -399,6 +445,9 @@ export type Project = typeof projects.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type ReminderSetting = typeof reminderSettings.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
+export type XPTransaction = typeof xpTransactions.$inferSelect;
+export type Badge = typeof badges.$inferSelect;
+export type UserBadge = typeof userBadges.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertClient = z.infer<typeof insertClientSchema>;
@@ -424,3 +473,6 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertReminderSetting = z.infer<typeof insertReminderSettingSchema>;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type InsertXPTransaction = z.infer<typeof insertXPTransactionSchema>;
+export type InsertBadge = z.infer<typeof insertBadgeSchema>;
+export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;

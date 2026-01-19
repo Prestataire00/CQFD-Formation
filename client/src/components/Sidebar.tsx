@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useGamificationProfile } from "@/hooks/use-gamification";
+import { LevelBadge, XPBar, StreakIndicator } from "@/components/gamification";
 import type { UserRole } from "@shared/models/auth";
 
 interface NavItem {
@@ -112,6 +114,7 @@ function getRoleBadge(role: UserRole): { label: string; color: string } {
 export function Sidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated, logout, isLoggingOut } = useAuth();
+  const { data: gamificationProfile } = useGamificationProfile();
 
   // Default to showing all items if not authenticated (for demo purposes)
   const userRole = (user?.role as UserRole) || "admin";
@@ -176,34 +179,61 @@ export function Sidebar() {
 
       {/* User Profile */}
       <div className="p-4 border-t border-border/50 space-y-3">
-        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-gradient-to-br from-gray-100 to-gray-50 border border-border">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-            {user?.profileImageUrl ? (
-              <img
-                src={user.profileImageUrl}
-                alt="Profile"
-                className="w-10 h-10 rounded-full object-cover"
-              />
-            ) : (
-              getInitials()
-            )}
-          </div>
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-gradient-to-br from-violet-50 to-fuchsia-50 border border-violet-200">
+          {/* Level Badge or Profile Image */}
+          {gamificationProfile && userRole !== "admin" ? (
+            <LevelBadge
+              level={gamificationProfile.currentLevel}
+              icon={gamificationProfile.levelIcon}
+              title={gamificationProfile.levelTitle}
+              size="sm"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+              {user?.profileImageUrl ? (
+                <img
+                  src={user.profileImageUrl}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                getInitials()
+              )}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">
               {user?.firstName && user?.lastName
                 ? `${user.firstName} ${user.lastName}`
                 : user?.email || "Utilisateur"}
             </p>
-            <span
-              className={cn(
-                "inline-block text-xs px-2 py-0.5 rounded-full font-medium",
-                roleBadge.color
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "inline-block text-xs px-2 py-0.5 rounded-full font-medium",
+                  roleBadge.color
+                )}
+              >
+                {roleBadge.label}
+              </span>
+              {gamificationProfile && userRole !== "admin" && (
+                <StreakIndicator days={gamificationProfile.streakDays} size="sm" />
               )}
-            >
-              {roleBadge.label}
-            </span>
+            </div>
           </div>
         </div>
+
+        {/* XP Bar for non-admin users */}
+        {gamificationProfile && userRole !== "admin" && (
+          <div className="px-3">
+            <XPBar
+              currentXP={gamificationProfile.xpInCurrentLevel}
+              maxXP={gamificationProfile.xpForNextLevel}
+              level={gamificationProfile.currentLevel}
+              size="sm"
+            />
+          </div>
+        )}
 
         {isAuthenticated && (
           <button

@@ -3,12 +3,14 @@ import {
   participants, missionParticipants, attendanceRecords, evaluations, auditLogs,
   invoices, documents, documentTemplates, documentTemplateVersions, templateNotifications,
   messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
+  xpTransactions, badges, userBadges,
   type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
   type Document, type DocumentTemplate, type DocumentTemplateVersion, type TemplateNotification,
   type Message, type Project, type Task,
   type ReminderSetting, type Reminder,
+  type XPTransaction, type Badge, type UserBadge,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
   type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
   type InsertMissionParticipant, type InsertAttendanceRecord,
@@ -16,6 +18,7 @@ import {
   type InsertDocumentTemplateVersion, type InsertTemplateNotification,
   type InsertAuditLog, type InsertMessage, type InsertProject, type InsertTask,
   type InsertReminderSetting, type InsertReminder,
+  type InsertXPTransaction, type InsertBadge, type InsertUserBadge,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
@@ -198,6 +201,31 @@ export interface IStorage {
   createReminder(reminder: InsertReminder): Promise<Reminder>;
   updateReminder(id: number, data: Partial<Reminder>): Promise<Reminder | undefined>;
   deleteReminder(id: number): Promise<boolean>;
+
+  // Gamification - XP Transactions
+  createXPTransaction(transaction: InsertXPTransaction): Promise<XPTransaction>;
+  getXPTransactions(userId: string): Promise<XPTransaction[]>;
+  getRecentXPTransactions(userId: string, limit: number): Promise<XPTransaction[]>;
+
+  // Gamification - Badges
+  getBadges(): Promise<Badge[]>;
+  getBadge(id: number): Promise<Badge | undefined>;
+  createBadge(badge: InsertBadge): Promise<Badge>;
+  updateBadge(id: number, data: Partial<Badge>): Promise<Badge | undefined>;
+
+  // Gamification - User Badges
+  getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
+  unlockBadge(userId: string, badgeId: number): Promise<UserBadge>;
+  getUnnotifiedBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]>;
+  markBadgeNotified(userBadgeId: number): Promise<void>;
+
+  // Gamification - Stats
+  getUserGamificationStats(userId: string): Promise<{
+    completedMissions: number;
+    completedTasks: number;
+    fiveStarEvaluations: number;
+    documentsUploaded: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1306,6 +1334,143 @@ export class DatabaseStorage implements IStorage {
   async deleteReminder(id: number): Promise<boolean> {
     await db.delete(reminders).where(eq(reminders.id, id));
     return true;
+  }
+
+  // ==================== GAMIFICATION - XP TRANSACTIONS ====================
+  async createXPTransaction(transaction: InsertXPTransaction): Promise<XPTransaction> {
+    const [newTransaction] = await db.insert(xpTransactions).values(transaction).returning();
+    return newTransaction;
+  }
+
+  async getXPTransactions(userId: string): Promise<XPTransaction[]> {
+    return await db.select().from(xpTransactions)
+      .where(eq(xpTransactions.userId, userId))
+      .orderBy(desc(xpTransactions.createdAt));
+  }
+
+  async getRecentXPTransactions(userId: string, limit: number): Promise<XPTransaction[]> {
+    return await db.select().from(xpTransactions)
+      .where(eq(xpTransactions.userId, userId))
+      .orderBy(desc(xpTransactions.createdAt))
+      .limit(limit);
+  }
+
+  // ==================== GAMIFICATION - BADGES ====================
+  async getBadges(): Promise<Badge[]> {
+    return await db.select().from(badges)
+      .where(eq(badges.isActive, true))
+      .orderBy(badges.category, badges.conditionValue);
+  }
+
+  async getBadge(id: number): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.id, id));
+    return badge;
+  }
+
+  async createBadge(badge: InsertBadge): Promise<Badge> {
+    const [newBadge] = await db.insert(badges).values(badge).returning();
+    return newBadge;
+  }
+
+  async updateBadge(id: number, data: Partial<Badge>): Promise<Badge | undefined> {
+    const [updated] = await db.update(badges)
+      .set(data)
+      .where(eq(badges.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== GAMIFICATION - USER BADGES ====================
+  async getUserBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]> {
+    const results = await db.select({
+      id: userBadges.id,
+      userId: userBadges.userId,
+      badgeId: userBadges.badgeId,
+      unlockedAt: userBadges.unlockedAt,
+      notified: userBadges.notified,
+      badge: badges,
+    })
+      .from(userBadges)
+      .innerJoin(badges, eq(userBadges.badgeId, badges.id))
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.unlockedAt));
+    return results;
+  }
+
+  async unlockBadge(userId: string, badgeId: number): Promise<UserBadge> {
+    const [userBadge] = await db.insert(userBadges).values({
+      userId,
+      badgeId,
+      notified: false,
+    }).returning();
+    return userBadge;
+  }
+
+  async getUnnotifiedBadges(userId: string): Promise<(UserBadge & { badge: Badge })[]> {
+    const results = await db.select({
+      id: userBadges.id,
+      userId: userBadges.userId,
+      badgeId: userBadges.badgeId,
+      unlockedAt: userBadges.unlockedAt,
+      notified: userBadges.notified,
+      badge: badges,
+    })
+      .from(userBadges)
+      .innerJoin(badges, eq(userBadges.badgeId, badges.id))
+      .where(and(
+        eq(userBadges.userId, userId),
+        eq(userBadges.notified, false)
+      ))
+      .orderBy(desc(userBadges.unlockedAt));
+    return results;
+  }
+
+  async markBadgeNotified(userBadgeId: number): Promise<void> {
+    await db.update(userBadges)
+      .set({ notified: true })
+      .where(eq(userBadges.id, userBadgeId));
+  }
+
+  // ==================== GAMIFICATION - STATS ====================
+  async getUserGamificationStats(userId: string): Promise<{
+    completedMissions: number;
+    completedTasks: number;
+    fiveStarEvaluations: number;
+    documentsUploaded: number;
+  }> {
+    // Count completed missions
+    const completedMissions = await db.select()
+      .from(missions)
+      .where(and(
+        eq(missions.trainerId, userId),
+        eq(missions.status, 'completed')
+      ));
+
+    // Count completed tasks (steps)
+    const completedTasks = await db.select()
+      .from(missionSteps)
+      .innerJoin(missions, eq(missionSteps.missionId, missions.id))
+      .where(and(
+        eq(missions.trainerId, userId),
+        eq(missionSteps.isCompleted, true)
+      ));
+
+    // Count 5-star evaluations
+    const fiveStarEvaluations = await db.select()
+      .from(evaluations)
+      .where(eq(evaluations.overallRating, 5));
+
+    // Count documents uploaded by user
+    const documentsUploaded = await db.select()
+      .from(documents)
+      .where(eq(documents.userId, userId));
+
+    return {
+      completedMissions: completedMissions.length,
+      completedTasks: completedTasks.length,
+      fiveStarEvaluations: fiveStarEvaluations.length,
+      documentsUploaded: documentsUploaded.length,
+    };
   }
 }
 

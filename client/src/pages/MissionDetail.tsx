@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { triggerConfetti, XPPopup, useXPPopup, LevelUpModal, AchievementUnlockedModal } from "@/components/gamification";
+import { useAwardXP } from "@/hooks/use-gamification";
 import {
   Select,
   SelectContent,
@@ -501,6 +503,11 @@ export default function MissionDetail() {
 
   const isAdmin = user?.role === "admin";
 
+  // Gamification
+  const awardXP = useAwardXP();
+  const xpPopup = useXPPopup();
+  const [levelUpData, setLevelUpData] = useState<{ isOpen: boolean; level: number; title: string; icon: string } | null>(null);
+
   const client = clients?.find((c: any) => c.id === mission?.clientId);
   const trainer = trainers?.find((t: any) => t.id === mission?.trainerId);
   const program = programs?.find((p: any) => p.id === mission?.programId);
@@ -519,8 +526,33 @@ export default function MissionDetail() {
     // Seulement mettre à jour si le statut doit changer
     if (expectedStatus !== mission.status) {
       updateMissionStatus.mutate({ id: missionId, status: expectedStatus });
+
+      // Award XP when mission is completed
+      if (expectedStatus === "completed" && mission.status !== "completed" && !isAdmin) {
+        triggerConfetti("large", ["#FFD700", "#FFA500", "#FF6347"]);
+        xpPopup.showPopup(500);
+
+        awardXP.mutateAsync({
+          amount: 500,
+          actionType: "mission_completed",
+          reason: "Mission terminee",
+          entityType: "mission",
+          entityId: missionId,
+        }).then((result) => {
+          if (result.leveledUp && result.newLevel && result.newTitle) {
+            setTimeout(() => {
+              setLevelUpData({
+                isOpen: true,
+                level: result.newLevel,
+                title: result.newTitle,
+                icon: getLevelIcon(result.newLevel),
+              });
+            }, 2000);
+          }
+        }).catch(console.error);
+      }
     }
-  }, [progressPercent, mission?.status, missionId, steps]);
+  }, [progressPercent, mission?.status, missionId, steps, isAdmin]);
 
   const startEdit = () => {
     if (mission) {
@@ -600,14 +632,56 @@ export default function MissionDetail() {
 
   const handleUpdateTask = async (taskId: number, data: any) => {
     try {
+      // Check if we're completing a task
+      const isCompleting = data.isCompleted === true;
+      const currentTask = steps?.find((s: any) => s.id === taskId);
+      const wasCompleted = currentTask?.isCompleted;
+
       await updateStep.mutateAsync({
         missionId,
         stepId: taskId,
         data,
       });
+
+      // Award XP for completing a task (not uncompleting)
+      if (isCompleting && !wasCompleted && !isAdmin) {
+        triggerConfetti("small", ["#8B5CF6", "#A78BFA", "#C4B5FD"]);
+        xpPopup.showPopup(50);
+
+        try {
+          const result = await awardXP.mutateAsync({
+            amount: 50,
+            actionType: "task_completed",
+            reason: "Tache completee",
+            entityType: "mission_step",
+            entityId: taskId,
+          });
+
+          // Check for level up
+          if (result.leveledUp && result.newLevel && result.newTitle) {
+            setLevelUpData({
+              isOpen: true,
+              level: result.newLevel,
+              title: result.newTitle,
+              icon: getLevelIcon(result.newLevel),
+            });
+          }
+        } catch (err) {
+          console.error("Failed to award XP:", err);
+        }
+      }
     } catch (error) {
       console.error("Failed to update task:", error);
     }
+  };
+
+  // Helper function to get level icon
+  const getLevelIcon = (level: number): string => {
+    const icons: Record<number, string> = {
+      1: "🌱", 2: "📚", 3: "💪", 4: "🎓", 5: "👑",
+      6: "⚡", 7: "🌟", 8: "💎", 9: "🏆", 10: "👸",
+    };
+    return icons[level] || "🌟";
   };
 
   // Types de documents disponibles
@@ -1130,19 +1204,51 @@ export default function MissionDetail() {
                   )}
 
                   {steps && steps.length > 0 ? (
-                    <div className="space-y-4">
-                      {steps.map((task: any) => (
-                        <TaskItem
-                          key={task.id}
-                          task={task}
-                          missionId={missionId}
-                          isAdmin={isAdmin}
-                          users={missionTrainerUsers.length > 0 ? missionTrainerUsers : allUsers || []}
-                          currentUserId={user?.id || ""}
-                          onUpdate={handleUpdateTask}
-                          onDelete={handleDeleteStep}
-                        />
-                      ))}
+                    <div className="relative">
+                      {/* Ligne de connexion verticale du workflow */}
+                      <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-violet-300 via-violet-400 to-violet-300" />
+
+                      <div className="space-y-4">
+                        {[...steps]
+                          .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
+                          .map((task: any, index: number) => (
+                          <div key={task.id} className="relative flex gap-4">
+                            {/* Numéro d'étape avec cercle */}
+                            <div className="relative z-10 flex-shrink-0">
+                              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold shadow-md ${
+                                task.isCompleted
+                                  ? 'bg-green-500 text-white'
+                                  : task.status === 'na'
+                                  ? 'bg-gray-300 text-gray-600'
+                                  : getAutoStatus(task) === 'late'
+                                  ? 'bg-red-500 text-white'
+                                  : getAutoStatus(task) === 'priority'
+                                  ? 'bg-amber-500 text-white'
+                                  : 'bg-violet-500 text-white'
+                              }`}>
+                                {task.isCompleted ? (
+                                  <CheckCircle2 className="w-6 h-6" />
+                                ) : (
+                                  index + 1
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Contenu de la tâche */}
+                            <div className="flex-1 pb-2">
+                              <TaskItem
+                                task={task}
+                                missionId={missionId}
+                                isAdmin={isAdmin}
+                                users={missionTrainerUsers.length > 0 ? missionTrainerUsers : allUsers || []}
+                                currentUserId={user?.id || ""}
+                                onUpdate={handleUpdateTask}
+                                onDelete={handleDeleteStep}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <p className="text-muted-foreground text-center py-8">
@@ -1156,10 +1262,10 @@ export default function MissionDetail() {
             {/* Sidebar droite (1/3) */}
             <div className="space-y-6">
               {/* Informations */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Info className="w-5 h-5" />
+              <Card className="border-violet-300 bg-gradient-to-br from-violet-50 to-violet-100/50 shadow-violet-100">
+                <CardHeader className="border-b border-violet-200 bg-violet-100/50">
+                  <CardTitle className="flex items-center gap-2 text-violet-800">
+                    <Info className="w-5 h-5 text-violet-600" />
                     Informations
                   </CardTitle>
                 </CardHeader>
@@ -1709,6 +1815,19 @@ export default function MissionDetail() {
           </div>
         </div>
       </main>
+
+      {/* Gamification modals */}
+      <XPPopup amount={xpPopup.amount} show={xpPopup.show} onComplete={xpPopup.hidePopup} />
+      {levelUpData && (
+        <LevelUpModal
+          isOpen={levelUpData.isOpen}
+          onClose={() => setLevelUpData(null)}
+          newLevel={levelUpData.level}
+          newTitle={levelUpData.title}
+          newIcon={levelUpData.icon}
+        />
+      )}
+      <AchievementUnlockedModal />
     </div>
   );
 }
