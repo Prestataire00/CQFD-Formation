@@ -350,6 +350,23 @@ export async function registerRoutes(
         res.status(404).json({ message: "Mission non trouvée" });
         return;
       }
+
+      // Award XP for completing a mission
+      if (input.status === 'completed') {
+        const user = req.user!;
+        await gamificationService.awardXP(
+          user.id,
+          XP_CONFIG.MISSION_COMPLETED,
+          'mission_completed',
+          `Mission complétée: ${mission.title}`,
+          'mission',
+          mission.id
+        );
+        
+        // Check for new badges
+        await gamificationService.checkMissionBadges(user.id);
+      }
+
       res.json(mission);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1802,8 +1819,8 @@ export async function registerRoutes(
   });
 
   // Seed Data
-  await seedDatabase();
-  await seedBadges();
+  await seedDatabase().catch(err => console.error('Error seeding database:', err));
+  await seedBadges().catch(err => console.error('Error seeding badges:', err));
 
   return httpServer;
 }

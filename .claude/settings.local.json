@@ -22,7 +22,8 @@
       "Bash(curl:*)",
       "Bash(netstat:*)",
       "Bash(ss:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }

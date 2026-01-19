@@ -1,0 +1,57 @@
+import { Zap, Trophy, Star, ChevronRight, Award } from "lucide-react";
+
+export function XPPopup({ xp, action }: { xp: number; action: string }) {
+  return (
+    <div className="fixed bottom-4 right-4 bg-primary text-primary-foreground p-4 rounded-lg shadow-lg flex items-center gap-3 animate-in slide-in-from-right-full duration-500">
+      <div className="bg-white/20 p-2 rounded-full">
+        <Zap className="h-5 w-5 fill-white" />
+      </div>
+      <div>
+        <p className="font-bold">+{xp} XP</p>
+        <p className="text-xs opacity-90">{action}</p>
+      </div>
+    </div>
+  );
+}
+
+export function useXPPopup() {
+  const [popup, setPopup] = (window as any).useState?.(null);
+  return {
+    show: (xp: number, action: string) => {
+      setPopup({ xp, action });
+      setTimeout(() => setPopup(null), 3000);
+    },
+    popup
+  };
+}
+
+export function LevelUpModal({ level, isOpen, onClose }: any) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-card p-8 rounded-2xl shadow-2xl text-center max-w-sm animate-in zoom-in duration-300">
+        <div className="relative inline-block mb-6">
+          <Trophy className="h-20 w-20 text-yellow-500 animate-bounce" />
+          <div className="absolute -top-2 -right-2 bg-primary text-primary-foreground w-10 h-10 rounded-full flex items-center justify-center font-bold text-xl border-4 border-card">
+            {level}
+          </div>
+        </div>
+        <h2 className="text-3xl font-black mb-2 italic">NIVEAU SUPÉRIEUR !</h2>
+        <p className="text-muted-foreground mb-8">Vous avez atteint le niveau {level}. Continuez comme ça !</p>
+        <button 
+          onClick={onClose}
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95"
+        >
+          CONTINUER L'AVENTURE
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function triggerConfetti() {
+  // Simple implementation or use a library if available
+  console.log("Confetti triggered!");
+}
+
+export { GamificationWidget, AchievementUnlockedModal } from "./index";
