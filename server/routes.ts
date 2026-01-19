@@ -6,7 +6,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail } from "./email";
+import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import multer from "multer";
 import path from "path";
@@ -331,6 +331,31 @@ export async function registerRoutes(
         res.status(404).json({ message: "Mission non trouvée" });
         return;
       }
+
+      // Envoyer notification par email à l'autre partie
+      try {
+        const currentUser = req.user!;
+        const modifiedBy = await storage.getUser(currentUser.id);
+        const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+        const admins = await storage.getUsersByRole('admin');
+        const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+        if (modifiedBy) {
+          await notifyOtherParty(
+            mission,
+            modifiedBy,
+            trainer || null,
+            admins,
+            client || null,
+            'update',
+            { changeDetails: 'Les informations de la mission ont été mises à jour.' }
+          );
+        }
+      } catch (emailErr) {
+        console.error('[Email] Erreur notification mission update:', emailErr);
+        // Ne pas bloquer la réponse si l'email échoue
+      }
+
       res.json(mission);
     } catch (err) {
       console.error('Mission update error:', err);
@@ -990,6 +1015,34 @@ export async function registerRoutes(
         ...input,
         userId: user.id,
       });
+
+      // Envoyer notification par email à l'autre partie
+      if (input.missionId) {
+        try {
+          const mission = await storage.getMission(input.missionId);
+          if (mission) {
+            const modifiedBy = await storage.getUser(user.id);
+            const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+            const admins = await storage.getUsersByRole('admin');
+            const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+            if (modifiedBy) {
+              await notifyOtherParty(
+                mission,
+                modifiedBy,
+                trainer || null,
+                admins,
+                client || null,
+                'document',
+                { documentTitle: input.title }
+              );
+            }
+          }
+        } catch (emailErr) {
+          console.error('[Email] Erreur notification document:', emailErr);
+        }
+      }
+
       res.status(201).json(doc);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1063,6 +1116,34 @@ export async function registerRoutes(
         ...input,
         senderId: user.id,
       });
+
+      // Envoyer notification par email à l'autre partie
+      if (input.missionId) {
+        try {
+          const mission = await storage.getMission(input.missionId);
+          if (mission) {
+            const modifiedBy = await storage.getUser(user.id);
+            const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+            const admins = await storage.getUsersByRole('admin');
+            const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+            if (modifiedBy) {
+              await notifyOtherParty(
+                mission,
+                modifiedBy,
+                trainer || null,
+                admins,
+                client || null,
+                'comment',
+                { commentContent: input.content }
+              );
+            }
+          }
+        } catch (emailErr) {
+          console.error('[Email] Erreur notification message:', emailErr);
+        }
+      }
+
       res.status(201).json(message);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1267,7 +1348,7 @@ export async function registerRoutes(
           for (const admin of adminUsers) {
             recipients.push({
               type: 'admin',
-              email: admin.email,
+              email: admin.email ?? undefined,
               name: `${admin.firstName} ${admin.lastName}`,
             });
           }
@@ -1278,7 +1359,7 @@ export async function registerRoutes(
           if (trainer) {
             recipients.push({
               type: 'trainer',
-              email: trainer.email,
+              email: trainer.email ?? undefined,
               name: `${trainer.firstName} ${trainer.lastName}`,
             });
           }
@@ -1620,6 +1701,70 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ==================== IN-APP NOTIFICATIONS ====================
+  // Get all in-app notifications for current user
+  app.get('/api/in-app-notifications', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const notifications = await storage.getInAppNotifications(user.id);
+      res.json(notifications);
+    } catch (err) {
+      console.error('Error fetching in-app notifications:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Get unread in-app notifications only
+  app.get('/api/in-app-notifications/unread', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const notifications = await storage.getUnreadInAppNotifications(user.id);
+      res.json(notifications);
+    } catch (err) {
+      console.error('Error fetching unread notifications:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Get unread notification count
+  app.get('/api/in-app-notifications/unread-count', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const count = await storage.getUnreadInAppNotificationCount(user.id);
+      res.json({ count });
+    } catch (err) {
+      console.error('Error fetching notification count:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Mark a notification as read
+  app.patch('/api/in-app-notifications/:id/read', isAuthenticated, async (req, res) => {
+    try {
+      const notification = await storage.markInAppNotificationAsRead(Number(req.params.id));
+      if (!notification) {
+        res.status(404).json({ message: 'Notification non trouvée' });
+        return;
+      }
+      res.json(notification);
+    } catch (err) {
+      console.error('Error marking notification as read:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Mark all notifications as read
+  app.patch('/api/in-app-notifications/read-all', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      await storage.markAllInAppNotificationsAsRead(user.id);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error marking all notifications as read:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
   // Duplicate mission for another trainer
   app.post('/api/missions/:id/duplicate', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
     try {
@@ -1889,31 +2034,28 @@ async function seedDatabase() {
   const program1 = await storage.createTrainingProgram({
     code: 'MGMT-001',
     title: 'Management d\'équipe',
+    type: 'Intra',
     description: 'Formation aux fondamentaux du management',
-    objectives: ['Développer son leadership', 'Gérer les conflits', 'Motiver son équipe'],
-    duration: 14, // 2 jours
-    modality: 'presentiel',
-    maxParticipants: 12,
-    pricePerParticipant: 75000, // 750€
-    category: 'Management',
+    objectives: 'Développer son leadership, Gérer les conflits, Motiver son équipe',
+    duration: '14 heures (2 jours)',
+    recommendedParticipants: 12,
   });
 
   const program2 = await storage.createTrainingProgram({
     code: 'SEC-001',
     title: 'Sécurité informatique',
+    type: 'Inter',
     description: 'Sensibilisation à la cybersécurité',
-    objectives: ['Identifier les menaces', 'Appliquer les bonnes pratiques', 'Réagir en cas d\'incident'],
-    duration: 7, // 1 jour
-    modality: 'hybride',
-    maxParticipants: 15,
-    pricePerParticipant: 45000, // 450€
-    category: 'Informatique',
+    objectives: 'Identifier les menaces, Appliquer les bonnes pratiques, Réagir en cas d\'incident',
+    duration: '7 heures (1 jour)',
+    recommendedParticipants: 15,
   });
 
   // Create missions
   const mission1 = await storage.createMission({
     reference: 'MIS-2024-001',
     title: 'Formation Management TechCorp',
+    typology: 'Intra',
     status: 'confirmed',
     programId: program1.id,
     clientId: client1.id,
@@ -1922,15 +2064,13 @@ async function seedDatabase() {
     endDate: new Date('2024-02-16'),
     totalHours: 14,
     locationType: 'presentiel',
-    locationAddress: '15 rue de la Tech',
-    locationCity: 'Paris',
-    totalAmount: 900000, // 9000€
-    trainerFee: 100000, // 1000€
+    location: '15 rue de la Tech, Paris',
   });
 
   const mission2 = await storage.createMission({
     reference: 'MIS-2024-002',
     title: 'Cybersécurité OPCO Commerce',
+    typology: 'Inter',
     status: 'draft',
     programId: program2.id,
     clientId: client2.id,
@@ -1939,9 +2079,7 @@ async function seedDatabase() {
     endDate: new Date('2024-03-10'),
     totalHours: 7,
     locationType: 'distanciel',
-    visioLink: 'https://meet.google.com/abc-defg-hij',
-    totalAmount: 675000, // 6750€
-    trainerFee: 50000, // 500€
+    location: 'En ligne',
   });
 
   // Create sessions for mission 1
@@ -1966,7 +2104,7 @@ async function seedDatabase() {
     email: 'alice.moreau@techcorp.fr',
     phone: '06 11 22 33 44',
     company: 'TechCorp SAS',
-    jobTitle: 'Chef de projet',
+    function: 'Chef de projet',
   });
 
   const participant2 = await storage.createParticipant({
@@ -1975,7 +2113,7 @@ async function seedDatabase() {
     email: 'bruno.petit@techcorp.fr',
     phone: '06 55 66 77 88',
     company: 'TechCorp SAS',
-    jobTitle: 'Responsable équipe',
+    function: 'Responsable équipe',
   });
 
   // Add participants to mission 1

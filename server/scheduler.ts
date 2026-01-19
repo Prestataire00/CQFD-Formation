@@ -196,6 +196,45 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             sentAt: now,
           });
           sent++;
+
+          // Create in-app notification for the recipient
+          // Find the user ID based on the recipient type and email
+          let userId: string | null = null;
+          const formattedDate = mission.startDate
+            ? new Date(mission.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+            : 'Date non définie';
+
+          if (reminder.recipientType === 'trainer' && mission.trainerId) {
+            userId = mission.trainerId;
+          } else if (reminder.recipientType === 'admin') {
+            // Find admin by email
+            const users = await storage.getUsers();
+            const adminUser = users.find(u => u.email === reminder.recipientEmail && u.role === 'admin');
+            if (adminUser) {
+              userId = adminUser.id;
+            }
+          }
+
+          if (userId) {
+            const notificationMetadata: Record<string, any> = {
+              daysBefore,
+              trainerName: trainer ? `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() : null,
+              clientName: client?.name || null,
+              location: mission.location || null,
+              startDate: mission.startDate ? mission.startDate.toISOString() : null,
+            };
+
+            await storage.createInAppNotification({
+              userId,
+              type: isJ2AdminReminder ? 'admin_alert' : 'reminder',
+              title: `Rappel J-${daysBefore} : ${mission.title}`,
+              message: `Formation "${mission.title}" prévue le ${formattedDate}`,
+              missionId: mission.id,
+              reminderId: reminder.id,
+              isRead: false,
+              metadata: notificationMetadata,
+            });
+          }
         } else {
           throw new Error("Échec de l'envoi de l'email");
         }

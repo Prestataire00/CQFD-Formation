@@ -7,8 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useMissions, useClients } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
-import { useGamificationProfile } from "@/hooks/use-gamification";
-import { GamificationWidget, BadgeGallery, AchievementUnlockedModal, StreakIndicator, AnimatedCounter } from "@/components/gamification";
+import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
 import {
   Loader2,
   UserCircle,
@@ -20,11 +19,17 @@ import {
   Mail,
   Phone,
   ArrowRight,
-  Trophy,
-  Zap,
-  Target,
+  Bell,
+  MapPin,
+  Download,
+  AlertTriangle,
+  ListTodo,
 } from "lucide-react";
-import type { Mission, MissionStatus, Client } from "@shared/schema";
+import { Button } from "@/components/ui/button";
+import { format, differenceInDays, addDays } from "date-fns";
+import { fr } from "date-fns/locale";
+import { useQuery } from "@tanstack/react-query";
+import type { Mission, MissionStatus, Client, InAppNotification, MissionStep } from "@shared/schema";
 
 function StatCard({
   title,
@@ -59,9 +64,23 @@ export default function TrainerSpace() {
   const [, setLocation] = useLocation();
   const { data: allMissions, isLoading: missionsLoading } = useMissions();
   const { data: allClients, isLoading: clientsLoading } = useClients();
-  const { data: gamificationProfile } = useGamificationProfile();
+  const { data: inAppNotifications } = useUnreadInAppNotifications();
+  const markInAppAsRead = useMarkInAppNotificationRead();
   const [view, setView] = useState<CalendarView>("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Handle notification click
+  const handleNotificationClick = async (notification: InAppNotification) => {
+    await markInAppAsRead.mutateAsync(notification.id);
+    if (notification.missionId) {
+      setLocation(`/missions/${notification.missionId}`);
+    }
+  };
+
+  // Get the 5 most recent unread notifications
+  const recentNotifications = useMemo(() => {
+    return (inAppNotifications || []).slice(0, 5);
+  }, [inAppNotifications]);
 
   // Filter missions assigned to the current trainer
   const trainerMissions = useMemo(() => {
@@ -104,6 +123,167 @@ export default function TrainerSpace() {
     return { inProgress, confirmed, completed, upcoming, total: trainerMissions.length };
   }, [trainerMissions]);
 
+  // Prochaines missions (14 prochains jours)
+  const upcomingMissions = useMemo(() => {
+    const now = new Date();
+    const in14Days = addDays(now, 14);
+
+    return trainerMissions
+      .filter((m: Mission) => {
+        if (!m.startDate) return false;
+        const startDate = new Date(m.startDate);
+        return (
+          startDate >= now &&
+          startDate <= in14Days &&
+          (m.status === "confirmed" || m.status === "in_progress")
+        );
+      })
+      .sort((a: Mission, b: Mission) =>
+        new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime()
+      )
+      .slice(0, 5);
+  }, [trainerMissions]);
+
+  // Récupérer les étapes de toutes les missions du formateur
+  const { data: allSteps } = useQuery({
+    queryKey: ["/api/trainer-steps", user?.id],
+    queryFn: async () => {
+      if (!trainerMissions.length) return [];
+      const stepsPromises = trainerMissions.map(async (mission: Mission) => {
+        try {
+          const response = await fetch(`/api/missions/${mission.id}/steps`, {
+            credentials: "include",
+          });
+          if (!response.ok) return [];
+          const steps = await response.json();
+          return steps.map((step: MissionStep) => ({ ...step, mission }));
+        } catch {
+          return [];
+        }
+      });
+      const results = await Promise.all(stepsPromises);
+      return results.flat();
+    },
+    enabled: trainerMissions.length > 0,
+  });
+
+  // Tâches prioritaires et en retard
+  const priorityTasks = useMemo(() => {
+    if (!allSteps) return [];
+
+    const now = new Date();
+    return allSteps
+      .filter((step: MissionStep & { mission: Mission }) => {
+        // Filtrer les tâches non terminées qui sont prioritaires ou en retard
+        if (step.isCompleted) return false;
+        if (step.status === "done" || step.status === "na") return false;
+
+        // Prioritaires ou en retard
+        if (step.status === "priority" || step.status === "late") return true;
+
+        // Ou avec une date d'échéance proche (7 jours) ou dépassée
+        if (step.dueDate) {
+          const dueDate = new Date(step.dueDate);
+          const daysUntilDue = differenceInDays(dueDate, now);
+          return daysUntilDue <= 7;
+        }
+
+        return false;
+      })
+      .sort((a: MissionStep & { mission: Mission }, b: MissionStep & { mission: Mission }) => {
+        // Trier par statut (late > priority > todo) puis par date
+        const statusOrder: Record<string, number> = { late: 0, priority: 1, todo: 2 };
+        const orderA = statusOrder[a.status] ?? 3;
+        const orderB = statusOrder[b.status] ?? 3;
+        if (orderA !== orderB) return orderA - orderB;
+
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        return 0;
+      })
+      .slice(0, 5);
+  }, [allSteps]);
+
+  // Fonction pour générer et télécharger le fichier iCal
+  const exportToIcal = () => {
+    const formatDateToIcal = (date: Date) => {
+      return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    };
+
+    const escapeIcalText = (text: string) => {
+      return text.replace(/[\\;,\n]/g, (match) => {
+        if (match === "\n") return "\\n";
+        return "\\" + match;
+      });
+    };
+
+    // Filtrer les missions actives (confirmées ou en cours)
+    const activeMissions = trainerMissions.filter(
+      (m: Mission) => m.status === "confirmed" || m.status === "in_progress"
+    );
+
+    let icalContent = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Formation CRM//Missions//FR",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Mes Missions de Formation",
+    ];
+
+    activeMissions.forEach((mission: Mission) => {
+      if (!mission.startDate) return;
+
+      const startDate = new Date(mission.startDate);
+      const endDate = mission.endDate ? new Date(mission.endDate) : startDate;
+
+      // Ajouter 1 jour à la date de fin pour les événements "toute la journée"
+      const endDatePlusOne = new Date(endDate);
+      endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+
+      const client = allClients?.find((c: Client) => c.id === mission.clientId);
+      const clientName = client?.name || "Client non défini";
+
+      const description = [
+        `Client: ${clientName}`,
+        mission.typology ? `Type: ${mission.typology}` : "",
+        mission.totalHours ? `Durée: ${mission.totalHours}h` : "",
+        mission.reference ? `Réf: ${mission.reference}` : "",
+      ]
+        .filter(Boolean)
+        .join("\\n");
+
+      icalContent.push(
+        "BEGIN:VEVENT",
+        `UID:mission-${mission.id}@formation-crm`,
+        `DTSTAMP:${formatDateToIcal(new Date())}`,
+        `DTSTART;VALUE=DATE:${startDate.toISOString().split("T")[0].replace(/-/g, "")}`,
+        `DTEND;VALUE=DATE:${endDatePlusOne.toISOString().split("T")[0].replace(/-/g, "")}`,
+        `SUMMARY:${escapeIcalText(mission.title)}`,
+        mission.location ? `LOCATION:${escapeIcalText(mission.location)}` : "",
+        `DESCRIPTION:${description}`,
+        "END:VEVENT"
+      );
+    });
+
+    icalContent.push("END:VCALENDAR");
+
+    // Filtrer les lignes vides
+    const icalString = icalContent.filter(Boolean).join("\r\n");
+
+    // Créer et télécharger le fichier
+    const blob = new Blob([icalString], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `mes-missions-${format(new Date(), "yyyy-MM-dd")}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -128,46 +308,6 @@ export default function TrainerSpace() {
             </div>
           ) : (
             <>
-              {/* Gamification Section */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <GamificationWidget className="lg:col-span-2" />
-                <Card className="border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Trophy className="w-5 h-5 text-amber-500" />
-                      Statistiques Rapides
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {gamificationProfile && (
-                      <>
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
-                          <div className="flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-emerald-500" />
-                            <span className="text-sm text-muted-foreground">XP Total</span>
-                          </div>
-                          <AnimatedCounter value={gamificationProfile.totalXP} className="text-lg text-emerald-600" />
-                        </div>
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
-                          <div className="flex items-center gap-2">
-                            <Target className="w-5 h-5 text-blue-500" />
-                            <span className="text-sm text-muted-foreground">Missions terminees</span>
-                          </div>
-                          <AnimatedCounter value={gamificationProfile.stats.completedMissions} className="text-lg text-blue-600" />
-                        </div>
-                        <div className="flex items-center justify-between p-3 rounded-lg bg-white/50">
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-purple-500" />
-                            <span className="text-sm text-muted-foreground">Badges obtenus</span>
-                          </div>
-                          <AnimatedCounter value={gamificationProfile.badges.length} className="text-lg text-purple-600" />
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
               {/* Statistics */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                 <StatCard
@@ -200,6 +340,197 @@ export default function TrainerSpace() {
                   icon={Building2}
                   color="bg-indigo-100 text-indigo-600"
                 />
+              </div>
+
+              {/* Notifications */}
+              {recentNotifications.length > 0 && (
+                <Card className="mb-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Bell className="w-5 h-5 text-orange-500" />
+                      Notifications ({recentNotifications.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {recentNotifications.map((notification: InAppNotification) => (
+                        <div
+                          key={notification.id}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          <Clock className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-medium text-sm">{notification.title}</p>
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                                Nouveau
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-0.5">
+                              {notification.message}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground">
+                              {notification.metadata?.startDate && (
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays className="w-3 h-3" />
+                                  {format(new Date(notification.metadata.startDate), "d MMMM yyyy", { locale: fr })}
+                                </span>
+                              )}
+                              {notification.metadata?.location && (
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {notification.metadata.location}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Prochaines missions & Tâches prioritaires */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                {/* Prochaines missions */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5 text-blue-500" />
+                      Prochaines missions (14 jours)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {upcomingMissions.length === 0 ? (
+                      <p className="text-muted-foreground text-sm text-center py-4">
+                        Aucune mission prevue dans les 14 prochains jours
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {upcomingMissions.map((mission: Mission) => {
+                          const client = allClients?.find((c: Client) => c.id === mission.clientId);
+                          const daysUntil = differenceInDays(new Date(mission.startDate!), new Date());
+
+                          return (
+                            <div
+                              key={mission.id}
+                              className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer"
+                              onClick={() => setLocation(`/missions/${mission.id}`)}
+                            >
+                              <div className="flex-shrink-0 w-12 h-12 bg-blue-500 text-white rounded-lg flex flex-col items-center justify-center">
+                                <span className="text-xs font-medium">
+                                  {format(new Date(mission.startDate!), "MMM", { locale: fr }).toUpperCase()}
+                                </span>
+                                <span className="text-lg font-bold leading-none">
+                                  {format(new Date(mission.startDate!), "d")}
+                                </span>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">{mission.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {client?.name || "Client non defini"}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  {mission.location && (
+                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {mission.location}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  daysUntil === 0
+                                    ? "bg-red-100 text-red-700 border-red-300"
+                                    : daysUntil <= 3
+                                    ? "bg-orange-100 text-orange-700 border-orange-300"
+                                    : "bg-blue-100 text-blue-700 border-blue-300"
+                                }
+                              >
+                                {daysUntil === 0
+                                  ? "Aujourd'hui"
+                                  : daysUntil === 1
+                                  ? "Demain"
+                                  : `J-${daysUntil}`}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Tâches prioritaires */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <ListTodo className="w-5 h-5 text-amber-500" />
+                      Taches prioritaires
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {priorityTasks.length === 0 ? (
+                      <p className="text-muted-foreground text-sm text-center py-4">
+                        Aucune tache prioritaire en attente
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {priorityTasks.map((step: MissionStep & { mission: Mission }) => {
+                          const isLate = step.status === "late" || (step.dueDate && new Date(step.dueDate) < new Date());
+
+                          return (
+                            <div
+                              key={step.id}
+                              className={`flex items-start gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                                isLate
+                                  ? "bg-red-50 border-red-200 hover:bg-red-100"
+                                  : "bg-amber-50 border-amber-200 hover:bg-amber-100"
+                              }`}
+                              onClick={() => setLocation(`/missions/${step.missionId}`)}
+                            >
+                              <div className={`p-2 rounded-lg ${isLate ? "bg-red-100" : "bg-amber-100"}`}>
+                                {isLate ? (
+                                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                                ) : (
+                                  <Clock className="w-4 h-4 text-amber-600" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">{step.title}</p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {step.mission.title}
+                                </p>
+                                {step.dueDate && (
+                                  <p className={`text-xs mt-1 ${isLate ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                                    Echeance: {format(new Date(step.dueDate), "d MMM yyyy", { locale: fr })}
+                                  </p>
+                                )}
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  isLate
+                                    ? "bg-red-100 text-red-700 border-red-300"
+                                    : step.status === "priority"
+                                    ? "bg-amber-100 text-amber-700 border-amber-300"
+                                    : "bg-slate-100 text-slate-700 border-slate-300"
+                                }
+                              >
+                                {isLate ? "En retard" : step.status === "priority" ? "Prioritaire" : "A faire"}
+                              </Badge>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
 
               {/* My Clients */}
@@ -261,26 +592,24 @@ export default function TrainerSpace() {
                 </Card>
               )}
 
-              {/* Badges Gallery */}
-              <Card className="mb-6 border-violet-200 bg-gradient-to-br from-violet-50/50 to-fuchsia-50/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Trophy className="w-5 h-5 text-amber-500" />
-                    Mes Succes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <BadgeGallery showLocked />
-                </CardContent>
-              </Card>
-
               {/* Calendar */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <CalendarDays className="w-5 h-5" />
-                    Mes Missions
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CalendarDays className="w-5 h-5" />
+                      Mes Missions
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToIcal}
+                      disabled={trainerMissions.filter((m: Mission) => m.status === "confirmed" || m.status === "in_progress").length === 0}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Exporter (.ics)
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="h-[calc(100vh-420px)] min-h-[500px]">
@@ -298,8 +627,6 @@ export default function TrainerSpace() {
           )}
         </div>
       </main>
-      {/* Gamification celebration modals */}
-      <AchievementUnlockedModal />
     </div>
   );
 }

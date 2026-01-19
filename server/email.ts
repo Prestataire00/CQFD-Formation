@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import type { User, Mission, Document, Client, Reminder, ReminderSetting } from '@shared/schema';
+import type { User, Mission, Document, Client, Reminder, ReminderSetting, Message } from '@shared/schema';
 
 // Configuration du transporteur email
 // Utilise les variables d'environnement pour la configuration SMTP
@@ -524,4 +524,191 @@ CQFD Formation
     html,
     text,
   });
+}
+
+// ==================== MISSION NOTIFICATION EMAILS ====================
+
+interface MissionNotificationData {
+  mission: Mission;
+  modifiedBy: User;
+  recipient: User;
+  client?: Client | null;
+  changeType: 'update' | 'document' | 'comment';
+  changeDetails?: string;
+  documentTitle?: string;
+  commentContent?: string;
+}
+
+export async function sendMissionNotificationEmail(data: MissionNotificationData): Promise<boolean> {
+  const { mission, modifiedBy, recipient, client, changeType, changeDetails, documentTitle, commentContent } = data;
+
+  if (!recipient.email) {
+    console.log(`[Email] Pas d'email pour le destinataire ${recipient.id}, notification non envoyée`);
+    return false;
+  }
+
+  const recipientName = `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Utilisateur';
+  const modifierName = `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || 'Un utilisateur';
+  const modifierRole = modifiedBy.role === 'admin' ? 'Administrateur' : 'Formateur';
+  const missionTitle = mission.title || `Mission #${mission.id}`;
+  const clientName = client?.name || 'Client non défini';
+
+  // Déterminer le titre et le contenu selon le type de changement
+  let headerTitle = '';
+  let headerColor = '#2563eb';
+  let changeDescription = '';
+  let subject = '';
+
+  switch (changeType) {
+    case 'update':
+      headerTitle = 'Mission modifiée';
+      headerColor = '#f59e0b';
+      changeDescription = changeDetails || 'Des modifications ont été apportées à la mission.';
+      subject = `Mission modifiée: ${missionTitle}`;
+      break;
+    case 'document':
+      headerTitle = 'Nouveau document ajouté';
+      headerColor = '#10b981';
+      changeDescription = documentTitle
+        ? `Un nouveau document a été ajouté: <strong>${documentTitle}</strong>`
+        : 'Un nouveau document a été ajouté à la mission.';
+      subject = `Nouveau document: ${missionTitle}`;
+      break;
+    case 'comment':
+      headerTitle = 'Nouveau commentaire';
+      headerColor = '#8b5cf6';
+      changeDescription = commentContent
+        ? `<blockquote style="border-left: 3px solid #8b5cf6; padding-left: 15px; margin: 10px 0; color: #4b5563;">${commentContent}</blockquote>`
+        : 'Un nouveau commentaire a été ajouté.';
+      subject = `Nouveau commentaire: ${missionTitle}`;
+      break;
+  }
+
+  const startDate = mission.startDate
+    ? new Date(mission.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
+    : 'Non définie';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: ${headerColor}; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; }
+        .mission-info { background-color: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid ${headerColor}; }
+        .change-info { background-color: white; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .modifier-badge { display: inline-block; background-color: #e5e7eb; padding: 4px 12px; border-radius: 20px; font-size: 12px; color: #4b5563; }
+        h1 { margin: 0; font-size: 24px; }
+        h2 { color: #1f2937; font-size: 18px; margin-top: 0; }
+        .detail-row { margin: 8px 0; }
+        .label { font-weight: bold; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${headerTitle}</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour ${recipientName},</p>
+
+          <p>
+            <span class="modifier-badge">${modifierRole}</span>
+            <strong>${modifierName}</strong> a effectué une modification sur une mission.
+          </p>
+
+          <div class="mission-info">
+            <h2>${missionTitle}</h2>
+            <div class="detail-row">
+              <span class="label">Référence:</span> ${mission.reference || 'N/A'}
+            </div>
+            <div class="detail-row">
+              <span class="label">Client:</span> ${clientName}
+            </div>
+            <div class="detail-row">
+              <span class="label">Date de début:</span> ${startDate}
+            </div>
+          </div>
+
+          <div class="change-info">
+            <h2>Détails de la modification</h2>
+            <p>${changeDescription}</p>
+          </div>
+
+          <p>Connectez-vous à la plateforme pour consulter les détails complets de cette mission.</p>
+        </div>
+        <div class="footer">
+          <p>Cet email a été envoyé automatiquement suite à une modification sur la plateforme.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+Bonjour ${recipientName},
+
+${modifierName} (${modifierRole}) a effectué une modification sur la mission "${missionTitle}".
+
+Mission: ${missionTitle}
+Référence: ${mission.reference || 'N/A'}
+Client: ${clientName}
+Date de début: ${startDate}
+
+Type de modification: ${changeType === 'update' ? 'Mise à jour' : changeType === 'document' ? 'Nouveau document' : 'Nouveau commentaire'}
+
+Connectez-vous à la plateforme pour consulter les détails.
+  `;
+
+  return sendEmail({
+    to: recipient.email,
+    subject,
+    html,
+    text,
+  });
+}
+
+// Fonction utilitaire pour notifier l'autre partie (admin ou formateur)
+export async function notifyOtherParty(
+  mission: Mission,
+  modifiedBy: User,
+  trainer: User | null,
+  admins: User[],
+  client: Client | null,
+  changeType: 'update' | 'document' | 'comment',
+  options?: { changeDetails?: string; documentTitle?: string; commentContent?: string }
+): Promise<void> {
+  const isModifierAdmin = modifiedBy.role === 'admin';
+
+  if (isModifierAdmin) {
+    // Admin a modifié -> notifier le formateur
+    if (trainer && trainer.email && trainer.id !== modifiedBy.id) {
+      await sendMissionNotificationEmail({
+        mission,
+        modifiedBy,
+        recipient: trainer,
+        client,
+        changeType,
+        ...options,
+      });
+    }
+  } else {
+    // Formateur a modifié -> notifier tous les admins
+    for (const admin of admins) {
+      if (admin.email && admin.id !== modifiedBy.id) {
+        await sendMissionNotificationEmail({
+          mission,
+          modifiedBy,
+          recipient: admin,
+          client,
+          changeType,
+          ...options,
+        });
+      }
+    }
+  }
 }

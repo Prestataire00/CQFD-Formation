@@ -263,7 +263,7 @@ export default function DocumentTemplates() {
                       <TableCell>
                         {template.clientId ? (
                           <Badge variant="secondary">
-                            {clients?.find((c) => c.id === template.clientId)?.name || "Client"}
+                            {clients?.find((c: { id: number; name: string }) => c.id === template.clientId)?.name || "Client"}
                           </Badge>
                         ) : (
                           <span className="text-muted-foreground text-sm">Global</span>

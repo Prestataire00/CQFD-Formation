@@ -1,12 +1,13 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
+import { Badge } from "@/components/ui/badge";
 import { useStats, useMissions, useInvoices } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
-import { GamificationWidget, AchievementUnlockedModal, LevelBadge } from "@/components/gamification";
+import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
 import {
   Briefcase,
   CheckCircle2,
@@ -17,10 +18,11 @@ import {
   Calendar,
   MapPin,
   ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, Invoice, MissionStatus, InvoiceStatus } from "@shared/schema";
+import type { Mission, Invoice, MissionStatus, InvoiceStatus, InAppNotification } from "@shared/schema";
 
 function getMissionStatusLabel(status: MissionStatus): { label: string; color: string } {
   const styles: Record<MissionStatus, { label: string; color: string }> = {
@@ -45,12 +47,26 @@ function getInvoiceStatusLabel(status: InvoiceStatus): { label: string; color: s
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const { data: stats } = useStats();
   const { data: missions } = useMissions();
   const { data: invoices } = useInvoices();
+  const { data: inAppNotifications } = useUnreadInAppNotifications();
+  const markInAppAsRead = useMarkInAppNotificationRead();
 
   const isAdmin = user?.role === "admin";
   const isPrestataire = user?.role === "prestataire";
+
+  // Get 4 most recent notifications
+  const recentNotifications = (inAppNotifications || []).slice(0, 4);
+
+  // Handle notification click
+  const handleNotificationClick = async (notification: InAppNotification) => {
+    await markInAppAsRead.mutateAsync(notification.id);
+    if (notification.missionId) {
+      setLocation(`/missions/${notification.missionId}`);
+    }
+  };
 
   // Get upcoming missions (next 5)
   const upcomingMissions = missions
@@ -73,27 +89,17 @@ export default function Dashboard() {
 
         <div className="p-6 lg:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-          {/* Welcome message with Gamification */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
-              <h2 className="text-2xl font-bold text-foreground mb-2">
-                Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
-              </h2>
-              <p className="text-muted-foreground">
-                {isAdmin
-                  ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
-                  : "Consultez vos missions assignees et suivez votre activite."}
-              </p>
-            </div>
-            {!isAdmin && (
-              <GamificationWidget compact />
-            )}
+          {/* Welcome message */}
+          <div className="bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
+            <h2 className="text-2xl font-bold text-foreground mb-2">
+              Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
+            </h2>
+            <p className="text-muted-foreground">
+              {isAdmin
+                ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
+                : "Consultez vos missions assignees et suivez votre activite."}
+            </p>
           </div>
-
-          {/* Full Gamification Widget for trainers */}
-          {!isAdmin && (
-            <GamificationWidget />
-          )}
 
           {/* Stats Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -240,6 +246,61 @@ export default function Dashboard() {
               </GridCard>
             )}
 
+            {/* Alertes et Rappels for admin */}
+            {isAdmin && recentNotifications.length > 0 && (
+              <GridCard
+                title="Alertes et Rappels"
+                actionLabel=""
+                actionLink=""
+              >
+                <div className="space-y-3">
+                  {recentNotifications.map((notification: InAppNotification) => (
+                    <div
+                      key={notification.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      {notification.type === 'admin_alert' ? (
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-sm truncate">{notification.title}</p>
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                            Nouveau
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          {notification.message}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                          {notification.metadata?.trainerName && (
+                            <span className="bg-muted px-1.5 py-0.5 rounded">
+                              {notification.metadata.trainerName}
+                            </span>
+                          )}
+                          {notification.metadata?.clientName && (
+                            <span className="bg-muted px-1.5 py-0.5 rounded">
+                              {notification.metadata.clientName}
+                            </span>
+                          )}
+                          {notification.metadata?.startDate && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {format(new Date(notification.metadata.startDate), "d MMM", { locale: fr })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </GridCard>
+            )}
+
             {/* Stats cards for admin */}
             {isAdmin && (
               <>
@@ -336,11 +397,44 @@ export default function Dashboard() {
                 </div>
               </GridCard>
             )}
+
+            {/* Notifications for trainers/prestataires */}
+            {!isAdmin && recentNotifications.length > 0 && (
+              <GridCard
+                title="Mes Rappels"
+                actionLabel=""
+                actionLink=""
+              >
+                <div className="space-y-3">
+                  {recentNotifications.map((notification: InAppNotification) => (
+                    <div
+                      key={notification.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <Clock className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{notification.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                          {notification.message}
+                        </p>
+                        {notification.metadata?.startDate && (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-1">
+                            <Calendar className="w-3 h-3" />
+                            {format(new Date(notification.metadata.startDate), "d MMMM yyyy", { locale: fr })}
+                          </span>
+                        )}
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </GridCard>
+            )}
           </div>
+
         </div>
       </main>
-      {/* Gamification celebration modals */}
-      <AchievementUnlockedModal />
     </div>
   );
 }

@@ -34,8 +34,15 @@ import {
   Search,
   Filter,
   Trash2,
+  ArrowUpDown,
+  BookOpen,
+  Tag,
+  X,
+  LayoutGrid,
+  List,
 } from "lucide-react";
-import { useMissions, useClients, useTrainers, usePrograms, useCreateMission } from "@/hooks/use-missions";
+import { useMissions, useClients, useTrainers, usePrograms, useCreateMission, useUpdateMissionStatus } from "@/hooks/use-missions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -87,9 +94,16 @@ export default function Missions() {
   const { data: trainers } = useTrainers();
   const { data: programs } = usePrograms();
   const createMission = useCreateMission();
+  const updateMissionStatus = useUpdateMissionStatus();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [trainerFilter, setTrainerFilter] = useState<string>("all");
+  const [typologyFilter, setTypologyFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
+  const [programFilter, setProgramFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<string>("date_desc");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [missionToDelete, setMissionToDelete] = useState<number | null>(null);
 
@@ -125,8 +139,55 @@ export default function Missions() {
       mission.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (mission.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === "all" || mission.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesTrainer = trainerFilter === "all" || mission.trainerId === trainerFilter;
+    const matchesTypology = typologyFilter === "all" || mission.typology === typologyFilter;
+    const matchesClient = clientFilter === "all" || mission.clientId?.toString() === clientFilter;
+    const matchesProgram = programFilter === "all" || mission.programId?.toString() === programFilter;
+    return matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient && matchesProgram;
   }) || [];
+
+  // Sort missions
+  const sortedMissions = [...filteredMissions].sort((a: Mission, b: Mission) => {
+    switch (sortBy) {
+      case "date_asc":
+        return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+      case "date_desc":
+        return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+      case "client":
+        const clientA = clients?.find((c: any) => c.id === a.clientId)?.name || "";
+        const clientB = clients?.find((c: any) => c.id === b.clientId)?.name || "";
+        return clientA.localeCompare(clientB);
+      case "trainer":
+        const trainerA = trainers?.find((t: any) => t.id === a.trainerId);
+        const trainerB = trainers?.find((t: any) => t.id === b.trainerId);
+        const nameA = trainerA ? `${trainerA.lastName} ${trainerA.firstName}` : "";
+        const nameB = trainerB ? `${trainerB.lastName} ${trainerB.firstName}` : "";
+        return nameA.localeCompare(nameB);
+      case "title":
+        return a.title.localeCompare(b.title);
+      case "typology":
+        return (a.typology || "").localeCompare(b.typology || "");
+      case "status":
+        const statusOrder = { draft: 0, confirmed: 1, in_progress: 2, completed: 3, cancelled: 4 };
+        return (statusOrder[a.status as keyof typeof statusOrder] || 0) - (statusOrder[b.status as keyof typeof statusOrder] || 0);
+      default:
+        return 0;
+    }
+  });
+
+  // Check if any filter is active
+  const hasActiveFilters = statusFilter !== "all" || trainerFilter !== "all" || typologyFilter !== "all" || clientFilter !== "all" || programFilter !== "all" || searchTerm !== "";
+
+  // Reset all filters
+  const resetFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setTrainerFilter("all");
+    setTypologyFilter("all");
+    setClientFilter("all");
+    setProgramFilter("all");
+    setSortBy("date_desc");
+  };
 
   const handleCreateMission = async () => {
     if (!newMission.title || newMission.clientIds.length === 0 || !newMission.startDate || !newMission.endDate || !newMission.typology) {
@@ -213,8 +274,8 @@ export default function Missions() {
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         <Header title="Missions" />
 
-        <div className="flex-1 p-6 space-y-6">
-          {/* Actions bar */}
+        <div className="flex-1 p-6 space-y-4">
+          {/* Search and main actions */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="flex flex-1 gap-4">
               <div className="relative flex-1 max-w-md">
@@ -226,20 +287,6 @@ export default function Missions() {
                   className="pl-10"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Statut" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  <SelectItem value="draft">Brouillon</SelectItem>
-                  <SelectItem value="confirmed">Confirmee</SelectItem>
-                  <SelectItem value="in_progress">En cours</SelectItem>
-                  <SelectItem value="completed">Terminee</SelectItem>
-                  <SelectItem value="cancelled">Annulee</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {isAdmin && (
@@ -457,25 +504,284 @@ export default function Missions() {
             )}
           </div>
 
+          {/* Filters bar */}
+          <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+            <div className="flex flex-wrap gap-3">
+              {/* Status filter */}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
+                  <SelectItem value="draft" className="focus:bg-violet-200">Brouillon</SelectItem>
+                  <SelectItem value="confirmed" className="focus:bg-violet-200">Confirmee</SelectItem>
+                  <SelectItem value="in_progress" className="focus:bg-violet-200">En cours</SelectItem>
+                  <SelectItem value="completed" className="focus:bg-violet-200">Terminee</SelectItem>
+                  <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Typology filter */}
+              <Select value={typologyFilter} onValueChange={setTypologyFilter}>
+                <SelectTrigger className="w-40">
+                  <Tag className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Typologie" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Toutes typologies</SelectItem>
+                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                  <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Client filter */}
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-48">
+                  <Building2 className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Client" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Tous les clients</SelectItem>
+                  {clients?.map((client: any) => (
+                    <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Trainer filter */}
+              <Select value={trainerFilter} onValueChange={setTrainerFilter}>
+                <SelectTrigger className="w-48">
+                  <User className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Formateur" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Tous les formateurs</SelectItem>
+                  {trainers?.map((trainer: any) => (
+                    <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
+                      {trainer.firstName} {trainer.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Program filter */}
+              <Select value={programFilter} onValueChange={setProgramFilter}>
+                <SelectTrigger className="w-52">
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Formation" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Toutes les formations</SelectItem>
+                  {programs?.map((program: any) => (
+                    <SelectItem key={program.id} value={program.id.toString()} className="focus:bg-violet-200">
+                      {program.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort and view options */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-52">
+                    <ArrowUpDown className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Trier par" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="date_desc" className="focus:bg-violet-200">Date (plus recentes)</SelectItem>
+                    <SelectItem value="date_asc" className="focus:bg-violet-200">Date (plus anciennes)</SelectItem>
+                    <SelectItem value="client" className="focus:bg-violet-200">Client (A-Z)</SelectItem>
+                    <SelectItem value="trainer" className="focus:bg-violet-200">Formateur (A-Z)</SelectItem>
+                    <SelectItem value="title" className="focus:bg-violet-200">Titre (A-Z)</SelectItem>
+                    <SelectItem value="typology" className="focus:bg-violet-200">Typologie</SelectItem>
+                    <SelectItem value="status" className="focus:bg-violet-200">Statut</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Reset filters */}
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={resetFilters} className="text-muted-foreground">
+                    <X className="w-4 h-4 mr-1" />
+                    Reinitialiser
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Results count */}
+                <span className="text-sm text-muted-foreground">
+                  {sortedMissions.length} mission{sortedMissions.length > 1 ? "s" : ""}
+                </span>
+
+                {/* View toggle */}
+                <div className="flex border rounded-md">
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="rounded-r-none"
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="rounded-l-none"
+                    onClick={() => setViewMode("list")}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Missions list */}
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredMissions.length === 0 ? (
+          ) : sortedMissions.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Calendar className="w-12 h-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold">Aucune mission</h3>
               <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== "all"
+                {hasActiveFilters
                   ? "Aucune mission ne correspond a vos criteres."
                   : "Commencez par creer une nouvelle mission."}
               </p>
+              {hasActiveFilters && (
+                <Button variant="link" onClick={resetFilters} className="mt-2">
+                  Reinitialiser les filtres
+                </Button>
+              )}
+            </div>
+          ) : viewMode === "list" ? (
+            /* List view */
+            <div className="bg-card rounded-lg border">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-3 font-medium text-sm">Reference</th>
+                    <th className="text-left p-3 font-medium text-sm">Titre</th>
+                    <th className="text-left p-3 font-medium text-sm">Client</th>
+                    <th className="text-left p-3 font-medium text-sm">Formateur</th>
+                    <th className="text-left p-3 font-medium text-sm">Dates</th>
+                    <th className="text-left p-3 font-medium text-sm">Typologie</th>
+                    <th className="text-left p-3 font-medium text-sm">Statut</th>
+                    <th className="text-right p-3 font-medium text-sm">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedMissions.map((mission: Mission) => {
+                    const client = clients?.find((c: any) => c.id === mission.clientId);
+                    const trainer = trainers?.find((t: any) => t.id === mission.trainerId);
+                    // Couleurs de fond selon le statut pour la vue liste
+                    const rowStatusStyles: Record<MissionStatus, string> = {
+                      draft: "bg-slate-50/70 border-l-4 border-l-slate-400",
+                      confirmed: "bg-blue-50/70 border-l-4 border-l-blue-500",
+                      in_progress: "bg-orange-50/70 border-l-4 border-l-orange-500",
+                      completed: "bg-green-50/70 border-l-4 border-l-green-500",
+                      cancelled: "bg-red-50/70 border-l-4 border-l-red-500",
+                    };
+                    const rowClass = rowStatusStyles[mission.status as MissionStatus] || rowStatusStyles.draft;
+                    return (
+                      <tr key={mission.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${rowClass}`}>
+                        <td className="p-3 text-sm font-mono text-muted-foreground">
+                          {mission.reference || "-"}
+                        </td>
+                        <td className="p-3">
+                          <Link href={`/missions/${mission.id}`} className="font-medium hover:text-primary transition-colors">
+                            {mission.title}
+                          </Link>
+                        </td>
+                        <td className="p-3 text-sm">{client?.name || "-"}</td>
+                        <td className="p-3 text-sm">
+                          {trainer ? `${trainer.firstName} ${trainer.lastName}` : "-"}
+                        </td>
+                        <td className="p-3 text-sm">
+                          {mission.startDate ? (
+                            <>
+                              {format(new Date(mission.startDate), "dd/MM/yy", { locale: fr })}
+                              {mission.endDate && mission.startDate !== mission.endDate && (
+                                <> - {format(new Date(mission.endDate), "dd/MM/yy", { locale: fr })}</>
+                              )}
+                            </>
+                          ) : "-"}
+                        </td>
+                        <td className="p-3">
+                          {mission.typology && (
+                            <Badge variant="outline" className="text-xs">
+                              {mission.typology}
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(mission.status as MissionStatus)}
+                            {mission.status !== "cancelled" && (
+                              <Checkbox
+                                checked={mission.status === "completed"}
+                                onCheckedChange={(checked) => {
+                                  const newStatus = checked ? "completed" : "in_progress";
+                                  updateMissionStatus.mutate({ id: mission.id, status: newStatus as MissionStatus });
+                                }}
+                                className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                                title={mission.status === "completed" ? "Marquer comme en cours" : "Marquer comme terminée"}
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href={`/missions/${mission.id}`}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setMissionToDelete(mission.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
+            /* Grid view */
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredMissions.map((mission: Mission) => (
-                <div key={mission.id} className="group relative bg-card rounded-xl border border-border p-5 hover:border-primary/50 hover:shadow-lg transition-all duration-200">
+              {sortedMissions.map((mission: Mission) => {
+                // Couleurs de bordure et fond selon le statut
+                const statusStyles: Record<MissionStatus, string> = {
+                  draft: "border-l-4 border-l-slate-400 bg-slate-50/50",
+                  confirmed: "border-l-4 border-l-blue-500 bg-blue-50/50",
+                  in_progress: "border-l-4 border-l-orange-500 bg-orange-50/50",
+                  completed: "border-l-4 border-l-green-500 bg-green-50/50",
+                  cancelled: "border-l-4 border-l-red-500 bg-red-50/50",
+                };
+                const statusClass = statusStyles[mission.status as MissionStatus] || statusStyles.draft;
+
+                return (
+                <div key={mission.id} className={`group relative rounded-xl border border-border p-5 hover:shadow-lg transition-all duration-200 ${statusClass}`}>
                   <Link href={`/missions/${mission.id}`} className="block cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -488,7 +794,21 @@ export default function Missions() {
                           {mission.title}
                         </h3>
                       </div>
-                      {getStatusBadge(mission.status as MissionStatus)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(mission.status as MissionStatus)}
+                        {mission.status !== "cancelled" && (
+                          <Checkbox
+                            checked={mission.status === "completed"}
+                            onCheckedChange={(checked) => {
+                              const newStatus = checked ? "completed" : "in_progress";
+                              updateMissionStatus.mutate({ id: mission.id, status: newStatus as MissionStatus });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                            title={mission.status === "completed" ? "Marquer comme en cours" : "Marquer comme terminée"}
+                          />
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2 text-sm">
@@ -571,7 +891,8 @@ export default function Missions() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

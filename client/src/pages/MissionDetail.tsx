@@ -7,8 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { triggerConfetti, XPPopup, useXPPopup, LevelUpModal, AchievementUnlockedModal, LevelBadge } from "@/components/gamification";
-import { useAwardXP } from "@/hooks/use-gamification";
 import {
   Select,
   SelectContent,
@@ -53,8 +51,21 @@ import {
   RefreshCw,
   Copy,
   ExternalLink,
+  Zap,
+  ChevronDown,
+  Settings,
+  Sparkles,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor, RichTextDisplay } from "@/components/ui/rich-text-editor";
 import {
   useMission,
   useUpdateMission,
@@ -79,6 +90,8 @@ import {
   useChildMissions,
   useParentMission,
   useSyncMissionChildren,
+  useMissionParticipants,
+  useUpdateMissionParticipant,
 } from "@/hooks/use-missions";
 import {
   Dialog,
@@ -376,9 +389,9 @@ function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, on
 
             {task.comment && !isEditingComment && (
               <div className="mt-3 bg-white/50 p-3 rounded-lg border border-gray-100">
-                <p className="text-sm text-gray-700">{task.comment}</p>
+                <RichTextDisplay content={task.comment} className="text-sm" />
                 {commentAuthor && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-2">
                     — {commentAuthor.firstName} {commentAuthor.lastName}
                     {task.commentUpdatedAt && (
                       <span className="ml-1">
@@ -391,12 +404,10 @@ function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, on
             )}
             {isEditingComment && (
               <div className="mt-3 space-y-2">
-                <Textarea
+                <RichTextEditor
                   value={comment}
-                  onChange={(e) => setComment(e.target.value)}
+                  onChange={setComment}
                   placeholder="Ajouter un commentaire..."
-                  className="text-sm"
-                  rows={2}
                 />
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setIsEditingComment(false)}>
@@ -475,6 +486,10 @@ export default function MissionDetail() {
   const { data: parentMission } = useParentMission(missionId, !!mission?.parentMissionId);
   const syncChildren = useSyncMissionChildren();
 
+  // Participants et suivi des documents
+  const { data: missionParticipants } = useMissionParticipants(missionId);
+  const updateMissionParticipant = useUpdateMissionParticipant();
+
   const [isEditing, setIsEditing] = useState(false);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [selectedTrainerIds, setSelectedTrainerIds] = useState<string[]>([]);
@@ -484,6 +499,12 @@ export default function MissionDetail() {
   const [newStepTitle, setNewStepTitle] = useState("");
   const [isAddingDocument, setIsAddingDocument] = useState(false);
   const [newDocumentType, setNewDocumentType] = useState("");
+  const [isAddingCustomAction, setIsAddingCustomAction] = useState(false);
+  const [newCustomAction, setNewCustomAction] = useState("");
+  const [customActions, setCustomActions] = useState<string[]>(() => {
+    const saved = localStorage.getItem("customQuickActions");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [editingDocId, setEditingDocId] = useState<number | null>(null);
   const [editDocTitle, setEditDocTitle] = useState("");
   const [editForm, setEditForm] = useState({
@@ -503,11 +524,6 @@ export default function MissionDetail() {
 
   const isAdmin = user?.role === "admin";
 
-  // Gamification
-  const awardXP = useAwardXP();
-  const xpPopup = useXPPopup();
-  const [levelUpData, setLevelUpData] = useState<{ isOpen: boolean; level: number; title: string; icon: string } | null>(null);
-
   const client = clients?.find((c: any) => c.id === mission?.clientId);
   const trainer = trainers?.find((t: any) => t.id === mission?.trainerId);
   const program = programs?.find((p: any) => p.id === mission?.programId);
@@ -526,33 +542,8 @@ export default function MissionDetail() {
     // Seulement mettre à jour si le statut doit changer
     if (expectedStatus !== mission.status) {
       updateMissionStatus.mutate({ id: missionId, status: expectedStatus });
-
-      // Award XP when mission is completed
-      if (expectedStatus === "completed" && mission.status !== "completed" && !isAdmin) {
-        triggerConfetti("large", ["#FFD700", "#FFA500", "#FF6347"]);
-        xpPopup.showPopup(500);
-
-        awardXP.mutateAsync({
-          amount: 500,
-          actionType: "mission_completed",
-          reason: "Mission terminee",
-          entityType: "mission",
-          entityId: missionId,
-        }).then((result) => {
-          if (result.leveledUp && result.newLevel && result.newTitle) {
-            setTimeout(() => {
-              setLevelUpData({
-                isOpen: true,
-                level: result.newLevel,
-                title: result.newTitle,
-                icon: getLevelIcon(result.newLevel),
-              });
-            }, 2000);
-          }
-        }).catch(console.error);
-      }
     }
-  }, [progressPercent, mission?.status, missionId, steps, isAdmin]);
+  }, [progressPercent, mission?.status, missionId, steps]);
 
   const startEdit = () => {
     if (mission) {
@@ -630,58 +621,112 @@ export default function MissionDetail() {
     }
   };
 
+  // Actions rapides prédéfinies avec couleurs
+  const quickActions = [
+    {
+      category: "Avant la formation",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50",
+      borderColor: "border-blue-200",
+      actions: [
+        "Envoyer la convocation",
+        "Envoyer le questionnaire de positionnement",
+        "Valider le programme avec le client",
+        "Réserver la salle",
+        "Préparer les supports de formation",
+        "Envoyer les consignes au formateur",
+      ]
+    },
+    {
+      category: "Pendant la formation",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50",
+      borderColor: "border-orange-200",
+      actions: [
+        "Vérifier les émargements",
+        "Suivre le bon déroulement",
+      ]
+    },
+    {
+      category: "Après la formation",
+      color: "text-green-600",
+      bgColor: "bg-green-50",
+      borderColor: "border-green-200",
+      actions: [
+        "Envoyer le questionnaire de satisfaction",
+        "Récupérer les émargements signés",
+        "Faire le bilan avec le formateur",
+        "Envoyer les attestations",
+        "Envoyer le compte-rendu au client",
+        "Facturer la mission",
+      ]
+    },
+  ];
+
+  // Gestion des actions personnalisées
+  const handleAddCustomAction = () => {
+    if (!newCustomAction.trim()) return;
+    const updated = [...customActions, newCustomAction.trim()];
+    setCustomActions(updated);
+    localStorage.setItem("customQuickActions", JSON.stringify(updated));
+    setNewCustomAction("");
+    setIsAddingCustomAction(false);
+  };
+
+  const handleDeleteCustomAction = (actionToDelete: string) => {
+    const updated = customActions.filter(a => a !== actionToDelete);
+    setCustomActions(updated);
+    localStorage.setItem("customQuickActions", JSON.stringify(updated));
+  };
+
+  const handleAddQuickAction = async (actionTitle: string) => {
+    try {
+      const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      await createStep.mutateAsync({
+        missionId,
+        data: {
+          title: actionTitle,
+          status: "todo",
+          order: maxOrder + 1,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create quick action:", error);
+    }
+  };
+
+  const handleAddAllQuickActions = async (category: string) => {
+    const categoryData = quickActions.find(c => c.category === category);
+    if (!categoryData) return;
+
+    let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+
+    for (const action of categoryData.actions) {
+      try {
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: action,
+            status: "todo",
+            order: ++maxOrder,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to create quick action:", error);
+      }
+    }
+  };
+
   const handleUpdateTask = async (taskId: number, data: any) => {
     try {
-      // Check if we're completing a task
-      const isCompleting = data.isCompleted === true;
-      const currentTask = steps?.find((s: any) => s.id === taskId);
-      const wasCompleted = currentTask?.isCompleted;
-
       await updateStep.mutateAsync({
         missionId,
         stepId: taskId,
         data,
       });
-
-      // Award XP for completing a task (not uncompleting)
-      if (isCompleting && !wasCompleted && !isAdmin) {
-        triggerConfetti("small", ["#8B5CF6", "#A78BFA", "#C4B5FD"]);
-        xpPopup.showPopup(50);
-
-        try {
-          const result = await awardXP.mutateAsync({
-            amount: 50,
-            actionType: "task_completed",
-            reason: "Tache completee",
-            entityType: "mission_step",
-            entityId: taskId,
-          });
-
-          // Check for level up
-          if (result.leveledUp && result.newLevel && result.newTitle) {
-            setLevelUpData({
-              isOpen: true,
-              level: result.newLevel,
-              title: result.newTitle,
-              icon: getLevelIcon(result.newLevel),
-            });
-          }
-        } catch (err) {
-          console.error("Failed to award XP:", err);
-        }
-      }
     } catch (error) {
       console.error("Failed to update task:", error);
     }
-  };
-
-  // Helper function to get level icon
-  const getLevelIcon = (level: number): string => {
-    const icons: Record<number, string> = {
-      1: "🌱", 2: "📚", 3: "💪", 4: "🎓", 5: "👑",
-      6: "⚡", 7: "🌟", 8: "💎", 9: "🏆", 10: "👸",
-    };
-    return icons[level] || "🌟";
   };
 
   // Types de documents disponibles
@@ -978,6 +1023,140 @@ export default function MissionDetail() {
                     </DialogContent>
                   </Dialog>
                 )}
+                {/* Bouton Actions rapides */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="bg-violet-50 border-violet-300 hover:bg-violet-100">
+                      <Zap className="w-4 h-4 mr-2 text-violet-600" />
+                      <span className="text-violet-700">Actions rapides</span>
+                      <ChevronDown className="w-4 h-4 ml-2 text-violet-600" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 max-h-[70vh] overflow-y-auto">
+                    {quickActions.map((category) => (
+                      <div key={category.category}>
+                        <DropdownMenuLabel className={`flex items-center justify-between ${category.bgColor} ${category.borderColor} border-b mx-1 rounded-t-md px-2 py-2 mt-1`}>
+                          <span className={`font-semibold ${category.color}`}>{category.category}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className={`h-6 px-2 text-xs ${category.color} hover:${category.bgColor}`}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleAddAllQuickActions(category.category);
+                            }}
+                          >
+                            Tout ajouter
+                          </Button>
+                        </DropdownMenuLabel>
+                        {category.actions.map((action) => (
+                          <DropdownMenuItem
+                            key={action}
+                            onClick={() => handleAddQuickAction(action)}
+                            className="cursor-pointer mx-1 hover:bg-slate-100"
+                          >
+                            <Plus className={`w-4 h-4 mr-2 ${category.color}`} />
+                            <span className="text-slate-700">{action}</span>
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator className="my-2" />
+                      </div>
+                    ))}
+
+                    {/* Actions personnalisées */}
+                    <div>
+                      <DropdownMenuLabel className="flex items-center justify-between bg-purple-50 border-purple-200 border-b mx-1 rounded-t-md px-2 py-2 mt-1">
+                        <span className="font-semibold text-purple-600 flex items-center gap-1">
+                          <Sparkles className="w-4 h-4" />
+                          Mes actions personnalisées
+                        </span>
+                      </DropdownMenuLabel>
+                      {customActions.length > 0 ? (
+                        customActions.map((action) => (
+                          <div key={action} className="flex items-center mx-1 group">
+                            <DropdownMenuItem
+                              onClick={() => handleAddQuickAction(action)}
+                              className="cursor-pointer flex-1 hover:bg-slate-100"
+                            >
+                              <Plus className="w-4 h-4 mr-2 text-purple-600" />
+                              <span className="text-slate-700">{action}</span>
+                            </DropdownMenuItem>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDeleteCustomAction(action);
+                              }}
+                            >
+                              <X className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-muted-foreground italic mx-1">
+                          Aucune action personnalisée
+                        </div>
+                      )}
+                      <DropdownMenuSeparator className="my-2" />
+                      <div className="px-2 pb-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full border-dashed border-purple-300 text-purple-600 hover:bg-purple-50"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setIsAddingCustomAction(true);
+                          }}
+                        >
+                          <Settings className="w-4 h-4 mr-2" />
+                          Ajouter une action personnalisée
+                        </Button>
+                      </div>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Dialog pour ajouter une action personnalisée */}
+                <Dialog open={isAddingCustomAction} onOpenChange={setIsAddingCustomAction}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-purple-600" />
+                        Nouvelle action personnalisée
+                      </DialogTitle>
+                      <DialogDescription>
+                        Créez une action rapide qui sera disponible pour toutes vos missions.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Label htmlFor="customAction">Nom de l'action</Label>
+                      <Input
+                        id="customAction"
+                        value={newCustomAction}
+                        onChange={(e) => setNewCustomAction(e.target.value)}
+                        placeholder="Ex: Envoyer le devis au client"
+                        className="mt-2"
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddCustomAction()}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsAddingCustomAction(false)}>
+                        Annuler
+                      </Button>
+                      <Button
+                        onClick={handleAddCustomAction}
+                        disabled={!newCustomAction.trim()}
+                        className="bg-purple-600 hover:bg-purple-700"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Ajouter
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
                 <Button onClick={startEdit}>
                   <Edit className="w-4 h-4 mr-2" />
                   Modifier
@@ -1067,10 +1246,26 @@ export default function MissionDetail() {
                           </Select>
                         </>
                       ) : (
-                        <>
+                        <div className="flex items-center gap-3">
                           {mission.typology && <Badge>{mission.typology}</Badge>}
                           {getStatusBadgeWithProgress(mission.status as MissionStatus, progressPercent)}
-                        </>
+                          {/* Case à cocher pour marquer comme terminée */}
+                          {mission.status !== "cancelled" && (
+                            <label className="flex items-center gap-2 cursor-pointer group">
+                              <Checkbox
+                                checked={mission.status === "completed"}
+                                onCheckedChange={(checked) => {
+                                  const newStatus = checked ? "completed" : "in_progress";
+                                  updateMissionStatus.mutate({ id: mission.id, status: newStatus });
+                                }}
+                                className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                              />
+                              <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                                Terminée
+                              </span>
+                            </label>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1811,23 +2006,208 @@ export default function MissionDetail() {
                   </CardContent>
                 </Card>
               )}
+
+              {/* Section Suivi des Documents Participants */}
+              {missionParticipants && missionParticipants.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="w-5 h-5" />
+                      Suivi des documents participants ({missionParticipants.length})
+                    </CardTitle>
+                    <CardDescription>
+                      Suivez l'envoi et la réception des documents pour chaque participant
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/50">
+                            <th className="text-left p-3 font-medium">Participant</th>
+                            <th className="text-center p-3 font-medium">
+                              <div className="flex flex-col items-center">
+                                <span>Quest. positionnement</span>
+                                <span className="text-xs text-muted-foreground font-normal">Envoyé / Reçu</span>
+                              </div>
+                            </th>
+                            <th className="text-center p-3 font-medium">
+                              <div className="flex flex-col items-center">
+                                <span>Évaluation</span>
+                                <span className="text-xs text-muted-foreground font-normal">Envoyé / Reçu</span>
+                              </div>
+                            </th>
+                            <th className="text-center p-3 font-medium">Convocation</th>
+                            <th className="text-center p-3 font-medium">Certificat</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {missionParticipants.map((mp: any) => (
+                            <tr key={mp.id} className="border-b hover:bg-muted/30">
+                              <td className="p-3">
+                                <div className="font-medium">
+                                  {mp.participant?.firstName} {mp.participant?.lastName}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {mp.participant?.email}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Checkbox
+                                    checked={!!mp.positioningQuestionnaireSentAt}
+                                    onCheckedChange={(checked) => {
+                                      updateMissionParticipant.mutate({
+                                        missionId,
+                                        participantId: mp.participantId,
+                                        data: {
+                                          positioningQuestionnaireSentAt: checked ? new Date().toISOString() : null
+                                        }
+                                      });
+                                    }}
+                                    className="data-[state=checked]:bg-blue-600"
+                                    title="Envoyé"
+                                  />
+                                  <Checkbox
+                                    checked={!!mp.positioningQuestionnaireReceivedAt}
+                                    onCheckedChange={(checked) => {
+                                      updateMissionParticipant.mutate({
+                                        missionId,
+                                        participantId: mp.participantId,
+                                        data: {
+                                          positioningQuestionnaireReceivedAt: checked ? new Date().toISOString() : null
+                                        }
+                                      });
+                                    }}
+                                    className="data-[state=checked]:bg-green-600"
+                                    title="Reçu"
+                                  />
+                                </div>
+                                {(mp.positioningQuestionnaireSentAt || mp.positioningQuestionnaireReceivedAt) && (
+                                  <div className="text-xs text-center text-muted-foreground mt-1">
+                                    {mp.positioningQuestionnaireSentAt && (
+                                      <span className="text-blue-600">
+                                        E: {format(new Date(mp.positioningQuestionnaireSentAt), "dd/MM")}
+                                      </span>
+                                    )}
+                                    {mp.positioningQuestionnaireSentAt && mp.positioningQuestionnaireReceivedAt && " - "}
+                                    {mp.positioningQuestionnaireReceivedAt && (
+                                      <span className="text-green-600">
+                                        R: {format(new Date(mp.positioningQuestionnaireReceivedAt), "dd/MM")}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center justify-center gap-2">
+                                  <Checkbox
+                                    checked={!!mp.evaluationSentAt}
+                                    onCheckedChange={(checked) => {
+                                      updateMissionParticipant.mutate({
+                                        missionId,
+                                        participantId: mp.participantId,
+                                        data: {
+                                          evaluationSentAt: checked ? new Date().toISOString() : null
+                                        }
+                                      });
+                                    }}
+                                    className="data-[state=checked]:bg-blue-600"
+                                    title="Envoyé"
+                                  />
+                                  <Checkbox
+                                    checked={!!mp.evaluationReceivedAt}
+                                    onCheckedChange={(checked) => {
+                                      updateMissionParticipant.mutate({
+                                        missionId,
+                                        participantId: mp.participantId,
+                                        data: {
+                                          evaluationReceivedAt: checked ? new Date().toISOString() : null
+                                        }
+                                      });
+                                    }}
+                                    className="data-[state=checked]:bg-green-600"
+                                    title="Reçu"
+                                  />
+                                </div>
+                                {(mp.evaluationSentAt || mp.evaluationReceivedAt) && (
+                                  <div className="text-xs text-center text-muted-foreground mt-1">
+                                    {mp.evaluationSentAt && (
+                                      <span className="text-blue-600">
+                                        E: {format(new Date(mp.evaluationSentAt), "dd/MM")}
+                                      </span>
+                                    )}
+                                    {mp.evaluationSentAt && mp.evaluationReceivedAt && " - "}
+                                    {mp.evaluationReceivedAt && (
+                                      <span className="text-green-600">
+                                        R: {format(new Date(mp.evaluationReceivedAt), "dd/MM")}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={!!mp.convocationSentAt}
+                                  onCheckedChange={(checked) => {
+                                    updateMissionParticipant.mutate({
+                                      missionId,
+                                      participantId: mp.participantId,
+                                      data: {
+                                        convocationSentAt: checked ? new Date().toISOString() : null
+                                      }
+                                    });
+                                  }}
+                                  className="data-[state=checked]:bg-green-600"
+                                />
+                                {mp.convocationSentAt && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {format(new Date(mp.convocationSentAt), "dd/MM/yy")}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="p-3 text-center">
+                                <Checkbox
+                                  checked={!!mp.certificateGeneratedAt}
+                                  onCheckedChange={(checked) => {
+                                    updateMissionParticipant.mutate({
+                                      missionId,
+                                      participantId: mp.participantId,
+                                      data: {
+                                        certificateGeneratedAt: checked ? new Date().toISOString() : null
+                                      }
+                                    });
+                                  }}
+                                  className="data-[state=checked]:bg-green-600"
+                                />
+                                {mp.certificateGeneratedAt && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {format(new Date(mp.certificateGeneratedAt), "dd/MM/yy")}
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-blue-600"></div>
+                        <span>Envoyé</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded bg-green-600"></div>
+                        <span>Reçu / Généré</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         </div>
       </main>
-
-      {/* Gamification modals */}
-      <XPPopup amount={xpPopup.amount} show={xpPopup.show} onComplete={xpPopup.hidePopup} />
-      {levelUpData && (
-        <LevelUpModal
-          isOpen={levelUpData.isOpen}
-          onClose={() => setLevelUpData(null)}
-          newLevel={levelUpData.level}
-          newTitle={levelUpData.title}
-          newIcon={levelUpData.icon}
-        />
-      )}
-      <AchievementUnlockedModal />
     </div>
   );
 }

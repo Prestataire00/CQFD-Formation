@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ import {
   Receipt,
   ClipboardCheck,
   ExternalLink,
+  Check,
 } from "lucide-react";
 import { useClients, useCreateClient, useMissions, useInvoices, useUsers } from "@/hooks/use-missions";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -140,26 +141,88 @@ function ClientMiniRecap({ stats }: { stats: ClientStats }) {
   );
 }
 
-// Client Detail Dialog Component
+// Client Detail Dialog Component with inline editing
 function ClientDetailDialog({
   client,
   stats,
   isOpen,
   onClose,
   onToggleStatus,
-  onEdit,
   isToggling,
+  trainers,
+  onSave,
 }: {
   client: Client;
   stats: ClientStats;
   isOpen: boolean;
   onClose: () => void;
   onToggleStatus: () => void;
-  onEdit: () => void;
   isToggling: boolean;
+  trainers: User[];
+  onSave: (data: any) => Promise<void>;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editData, setEditData] = useState({
+    name: client.name,
+    type: client.type,
+    contractStatus: client.contractStatus || "negotiation",
+    contractAmount: (client.contractAmount || 0) / 100,
+    assignedTrainerId: client.assignedTrainerId || "",
+    siret: client.siret || "",
+    address: client.address || "",
+    city: client.city || "",
+    postalCode: client.postalCode || "",
+    contactName: client.contactName || "",
+    contactEmail: client.contactEmail || "",
+    contactPhone: client.contactPhone || "",
+    demand: client.demand || "",
+  });
+
+  // Reset edit data when client changes
+  useEffect(() => {
+    setEditData({
+      name: client.name,
+      type: client.type,
+      contractStatus: client.contractStatus || "negotiation",
+      contractAmount: (client.contractAmount || 0) / 100,
+      assignedTrainerId: client.assignedTrainerId || "",
+      siret: client.siret || "",
+      address: client.address || "",
+      city: client.city || "",
+      postalCode: client.postalCode || "",
+      contactName: client.contactName || "",
+      contactEmail: client.contactEmail || "",
+      contactPhone: client.contactPhone || "",
+      demand: client.demand || "",
+    });
+    setIsEditing(false);
+  }, [client]);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave({
+        ...editData,
+        contractAmount: editData.contractAmount * 100,
+        assignedTrainerId: editData.assignedTrainerId || null,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const status = client.contractStatus || "negotiation";
   const isAcquired = status === "acquired";
+
+  const getTrainerName = (trainerId: string | null | undefined) => {
+    if (!trainerId) return null;
+    const trainer = trainers.find((t) => t.id === trainerId);
+    return trainer ? `${trainer.firstName} ${trainer.lastName}` : null;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -167,9 +230,31 @@ function ClientDetailDialog({
         <DialogHeader>
           <div className="flex items-start justify-between">
             <div>
-              <DialogTitle className="text-2xl">{client.name}</DialogTitle>
+              {isEditing ? (
+                <Input
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="text-2xl font-semibold h-auto py-1 px-2"
+                />
+              ) : (
+                <DialogTitle className="text-2xl">{client.name}</DialogTitle>
+              )}
               <div className="flex items-center gap-2 mt-2">
-                {getTypeBadge(client.type)}
+                {isEditing ? (
+                  <Select value={editData.type} onValueChange={(v) => setEditData({ ...editData, type: v })}>
+                    <SelectTrigger className="w-32 h-8">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="entreprise">Entreprise</SelectItem>
+                      <SelectItem value="opco">OPCO</SelectItem>
+                      <SelectItem value="particulier">Particulier</SelectItem>
+                      <SelectItem value="institution">Institution</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  getTypeBadge(client.type)
+                )}
                 <button
                   onClick={onToggleStatus}
                   disabled={isToggling}
@@ -188,10 +273,23 @@ function ClientDetailDialog({
                 </button>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={onEdit}>
-              <Edit className="w-4 h-4 mr-2" />
-              Modifier
-            </Button>
+            {!isEditing ? (
+              <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                <Edit className="w-4 h-4 mr-2" />
+                Modifier
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+                  <X className="w-4 h-4 mr-2" />
+                  Annuler
+                </Button>
+                <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                  Enregistrer
+                </Button>
+              </div>
+            )}
           </div>
         </DialogHeader>
 
@@ -203,67 +301,142 @@ function ClientDetailDialog({
               Informations
             </h3>
 
-            {client.contractAmount && client.contractAmount > 0 && (
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Euro className="w-5 h-5 text-green-600" />
-                  <span className="font-semibold text-green-800">
-                    Montant du contrat: {formatCurrency(client.contractAmount)}
-                  </span>
+            {isEditing ? (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Montant du contrat (EUR)</Label>
+                  <Input
+                    type="number"
+                    value={editData.contractAmount || ""}
+                    onChange={(e) => setEditData({ ...editData, contractAmount: parseFloat(e.target.value) || 0 })}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Formateur assigne</Label>
+                  <Select value={editData.assignedTrainerId || "none"} onValueChange={(v) => setEditData({ ...editData, assignedTrainerId: v === "none" ? "" : v })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Aucun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun</SelectItem>
+                      {trainers.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">SIRET</Label>
+                  <Input value={editData.siret} onChange={(e) => setEditData({ ...editData, siret: e.target.value })} placeholder="12345678901234" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Contact</Label>
+                  <Input value={editData.contactName} onChange={(e) => setEditData({ ...editData, contactName: e.target.value })} placeholder="Nom du contact" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Email</Label>
+                  <Input type="email" value={editData.contactEmail} onChange={(e) => setEditData({ ...editData, contactEmail: e.target.value })} placeholder="email@example.com" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Telephone</Label>
+                  <Input value={editData.contactPhone} onChange={(e) => setEditData({ ...editData, contactPhone: e.target.value })} placeholder="01 23 45 67 89" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Adresse</Label>
+                  <Input value={editData.address} onChange={(e) => setEditData({ ...editData, address: e.target.value })} placeholder="Adresse" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Code postal</Label>
+                    <Input value={editData.postalCode} onChange={(e) => setEditData({ ...editData, postalCode: e.target.value })} placeholder="75001" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Ville</Label>
+                    <Input value={editData.city} onChange={(e) => setEditData({ ...editData, city: e.target.value })} placeholder="Paris" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Demande</Label>
+                  <Input value={editData.demand} onChange={(e) => setEditData({ ...editData, demand: e.target.value })} placeholder="Details de la demande" />
                 </div>
               </div>
-            )}
+            ) : (
+              <>
+                {client.contractAmount && client.contractAmount > 0 && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Euro className="w-5 h-5 text-green-600" />
+                      <span className="font-semibold text-green-800">
+                        Montant du contrat: {formatCurrency(client.contractAmount)}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
-            <div className="space-y-3 text-sm">
-              {client.siret && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">SIRET:</span>
-                  <span className="font-medium">{client.siret}</span>
+                {client.assignedTrainerId && getTrainerName(client.assignedTrainerId) && (
+                  <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <UserCircle className="w-5 h-5 text-violet-600" />
+                      <span className="font-semibold text-violet-800">
+                        Formateur: {getTrainerName(client.assignedTrainerId)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3 text-sm">
+                  {client.siret && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">SIRET:</span>
+                      <span className="font-medium">{client.siret}</span>
+                    </div>
+                  )}
+                  {client.contactName && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">Contact:</span>
+                      <span className="font-medium">{client.contactName}</span>
+                    </div>
+                  )}
+                  {client.contactEmail && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">Email:</span>
+                      <a href={`mailto:${client.contactEmail}`} className="text-primary hover:underline flex items-center gap-1">
+                        <Mail className="w-4 h-4" />
+                        {client.contactEmail}
+                      </a>
+                    </div>
+                  )}
+                  {client.contactPhone && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">Telephone:</span>
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-4 h-4" />
+                        {client.contactPhone}
+                      </span>
+                    </div>
+                  )}
+                  {(client.address || client.city) && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">Adresse:</span>
+                      <span className="flex items-start gap-1">
+                        <MapPin className="w-4 h-4 mt-0.5" />
+                        <span>
+                          {client.address && <>{client.address}<br /></>}
+                          {client.postalCode} {client.city}
+                        </span>
+                      </span>
+                    </div>
+                  )}
+                  {client.demand && (
+                    <div className="flex items-start gap-3">
+                      <span className="text-muted-foreground w-24">Demande:</span>
+                      <span>{client.demand}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-              {client.contactName && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">Contact:</span>
-                  <span className="font-medium">{client.contactName}</span>
-                </div>
-              )}
-              {client.contactEmail && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">Email:</span>
-                  <a href={`mailto:${client.contactEmail}`} className="text-primary hover:underline flex items-center gap-1">
-                    <Mail className="w-4 h-4" />
-                    {client.contactEmail}
-                  </a>
-                </div>
-              )}
-              {client.contactPhone && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">Telephone:</span>
-                  <span className="flex items-center gap-1">
-                    <Phone className="w-4 h-4" />
-                    {client.contactPhone}
-                  </span>
-                </div>
-              )}
-              {(client.address || client.city) && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">Adresse:</span>
-                  <span className="flex items-start gap-1">
-                    <MapPin className="w-4 h-4 mt-0.5" />
-                    <span>
-                      {client.address && <>{client.address}<br /></>}
-                      {client.postalCode} {client.city}
-                    </span>
-                  </span>
-                </div>
-              )}
-              {client.demand && (
-                <div className="flex items-start gap-3">
-                  <span className="text-muted-foreground w-24">Demande:</span>
-                  <span>{client.demand}</span>
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {/* Statistics */}
@@ -398,13 +571,8 @@ export default function Clients() {
 
   // Filter trainers from users (role = formateur or prestataire)
   const trainers = useMemo(() => {
-    if (!users) {
-      console.log('[DEBUG] No users loaded yet');
-      return [];
-    }
-    const filtered = users.filter((u: User) => u.role === "formateur" || u.role === "prestataire");
-    console.log('[DEBUG] Trainers loaded:', filtered.length, filtered.map((t: User) => ({ id: t.id, name: t.firstName })));
-    return filtered;
+    if (!users) return [];
+    return users.filter((u: User) => u.role === "formateur" || u.role === "prestataire");
   }, [users]);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -567,10 +735,6 @@ export default function Clients() {
   };
 
   const handleUpdateClient = async () => {
-    console.log('[UPDATE] handleUpdateClient called');
-    console.log('[UPDATE] editingClient:', editingClient);
-    console.log('[UPDATE] newClient at function start:', newClient);
-
     if (!editingClient) return;
 
     const dataToSend = {
@@ -589,12 +753,6 @@ export default function Clients() {
       demand: newClient.demand || null,
     };
 
-    console.log('[UPDATE] Form state:', newClient);
-    console.log('[UPDATE] Sending data:', dataToSend);
-
-    // Temporary debug alert - remove after fixing
-    alert(`Envoi de la mise à jour:\nassignedTrainerId = ${dataToSend.assignedTrainerId}\nClient ID = ${editingClient.id}`);
-
     try {
       const response = await fetch(`/api/clients/${editingClient.id}`, {
         method: "PUT",
@@ -604,21 +762,18 @@ export default function Clients() {
       });
 
       const responseData = await response.json();
-      console.log('[UPDATE] Server response:', responseData);
-
-      // Temporary debug alert - remove after fixing
-      alert(`Réponse du serveur:\nassignedTrainerId = ${responseData.assignedTrainerId}\nID = ${responseData.id}`);
 
       if (!response.ok) {
         throw new Error(responseData.message || "Erreur lors de la mise à jour");
       }
 
-      // Close dialog
       setEditingClient(null);
       resetForm();
-
-      // Force page reload to ensure fresh data
-      window.location.reload();
+      await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
+      toast({
+        title: "Client mis à jour",
+        description: "Les modifications ont été enregistrées.",
+      });
     } catch (error: any) {
       console.error("Failed to update client:", error);
       toast({
@@ -892,12 +1047,30 @@ export default function Clients() {
               isOpen={selectedClient !== null}
               onClose={() => setSelectedClient(null)}
               onToggleStatus={() => handleToggleContractStatus(selectedClient)}
-              onEdit={() => openEditDialog(selectedClient)}
               isToggling={togglingClientId === selectedClient.id}
+              trainers={trainers}
+              onSave={async (data) => {
+                const response = await fetch(`/api/clients/${selectedClient.id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  credentials: "include",
+                  body: JSON.stringify(data),
+                });
+                if (!response.ok) {
+                  throw new Error("Erreur lors de la mise à jour");
+                }
+                const updatedClient = await response.json();
+                setSelectedClient(updatedClient);
+                await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
+                toast({
+                  title: "Client mis à jour",
+                  description: "Les modifications ont été enregistrées.",
+                });
+              }}
             />
           )}
 
-          {/* Clients grid */}
+          {/* Clients list */}
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -918,116 +1091,75 @@ export default function Clients() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredClients.map((client: Client) => {
-                const stats = clientStatsMap.get(client.id) || {
-                  completedMissions: 0,
-                  upcomingMissions: 0,
-                  totalRevenue: 0,
-                  avgSatisfaction: null,
-                  missions: [],
-                  invoices: [],
-                };
-                const status = client.contractStatus || "negotiation";
-                const isAcquired = status === "acquired";
+            <div className="bg-card rounded-lg border shadow-sm">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-left p-4 font-medium text-sm">Nom</th>
+                    <th className="text-left p-4 font-medium text-sm">Email</th>
+                    <th className="text-left p-4 font-medium text-sm">Type</th>
+                    <th className="text-left p-4 font-medium text-sm">Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClients.map((client: Client) => {
+                    const status = client.contractStatus || "negotiation";
+                    const isAcquired = status === "acquired";
 
-                return (
-                  <Card
-                    key={client.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => setSelectedClient(client)}
-                  >
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg">{client.name}</CardTitle>
-                          <div className="flex items-center gap-2 mt-1 flex-wrap">
-                            {getTypeBadge(client.type)}
-                            <button
-                              onClick={(e) => handleToggleContractStatus(client, e)}
-                              disabled={togglingClientId === client.id}
-                              className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium border transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                isAcquired
-                                  ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-                                  : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
-                              }`}
-                              title={
-                                isAcquired
-                                  ? "Cliquez pour repasser en negociation"
-                                  : "Cliquez pour marquer comme acquis"
-                              }
+                    return (
+                      <tr
+                        key={client.id}
+                        className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                        onClick={() => setSelectedClient(client)}
+                      >
+                        <td className="p-4">
+                          <span className="font-medium">{client.name}</span>
+                        </td>
+                        <td className="p-4">
+                          {client.contactEmail ? (
+                            <a
+                              href={`mailto:${client.contactEmail}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-sm text-primary hover:underline flex items-center gap-1"
                             >
-                              {togglingClientId === client.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <ArrowRightLeft className="w-3 h-3" />
-                              )}
-                              {isAcquired ? "Acquis" : "En negociation"}
-                            </button>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(client);
-                          }}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {/* Assigned trainer - prominent display */}
-                      {client.assignedTrainerId && getTrainerName(client.assignedTrainerId) && (
-                        <div className="flex items-center gap-2 mb-3 p-2 bg-violet-50 border border-violet-200 rounded-lg">
-                          <UserCircle className="w-4 h-4 text-violet-600" />
-                          <span className="text-sm font-medium text-violet-700">
-                            {getTrainerName(client.assignedTrainerId)}
-                          </span>
-                        </div>
-                      )}
-
-                      {client.contractAmount && client.contractAmount > 0 && (
-                        <div className="flex items-center gap-2 mb-3 p-2 bg-muted/50 rounded-lg">
-                          <Euro className="w-4 h-4 text-green-600" />
-                          <span className="text-sm font-medium">
-                            Contrat: {formatCurrency(client.contractAmount)}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="space-y-1.5">
-                        {client.contactName && (
-                          <p className="text-sm font-medium">{client.contactName}</p>
-                        )}
-                        {client.contactEmail && (
-                          <p className="text-xs flex items-center gap-1 text-primary">
-                            <Mail className="w-3 h-3" />
-                            {client.contactEmail}
-                          </p>
-                        )}
-                        {client.contactPhone && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Phone className="w-3 h-3" />
-                            {client.contactPhone}
-                          </p>
-                        )}
-                        {client.city && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {client.city}
-                            {client.postalCode && ` (${client.postalCode})`}
-                          </p>
-                        )}
-                      </div>
-
-                      <ClientMiniRecap stats={stats} />
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                              <Mail className="w-3 h-3" />
+                              {client.contactEmail}
+                            </a>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          {getTypeBadge(client.type)}
+                        </td>
+                        <td className="p-4">
+                          <button
+                            onClick={(e) => handleToggleContractStatus(client, e)}
+                            disabled={togglingClientId === client.id}
+                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium border transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
+                              isAcquired
+                                ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
+                                : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
+                            }`}
+                            title={
+                              isAcquired
+                                ? "Cliquez pour repasser en negociation"
+                                : "Cliquez pour marquer comme acquis"
+                            }
+                          >
+                            {togglingClientId === client.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <ArrowRightLeft className="w-3 h-3" />
+                            )}
+                            {isAcquired ? "Acquis" : "Negociation"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -1068,11 +1200,6 @@ function ClientForm({
   submitLabel: string;
   trainers: User[];
 }) {
-  console.log('[ClientForm] Rendering with:', {
-    assignedTrainerId: client.assignedTrainerId,
-    trainersCount: trainers.length
-  });
-
   return (
     <>
       <div className="grid gap-4 py-4">
@@ -1152,9 +1279,7 @@ function ClientForm({
             <Select
               value={client.assignedTrainerId || "none"}
               onValueChange={(value) => {
-                console.log('[FORM] Trainer selected:', value);
                 const newValue = value === "none" ? "" : value;
-                console.log('[FORM] Setting assignedTrainerId to:', newValue);
                 onChange({ ...client, assignedTrainerId: newValue });
               }}
             >
@@ -1171,9 +1296,6 @@ function ClientForm({
               </SelectContent>
             </Select>
           )}
-          <p className="text-xs text-blue-600 font-mono bg-blue-50 p-1 rounded">
-            DEBUG: assignedTrainerId = "{client.assignedTrainerId || ""}"
-          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

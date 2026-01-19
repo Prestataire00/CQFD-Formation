@@ -144,6 +144,39 @@ export function useAddParticipantToMission() {
   });
 }
 
+export function useUpdateMissionParticipant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, participantId, data }: {
+      missionId: number;
+      participantId: number;
+      data: {
+        status?: string;
+        convocationSentAt?: string | null;
+        attendanceValidated?: boolean;
+        certificateGeneratedAt?: string | null;
+        positioningQuestionnaireSentAt?: string | null;
+        positioningQuestionnaireReceivedAt?: string | null;
+        evaluationSentAt?: string | null;
+        evaluationReceivedAt?: string | null;
+      }
+    }) => {
+      const url = buildUrl(api.missions.participants.update.path, { missionId, participantId });
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update participant");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.participants.list.path, missionId] });
+    },
+  });
+}
+
 // Mission Trainers (multi-trainers support)
 export function useMissionTrainers(missionId: number) {
   return useQuery({

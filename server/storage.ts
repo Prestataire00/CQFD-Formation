@@ -3,13 +3,13 @@ import {
   participants, missionParticipants, attendanceRecords, evaluations, auditLogs,
   invoices, documents, documentTemplates, documentTemplateVersions, templateNotifications,
   messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
-  xpTransactions, badges, userBadges,
+  xpTransactions, badges, userBadges, inAppNotifications,
   type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
   type Document, type DocumentTemplate, type DocumentTemplateVersion, type TemplateNotification,
   type Message, type Project, type Task,
-  type ReminderSetting, type Reminder,
+  type ReminderSetting, type Reminder, type InAppNotification,
   type XPTransaction, type Badge, type UserBadge,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
   type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
@@ -17,7 +17,7 @@ import {
   type InsertEvaluation, type InsertInvoice, type InsertDocument, type InsertDocumentTemplate,
   type InsertDocumentTemplateVersion, type InsertTemplateNotification,
   type InsertAuditLog, type InsertMessage, type InsertProject, type InsertTask,
-  type InsertReminderSetting, type InsertReminder,
+  type InsertReminderSetting, type InsertReminder, type InsertInAppNotification,
   type InsertXPTransaction, type InsertBadge, type InsertUserBadge,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
@@ -35,6 +35,7 @@ export interface IStorage {
   softDeleteUser(id: string): Promise<boolean>;
   getUsers(): Promise<User[]>;
   getTrainers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
 
   // Password Reset Tokens
@@ -226,6 +227,14 @@ export interface IStorage {
     fiveStarEvaluations: number;
     documentsUploaded: number;
   }>;
+
+  // In-App Notifications
+  getInAppNotifications(userId: string): Promise<InAppNotification[]>;
+  getUnreadInAppNotifications(userId: string): Promise<InAppNotification[]>;
+  getUnreadInAppNotificationCount(userId: string): Promise<number>;
+  createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification>;
+  markInAppNotificationAsRead(id: number): Promise<InAppNotification | undefined>;
+  markAllInAppNotificationsAsRead(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -265,6 +274,12 @@ export class DatabaseStorage implements IStorage {
   async getTrainers(): Promise<User[]> {
     return await db.select().from(users)
       .where(sql`${users.role} IN ('formateur', 'prestataire') AND ${users.status} = 'ACTIF'`)
+      .orderBy(users.lastName);
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(sql`${users.role} = ${role} AND ${users.status} = 'ACTIF'`)
       .orderBy(users.lastName);
   }
 
@@ -1471,6 +1486,55 @@ export class DatabaseStorage implements IStorage {
       fiveStarEvaluations: fiveStarEvaluations.length,
       documentsUploaded: documentsUploaded.length,
     };
+  }
+
+  // ==================== IN-APP NOTIFICATIONS ====================
+  async getInAppNotifications(userId: string): Promise<InAppNotification[]> {
+    return await db.select().from(inAppNotifications)
+      .where(eq(inAppNotifications.userId, userId))
+      .orderBy(desc(inAppNotifications.createdAt));
+  }
+
+  async getUnreadInAppNotifications(userId: string): Promise<InAppNotification[]> {
+    return await db.select().from(inAppNotifications)
+      .where(and(
+        eq(inAppNotifications.userId, userId),
+        eq(inAppNotifications.isRead, false)
+      ))
+      .orderBy(desc(inAppNotifications.createdAt));
+  }
+
+  async getUnreadInAppNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(inAppNotifications)
+      .where(and(
+        eq(inAppNotifications.userId, userId),
+        eq(inAppNotifications.isRead, false)
+      ));
+    return result[0]?.count || 0;
+  }
+
+  async createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification> {
+    const [newNotification] = await db.insert(inAppNotifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async markInAppNotificationAsRead(id: number): Promise<InAppNotification | undefined> {
+    const [updated] = await db.update(inAppNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(eq(inAppNotifications.id, id))
+      .returning();
+    return updated;
+  }
+
+  async markAllInAppNotificationsAsRead(userId: string): Promise<boolean> {
+    await db.update(inAppNotifications)
+      .set({ isRead: true, readAt: new Date() })
+      .where(and(
+        eq(inAppNotifications.userId, userId),
+        eq(inAppNotifications.isRead, false)
+      ));
+    return true;
   }
 }
 

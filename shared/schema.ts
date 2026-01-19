@@ -390,6 +390,23 @@ export const reminders = pgTable("reminders", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// --- IN-APP NOTIFICATIONS ---
+export type InAppNotificationType = 'reminder' | 'admin_alert' | 'mission_assignment' | 'template_update';
+
+export const inAppNotifications = pgTable("in_app_notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // reminder, admin_alert, mission_assignment, template_update
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  missionId: integer("mission_id").references(() => missions.id),
+  reminderId: integer("reminder_id").references(() => reminders.id),
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // --- SCHEMAS ---
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -415,6 +432,7 @@ export const insertProjectSchema = createInsertSchema(projects).omit({ id: true,
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReminderSettingSchema = createInsertSchema(reminderSettings).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReminderSchema = createInsertSchema(reminders).omit({ id: true, createdAt: true });
+export const insertInAppNotificationSchema = createInsertSchema(inAppNotifications).omit({ id: true, createdAt: true });
 export const insertXPTransactionSchema = createInsertSchema(xpTransactions).omit({ id: true, createdAt: true });
 export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true, createdAt: true });
 export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({ id: true, unlockedAt: true });
@@ -445,6 +463,7 @@ export type Project = typeof projects.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type ReminderSetting = typeof reminderSettings.$inferSelect;
 export type Reminder = typeof reminders.$inferSelect;
+export type InAppNotification = typeof inAppNotifications.$inferSelect;
 export type XPTransaction = typeof xpTransactions.$inferSelect;
 export type Badge = typeof badges.$inferSelect;
 export type UserBadge = typeof userBadges.$inferSelect;
@@ -473,6 +492,7 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type InsertReminderSetting = z.infer<typeof insertReminderSettingSchema>;
 export type InsertReminder = z.infer<typeof insertReminderSchema>;
+export type InsertInAppNotification = z.infer<typeof insertInAppNotificationSchema>;
 export type InsertXPTransaction = z.infer<typeof insertXPTransactionSchema>;
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
