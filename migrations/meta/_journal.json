@@ -15,6 +15,20 @@
       "when": 1768845985603,
       "tag": "0001_robust_rachel_grey",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768902807567,
+      "tag": "0002_add_feedback_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1768907362752,
+      "tag": "0003_dear_colossus",
+      "breakpoints": true
     }
   ]
 }

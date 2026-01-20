@@ -1,0 +1,1 @@
+ALTER TABLE "missions" ADD COLUMN "program_title" text;

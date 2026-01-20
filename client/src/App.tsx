@@ -13,11 +13,14 @@ import Missions from "@/pages/Missions";
 import MissionDetail from "@/pages/MissionDetail";
 import Clients from "@/pages/Clients";
 import Participants from "@/pages/Participants";
+import Feedback from "@/pages/Feedback";
+import QuestionnaireResponse from "@/pages/QuestionnaireResponse";
 import Invoices from "@/pages/Invoices";
 import Users from "@/pages/Users";
 import DocumentTemplates from "@/pages/DocumentTemplates";
 import Calendar from "@/pages/Calendar";
 import TrainerSpace from "@/pages/TrainerSpace";
+import Settings from "@/pages/Settings";
 import { Sidebar } from "@/components/Sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -93,6 +96,9 @@ function Router() {
       <Route path="/reset-password">
         {isAuthenticated ? <Redirect to="/" /> : <ResetPassword />}
       </Route>
+      <Route path="/questionnaire/:token">
+        <QuestionnaireResponse />
+      </Route>
 
       {/* Protected routes */}
       <Route path="/">
@@ -109,6 +115,9 @@ function Router() {
       </Route>
       <Route path="/participants">
         <ProtectedRoute component={Participants} />
+      </Route>
+      <Route path="/feedback">
+        <ProtectedRoute component={Feedback} adminOnly />
       </Route>
       <Route path="/invoices">
         <ProtectedRoute component={Invoices} />
@@ -147,7 +156,7 @@ function Router() {
         <ProtectedRoute component={() => <PlaceholderPage title="Rapports" />} />
       </Route>
       <Route path="/settings">
-        <ProtectedRoute component={() => <PlaceholderPage title="Parametres" />} />
+        <ProtectedRoute component={Settings} adminOnly />
       </Route>
       <Route path="/help">
         <ProtectedRoute component={() => <PlaceholderPage title="Aide" />} />

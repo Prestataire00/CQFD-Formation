@@ -107,6 +107,7 @@ export default function Dashboard() {
               label="Missions Totales"
               value={stats?.totalMissions || 0}
               icon={Briefcase}
+              href="/missions"
             />
             <StatCard
               label="Missions Actives"
@@ -114,17 +115,20 @@ export default function Dashboard() {
               icon={Clock}
               trend={stats?.activeMissions > 0 ? "En cours" : undefined}
               trendUp={true}
+              href="/missions"
             />
             <StatCard
               label="Missions Terminees"
               value={stats?.completedMissions || 0}
               icon={CheckCircle2}
+              href="/missions"
             />
             {isAdmin ? (
               <StatCard
                 label="Participants"
                 value={stats?.totalParticipants || 0}
                 icon={Users}
+                href="/participants"
               />
             ) : (
               <StatCard
@@ -208,14 +212,15 @@ export default function Dashboard() {
                       return (
                         <div
                           key={invoice.id}
-                          className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50"
+                          className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer group"
+                          onClick={() => setLocation("/invoices")}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
                               <Receipt className="w-4 h-4" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium font-mono">{invoice.invoiceNumber}</p>
+                              <p className="text-sm font-medium font-mono group-hover:text-primary transition-colors">{invoice.invoiceNumber}</p>
                               {invoice.createdAt && (
                                 <p className="text-xs text-muted-foreground">
                                   {format(new Date(invoice.createdAt), "d MMM yyyy", { locale: fr })}
@@ -223,16 +228,19 @@ export default function Dashboard() {
                               )}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-sm">
-                              {new Intl.NumberFormat("fr-FR", {
-                                style: "currency",
-                                currency: "EUR",
-                              }).format(invoice.amount / 100)}
-                            </p>
-                            <span className={`text-xs font-medium ${color}`}>
-                              {label}
-                            </span>
+                          <div className="text-right flex items-center gap-2">
+                            <div>
+                              <p className="font-bold text-sm">
+                                {new Intl.NumberFormat("fr-FR", {
+                                  style: "currency",
+                                  currency: "EUR",
+                                }).format(invoice.amount / 100)}
+                              </p>
+                              <span className={`text-xs font-medium ${color}`}>
+                                {label}
+                              </span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                           </div>
                         </div>
                       );

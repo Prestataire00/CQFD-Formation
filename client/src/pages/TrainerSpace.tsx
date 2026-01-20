@@ -557,12 +557,19 @@ export default function TrainerSpace() {
                                 <Badge
                                   variant="outline"
                                   className={
-                                    client.contractStatus === "acquired"
+                                    client.contractStatus === "client"
                                       ? "bg-green-100 text-green-700 border-green-300"
-                                      : "bg-amber-100 text-amber-700 border-amber-300"
+                                      : client.contractStatus === "lost"
+                                      ? "bg-red-100 text-red-700 border-red-300"
+                                      : client.contractStatus === "negotiation"
+                                      ? "bg-amber-100 text-amber-700 border-amber-300"
+                                      : "bg-blue-100 text-blue-700 border-blue-300"
                                   }
                                 >
-                                  {client.contractStatus === "acquired" ? "Acquis" : "En negociation"}
+                                  {client.contractStatus === "client" ? "Client"
+                                    : client.contractStatus === "lost" ? "Perdu"
+                                    : client.contractStatus === "negotiation" ? "En negociation"
+                                    : "Prospect"}
                                 </Badge>
                               </div>
                               <ArrowRight className="w-4 h-4 text-muted-foreground" />

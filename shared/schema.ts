@@ -52,13 +52,13 @@ export type InvoiceStatus = 'draft' | 'submitted' | 'paid' | 'rejected';
 export type StepStatus = 'todo' | 'priority' | 'late' | 'done' | 'na';
 export type LocationType = 'presentiel' | 'distanciel' | 'hybride';
 
-export type ClientContractStatus = 'negotiation' | 'acquired';
+export type ClientContractStatus = 'prospect' | 'negotiation' | 'lost' | 'client';
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   type: text("type").default("entreprise").notNull(), // entreprise, opco, particulier, institution
-  contractStatus: text("contract_status").default("negotiation").notNull(), // negotiation, acquired
+  contractStatus: text("contract_status").default("prospect").notNull(), // prospect, negotiation, lost, client
   contractAmount: integer("contract_amount").default(0), // Montant du contrat en centimes
   assignedTrainerId: text("assigned_trainer_id"), // Formateur assigné à ce client
   siret: text("siret"),
@@ -109,6 +109,7 @@ export const missions = pgTable("missions", {
   trainerId: varchar("trainer_id").references(() => users.id),
   clientId: integer("client_id").references(() => clients.id),
   programId: integer("program_id").references(() => trainingPrograms.id),
+  programTitle: text("program_title"), // Titre du programme en texte libre
   // Multi-trainer duplication fields
   parentMissionId: integer("parent_mission_id"), // Reference to original mission if this is a copy
   isOriginal: boolean("is_original").default(true).notNull(), // true = original, false = copy
@@ -244,6 +245,88 @@ export const documents = pgTable("documents", {
   templateId: integer("template_id"), // Reference to document template if this is an auto-attached doc
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// --- COMPANY SETTINGS (for invoices/contracts) ---
+export const companySettings = pgTable("company_settings", {
+  id: serial("id").primaryKey(),
+  companyName: text("company_name").notNull(),
+  legalForm: text("legal_form"), // SARL, SAS, EURL, etc.
+  siret: text("siret"),
+  tvaNumber: text("tva_number"), // Numéro de TVA intracommunautaire
+  address: text("address"),
+  city: text("city"),
+  postalCode: text("postal_code"),
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  bankName: text("bank_name"),
+  iban: text("iban"),
+  bic: text("bic"),
+  logoUrl: text("logo_url"),
+  invoicePrefix: text("invoice_prefix").default("FAC"),
+  contractPrefix: text("contract_prefix").default("CTR"),
+  invoiceFooter: text("invoice_footer"), // Mentions légales facture
+  contractFooter: text("contract_footer"), // Mentions légales contrat
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// --- CLIENT CONTRACTS ---
+export type ContractStatus = 'draft' | 'sent' | 'signed' | 'cancelled';
+
+export const clientContracts = pgTable("client_contracts", {
+  id: serial("id").primaryKey(),
+  contractNumber: text("contract_number").notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content"), // Contenu du contrat (texte modifiable)
+  amount: integer("amount").notNull(), // Montant HT en centimes
+  vatRate: integer("vat_rate").default(20), // Taux de TVA en pourcentage
+  vatAmount: integer("vat_amount"), // Montant TVA en centimes
+  totalAmount: integer("total_amount"), // Montant TTC en centimes
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  status: text("status").default("draft").notNull(), // draft, sent, signed, cancelled
+  signedAt: timestamp("signed_at"),
+  pdfUrl: text("pdf_url"), // URL du PDF généré
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// --- CLIENT INVOICES (enhanced version) ---
+export const clientInvoices = pgTable("client_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: text("invoice_number").notNull(),
+  clientId: integer("client_id").references(() => clients.id).notNull(),
+  contractId: integer("contract_id").references(() => clientContracts.id),
+  missionId: integer("mission_id").references(() => missions.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  // Lignes de facturation stockées en JSON
+  lineItems: jsonb("line_items").$type<InvoiceLineItem[]>(),
+  subtotal: integer("subtotal").notNull(), // Montant HT en centimes
+  vatRate: integer("vat_rate").default(20), // Taux de TVA
+  vatAmount: integer("vat_amount"), // Montant TVA
+  totalAmount: integer("total_amount").notNull(), // Montant TTC
+  invoiceDate: timestamp("invoice_date").defaultNow(),
+  dueDate: timestamp("due_date"), // Date d'échéance
+  status: text("status").default("draft").notNull(), // draft, sent, paid, overdue, cancelled
+  paidAt: timestamp("paid_at"),
+  paymentMethod: text("payment_method"), // virement, chèque, CB, etc.
+  paymentReference: text("payment_reference"),
+  pdfUrl: text("pdf_url"),
+  notes: text("notes"), // Notes additionnelles
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Type pour les lignes de facture
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitPrice: number; // en centimes
+  total: number; // en centimes
+}
 
 // Table pour les templates de documents (documents automatiques)
 export const documentTemplates = pgTable("document_templates", {
@@ -407,6 +490,55 @@ export const inAppNotifications = pgTable("in_app_notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// --- FEEDBACK QUESTIONNAIRES ---
+export type QuestionType = 'rating' | 'text' | 'multiple_choice' | 'yes_no';
+export type FeedbackQuestionnaireStatus = 'draft' | 'active' | 'closed';
+
+export const feedbackQuestionnaires = pgTable("feedback_questionnaires", {
+  id: serial("id").primaryKey(),
+  missionId: integer("mission_id").references(() => missions.id).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").default("draft").notNull(), // draft, active, closed
+  generatedByAI: boolean("generated_by_ai").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const feedbackQuestions = pgTable("feedback_questions", {
+  id: serial("id").primaryKey(),
+  questionnaireId: integer("questionnaire_id").references(() => feedbackQuestionnaires.id).notNull(),
+  questionText: text("question_text").notNull(),
+  questionType: text("question_type").default("rating").notNull(), // rating, text, multiple_choice, yes_no
+  options: jsonb("options").$type<string[]>(), // For multiple choice questions
+  order: integer("order").notNull(),
+  isRequired: boolean("is_required").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const feedbackResponseTokens = pgTable("feedback_response_tokens", {
+  id: serial("id").primaryKey(),
+  questionnaireId: integer("questionnaire_id").references(() => feedbackQuestionnaires.id).notNull(),
+  participantId: integer("participant_id").references(() => participants.id).notNull(),
+  token: varchar("token").notNull().unique(),
+  sentAt: timestamp("sent_at"),
+  sentVia: text("sent_via"), // email, qr_code
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const feedbackResponses = pgTable("feedback_responses", {
+  id: serial("id").primaryKey(),
+  tokenId: integer("token_id").references(() => feedbackResponseTokens.id).notNull(),
+  questionId: integer("question_id").references(() => feedbackQuestions.id).notNull(),
+  ratingValue: integer("rating_value"), // For rating questions (1-5)
+  textValue: text("text_value"), // For text questions
+  selectedOptions: jsonb("selected_options").$type<string[]>(), // For multiple choice
+  booleanValue: boolean("boolean_value"), // For yes/no questions
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // --- SCHEMAS ---
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -436,6 +568,13 @@ export const insertInAppNotificationSchema = createInsertSchema(inAppNotificatio
 export const insertXPTransactionSchema = createInsertSchema(xpTransactions).omit({ id: true, createdAt: true });
 export const insertBadgeSchema = createInsertSchema(badges).omit({ id: true, createdAt: true });
 export const insertUserBadgeSchema = createInsertSchema(userBadges).omit({ id: true, unlockedAt: true });
+export const insertFeedbackQuestionnaireSchema = createInsertSchema(feedbackQuestionnaires).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertFeedbackQuestionSchema = createInsertSchema(feedbackQuestions).omit({ id: true, createdAt: true });
+export const insertFeedbackResponseTokenSchema = createInsertSchema(feedbackResponseTokens).omit({ id: true, createdAt: true });
+export const insertFeedbackResponseSchema = createInsertSchema(feedbackResponses).omit({ id: true, createdAt: true });
+export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true, updatedAt: true });
+export const insertClientContractSchema = createInsertSchema(clientContracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit({ id: true, createdAt: true, updatedAt: true });
 
 // --- TYPES ---
 export type User = typeof users.$inferSelect;
@@ -496,3 +635,17 @@ export type InsertInAppNotification = z.infer<typeof insertInAppNotificationSche
 export type InsertXPTransaction = z.infer<typeof insertXPTransactionSchema>;
 export type InsertBadge = z.infer<typeof insertBadgeSchema>;
 export type InsertUserBadge = z.infer<typeof insertUserBadgeSchema>;
+export type FeedbackQuestionnaire = typeof feedbackQuestionnaires.$inferSelect;
+export type FeedbackQuestion = typeof feedbackQuestions.$inferSelect;
+export type FeedbackResponseToken = typeof feedbackResponseTokens.$inferSelect;
+export type FeedbackResponse = typeof feedbackResponses.$inferSelect;
+export type InsertFeedbackQuestionnaire = z.infer<typeof insertFeedbackQuestionnaireSchema>;
+export type InsertFeedbackQuestion = z.infer<typeof insertFeedbackQuestionSchema>;
+export type InsertFeedbackResponseToken = z.infer<typeof insertFeedbackResponseTokenSchema>;
+export type InsertFeedbackResponse = z.infer<typeof insertFeedbackResponseSchema>;
+export type CompanySettings = typeof companySettings.$inferSelect;
+export type ClientContract = typeof clientContracts.$inferSelect;
+export type ClientInvoice = typeof clientInvoices.$inferSelect;
+export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
+export type InsertClientContract = z.infer<typeof insertClientContractSchema>;
+export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;

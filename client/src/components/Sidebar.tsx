@@ -5,7 +5,7 @@ import {
   Building2,
   GraduationCap,
   Users,
-  UserCheck,
+  MessageSquareText,
   UserCog,
   FileText,
   Settings,
@@ -59,21 +59,15 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin"],
   },
   {
-    icon: GraduationCap,
-    label: "Formations",
-    href: "/programs",
-    roles: ["admin"],
-  },
-  {
     icon: Users,
-    label: "Formateurs",
-    href: "/trainers",
-    roles: ["admin"],
-  },
-  {
-    icon: UserCheck,
     label: "Participants",
     href: "/participants",
+    roles: ["admin"],
+  },
+  {
+    icon: MessageSquareText,
+    label: "Feedback",
+    href: "/feedback",
     roles: ["admin"],
   },
   {

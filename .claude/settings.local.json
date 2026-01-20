@@ -25,7 +25,13 @@
       "Bash(ls:*)",
       "Bash(git checkout:*)",
       "Bash(grep:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(wc:*)",
+      "Bash(yes:*)",
+      "Bash(node -e:*)",
+      "Bash(echo:*)",
+      "Bash(node run-feedback-migration.js:*)",
+      "Bash(npm run db:generate:*)"
     ]
   }
 }

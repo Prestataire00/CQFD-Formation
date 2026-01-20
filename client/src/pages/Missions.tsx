@@ -136,11 +136,11 @@ export default function Missions() {
   // Filter missions
   const filteredMissions = missions?.filter((mission: Mission) => {
     const matchesSearch =
-      mission.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (mission.title?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
       (mission.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === "all" || mission.status === statusFilter;
     const matchesTrainer = trainerFilter === "all" || mission.trainerId === trainerFilter;
-    const matchesTypology = typologyFilter === "all" || mission.typology === typologyFilter;
+    const matchesTypology = typologyFilter === "all" || (mission.typology || "") === typologyFilter;
     const matchesClient = clientFilter === "all" || mission.clientId?.toString() === clientFilter;
     const matchesProgram = programFilter === "all" || mission.programId?.toString() === programFilter;
     return matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient && matchesProgram;
@@ -160,11 +160,11 @@ export default function Missions() {
       case "trainer":
         const trainerA = trainers?.find((t: any) => t.id === a.trainerId);
         const trainerB = trainers?.find((t: any) => t.id === b.trainerId);
-        const nameA = trainerA ? `${trainerA.lastName} ${trainerA.firstName}` : "";
-        const nameB = trainerB ? `${trainerB.lastName} ${trainerB.firstName}` : "";
+        const nameA = trainerA ? `${trainerA.lastName || ""} ${trainerA.firstName || ""}` : "";
+        const nameB = trainerB ? `${trainerB.lastName || ""} ${trainerB.firstName || ""}` : "";
         return nameA.localeCompare(nameB);
       case "title":
-        return a.title.localeCompare(b.title);
+        return (a.title || "").localeCompare(b.title || "");
       case "typology":
         return (a.typology || "").localeCompare(b.typology || "");
       case "status":

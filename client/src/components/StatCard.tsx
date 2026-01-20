@@ -1,4 +1,5 @@
-import { LucideIcon } from "lucide-react";
+import { LucideIcon, ArrowUpRight } from "lucide-react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 
 interface StatCardProps {
@@ -8,14 +9,12 @@ interface StatCardProps {
   trend?: string;
   trendUp?: boolean;
   className?: string;
+  href?: string;
 }
 
-export function StatCard({ label, value, icon: Icon, trend, trendUp, className }: StatCardProps) {
-  return (
-    <div className={cn(
-      "bg-card rounded-2xl p-6 border border-border/50 shadow-sm hover:shadow-md transition-all duration-300",
-      className
-    )}>
+export function StatCard({ label, value, icon: Icon, trend, trendUp, className, href }: StatCardProps) {
+  const content = (
+    <>
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
@@ -36,6 +35,34 @@ export function StatCard({ label, value, icon: Icon, trend, trendUp, className }
           <span className="text-muted-foreground">par rapport au mois dernier</span>
         </div>
       )}
+      {href && (
+        <div className="mt-4 flex items-center justify-end text-xs text-primary font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          <span>Voir details</span>
+          <ArrowUpRight className="w-3 h-3 ml-1" />
+        </div>
+      )}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href}>
+        <div className={cn(
+          "bg-card rounded-2xl p-6 border border-border/50 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-300 cursor-pointer group",
+          className
+        )}>
+          {content}
+        </div>
+      </Link>
+    );
+  }
+
+  return (
+    <div className={cn(
+      "bg-card rounded-2xl p-6 border border-border/50 shadow-sm hover:shadow-md transition-all duration-300",
+      className
+    )}>
+      {content}
     </div>
   );
 }

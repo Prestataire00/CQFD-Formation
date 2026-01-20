@@ -8,6 +8,8 @@ import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
+import { registerFeedbackRoutes } from "./feedback";
+import documentsRouter from "./documents";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -1962,6 +1964,12 @@ export async function registerRoutes(
   app.get('/api/gamification/xp-config', isAuthenticated, async (req, res) => {
     res.json(XP_CONFIG);
   });
+
+  // Register Feedback routes
+  registerFeedbackRoutes(app);
+
+  // Register Documents routes (contracts, invoices)
+  app.use('/api/documents', isAuthenticated, documentsRouter);
 
   // Seed Data
   await seedDatabase().catch(err => console.error('Error seeding database:', err));

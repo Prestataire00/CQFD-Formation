@@ -4,6 +4,8 @@ import {
   invoices, documents, documentTemplates, documentTemplateVersions, templateNotifications,
   messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
   xpTransactions, badges, userBadges, inAppNotifications,
+  feedbackQuestionnaires, feedbackQuestions, feedbackResponseTokens, feedbackResponses,
+  companySettings, clientContracts, clientInvoices,
   type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
@@ -11,6 +13,8 @@ import {
   type Message, type Project, type Task,
   type ReminderSetting, type Reminder, type InAppNotification,
   type XPTransaction, type Badge, type UserBadge,
+  type FeedbackQuestionnaire, type FeedbackQuestion, type FeedbackResponseToken, type FeedbackResponse,
+  type CompanySettings, type ClientContract, type ClientInvoice,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
   type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
   type InsertMissionParticipant, type InsertAttendanceRecord,
@@ -19,6 +23,8 @@ import {
   type InsertAuditLog, type InsertMessage, type InsertProject, type InsertTask,
   type InsertReminderSetting, type InsertReminder, type InsertInAppNotification,
   type InsertXPTransaction, type InsertBadge, type InsertUserBadge,
+  type InsertFeedbackQuestionnaire, type InsertFeedbackQuestion, type InsertFeedbackResponseToken, type InsertFeedbackResponse,
+  type InsertCompanySettings, type InsertClientContract, type InsertClientInvoice,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
@@ -235,6 +241,29 @@ export interface IStorage {
   createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification>;
   markInAppNotificationAsRead(id: number): Promise<InAppNotification | undefined>;
   markAllInAppNotificationsAsRead(userId: string): Promise<boolean>;
+
+  // Feedback Questionnaires
+  getFeedbackQuestionnaire(id: number): Promise<FeedbackQuestionnaire | undefined>;
+  getFeedbackQuestionnaireByMission(missionId: number): Promise<FeedbackQuestionnaire | undefined>;
+  createFeedbackQuestionnaire(questionnaire: InsertFeedbackQuestionnaire): Promise<FeedbackQuestionnaire>;
+  updateFeedbackQuestionnaire(id: number, data: Partial<FeedbackQuestionnaire>): Promise<FeedbackQuestionnaire | undefined>;
+
+  // Feedback Questions
+  getFeedbackQuestions(questionnaireId: number): Promise<FeedbackQuestion[]>;
+  createFeedbackQuestion(question: InsertFeedbackQuestion): Promise<FeedbackQuestion>;
+  deleteFeedbackQuestions(questionnaireId: number): Promise<void>;
+
+  // Feedback Response Tokens
+  getFeedbackResponseTokenByToken(token: string): Promise<FeedbackResponseToken | undefined>;
+  getFeedbackTokenByParticipant(questionnaireId: number, participantId: number): Promise<FeedbackResponseToken | undefined>;
+  getFeedbackTokensByQuestionnaire(questionnaireId: number): Promise<FeedbackResponseToken[]>;
+  createFeedbackResponseToken(token: InsertFeedbackResponseToken): Promise<FeedbackResponseToken>;
+  updateFeedbackResponseToken(id: number, data: Partial<FeedbackResponseToken>): Promise<FeedbackResponseToken | undefined>;
+
+  // Feedback Responses
+  getFeedbackResponsesByToken(tokenId: number): Promise<FeedbackResponse[]>;
+  getFeedbackResponsesByQuestion(questionId: number): Promise<FeedbackResponse[]>;
+  createFeedbackResponse(response: InsertFeedbackResponse): Promise<FeedbackResponse>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -320,6 +349,18 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return !!updated;
+  }
+
+  async updateUserStreak(userId: string, streakDays: number, lastActivityDate: Date): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({
+        streakDays,
+        lastActivityDate,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated;
   }
 
   // ==================== PASSWORD RESET TOKENS ====================
@@ -1535,6 +1576,215 @@ export class DatabaseStorage implements IStorage {
         eq(inAppNotifications.isRead, false)
       ));
     return true;
+  }
+
+  // ==================== FEEDBACK QUESTIONNAIRES ====================
+  async getFeedbackQuestionnaire(id: number): Promise<FeedbackQuestionnaire | undefined> {
+    const [questionnaire] = await db.select().from(feedbackQuestionnaires).where(eq(feedbackQuestionnaires.id, id));
+    return questionnaire;
+  }
+
+  async getFeedbackQuestionnaireByMission(missionId: number): Promise<FeedbackQuestionnaire | undefined> {
+    const [questionnaire] = await db.select().from(feedbackQuestionnaires).where(eq(feedbackQuestionnaires.missionId, missionId));
+    return questionnaire;
+  }
+
+  async createFeedbackQuestionnaire(questionnaire: InsertFeedbackQuestionnaire): Promise<FeedbackQuestionnaire> {
+    const [created] = await db.insert(feedbackQuestionnaires).values(questionnaire).returning();
+    return created;
+  }
+
+  async updateFeedbackQuestionnaire(id: number, data: Partial<FeedbackQuestionnaire>): Promise<FeedbackQuestionnaire | undefined> {
+    const [updated] = await db.update(feedbackQuestionnaires)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(feedbackQuestionnaires.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== FEEDBACK QUESTIONS ====================
+  async getFeedbackQuestions(questionnaireId: number): Promise<FeedbackQuestion[]> {
+    return await db.select().from(feedbackQuestions)
+      .where(eq(feedbackQuestions.questionnaireId, questionnaireId))
+      .orderBy(feedbackQuestions.order);
+  }
+
+  async createFeedbackQuestion(question: InsertFeedbackQuestion): Promise<FeedbackQuestion> {
+    const [created] = await db.insert(feedbackQuestions).values({
+      ...question,
+      options: question.options ? [...question.options] : null,
+    }).returning();
+    return created;
+  }
+
+  async deleteFeedbackQuestions(questionnaireId: number): Promise<void> {
+    await db.delete(feedbackQuestions).where(eq(feedbackQuestions.questionnaireId, questionnaireId));
+  }
+
+  // ==================== FEEDBACK RESPONSE TOKENS ====================
+  async getFeedbackResponseTokenByToken(token: string): Promise<FeedbackResponseToken | undefined> {
+    const [responseToken] = await db.select().from(feedbackResponseTokens).where(eq(feedbackResponseTokens.token, token));
+    return responseToken;
+  }
+
+  async getFeedbackTokenByParticipant(questionnaireId: number, participantId: number): Promise<FeedbackResponseToken | undefined> {
+    const [token] = await db.select().from(feedbackResponseTokens)
+      .where(and(
+        eq(feedbackResponseTokens.questionnaireId, questionnaireId),
+        eq(feedbackResponseTokens.participantId, participantId)
+      ));
+    return token;
+  }
+
+  async getFeedbackTokensByQuestionnaire(questionnaireId: number): Promise<FeedbackResponseToken[]> {
+    return await db.select().from(feedbackResponseTokens)
+      .where(eq(feedbackResponseTokens.questionnaireId, questionnaireId));
+  }
+
+  async createFeedbackResponseToken(token: InsertFeedbackResponseToken): Promise<FeedbackResponseToken> {
+    const [created] = await db.insert(feedbackResponseTokens).values(token).returning();
+    return created;
+  }
+
+  async updateFeedbackResponseToken(id: number, data: Partial<FeedbackResponseToken>): Promise<FeedbackResponseToken | undefined> {
+    const [updated] = await db.update(feedbackResponseTokens)
+      .set(data)
+      .where(eq(feedbackResponseTokens.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== FEEDBACK RESPONSES ====================
+  async getFeedbackResponsesByToken(tokenId: number): Promise<FeedbackResponse[]> {
+    return await db.select().from(feedbackResponses).where(eq(feedbackResponses.tokenId, tokenId));
+  }
+
+  async getFeedbackResponsesByQuestion(questionId: number): Promise<FeedbackResponse[]> {
+    return await db.select().from(feedbackResponses).where(eq(feedbackResponses.questionId, questionId));
+  }
+
+  async createFeedbackResponse(response: InsertFeedbackResponse): Promise<FeedbackResponse> {
+    const [created] = await db.insert(feedbackResponses).values({
+      ...response,
+      selectedOptions: response.selectedOptions ? [...response.selectedOptions] : null,
+    }).returning();
+    return created;
+  }
+
+  // ==================== COMPANY SETTINGS ====================
+  async getCompanySettings(): Promise<CompanySettings | undefined> {
+    const [settings] = await db.select().from(companySettings).limit(1);
+    return settings;
+  }
+
+  async updateCompanySettings(data: Partial<CompanySettings>): Promise<CompanySettings> {
+    const existing = await this.getCompanySettings();
+    if (existing) {
+      const [updated] = await db.update(companySettings)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(companySettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(companySettings)
+        .values(data as InsertCompanySettings)
+        .returning();
+      return created;
+    }
+  }
+
+  // ==================== CLIENT CONTRACTS ====================
+  async getClientContracts(): Promise<ClientContract[]> {
+    return await db.select().from(clientContracts).orderBy(desc(clientContracts.createdAt));
+  }
+
+  async getClientContractsByClient(clientId: number): Promise<ClientContract[]> {
+    return await db.select().from(clientContracts)
+      .where(eq(clientContracts.clientId, clientId))
+      .orderBy(desc(clientContracts.createdAt));
+  }
+
+  async getClientContract(id: number): Promise<ClientContract | undefined> {
+    const [contract] = await db.select().from(clientContracts).where(eq(clientContracts.id, id));
+    return contract;
+  }
+
+  async createClientContract(contract: InsertClientContract): Promise<ClientContract> {
+    const [created] = await db.insert(clientContracts).values(contract).returning();
+    return created;
+  }
+
+  async updateClientContract(id: number, data: Partial<ClientContract>): Promise<ClientContract | undefined> {
+    const [updated] = await db.update(clientContracts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientContracts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClientContract(id: number): Promise<boolean> {
+    await db.delete(clientContracts).where(eq(clientContracts.id, id));
+    return true;
+  }
+
+  async getNextContractNumber(): Promise<string> {
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.contractPrefix || 'CTR';
+    const year = new Date().getFullYear();
+
+    const contracts = await db.select().from(clientContracts)
+      .where(sql`EXTRACT(YEAR FROM ${clientContracts.createdAt}) = ${year}`)
+      .orderBy(desc(clientContracts.id));
+
+    const nextNumber = (contracts.length + 1).toString().padStart(4, '0');
+    return `${prefix}-${year}-${nextNumber}`;
+  }
+
+  // ==================== CLIENT INVOICES ====================
+  async getClientInvoices(): Promise<ClientInvoice[]> {
+    return await db.select().from(clientInvoices).orderBy(desc(clientInvoices.createdAt));
+  }
+
+  async getClientInvoicesByClient(clientId: number): Promise<ClientInvoice[]> {
+    return await db.select().from(clientInvoices)
+      .where(eq(clientInvoices.clientId, clientId))
+      .orderBy(desc(clientInvoices.createdAt));
+  }
+
+  async getClientInvoice(id: number): Promise<ClientInvoice | undefined> {
+    const [invoice] = await db.select().from(clientInvoices).where(eq(clientInvoices.id, id));
+    return invoice;
+  }
+
+  async createClientInvoice(invoice: InsertClientInvoice): Promise<ClientInvoice> {
+    const [created] = await db.insert(clientInvoices).values(invoice as any).returning();
+    return created;
+  }
+
+  async updateClientInvoice(id: number, data: Partial<ClientInvoice>): Promise<ClientInvoice | undefined> {
+    const [updated] = await db.update(clientInvoices)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(clientInvoices.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteClientInvoice(id: number): Promise<boolean> {
+    await db.delete(clientInvoices).where(eq(clientInvoices.id, id));
+    return true;
+  }
+
+  async getNextInvoiceNumber(): Promise<string> {
+    const settings = await this.getCompanySettings();
+    const prefix = settings?.invoicePrefix || 'FAC';
+    const year = new Date().getFullYear();
+
+    const invoicesList = await db.select().from(clientInvoices)
+      .where(sql`EXTRACT(YEAR FROM ${clientInvoices.createdAt}) = ${year}`)
+      .orderBy(desc(clientInvoices.id));
+
+    const nextNumber = (invoicesList.length + 1).toString().padStart(4, '0');
+    return `${prefix}-${year}-${nextNumber}`;
   }
 }
 

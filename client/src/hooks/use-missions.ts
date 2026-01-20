@@ -177,6 +177,24 @@ export function useUpdateMissionParticipant() {
   });
 }
 
+export function useRemoveParticipantFromMission() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, participantId }: { missionId: number; participantId: number }) => {
+      const url = buildUrl(api.missions.participants.remove.path, { missionId, participantId });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to remove participant");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.participants.list.path, missionId] });
+    },
+  });
+}
+
 // Mission Trainers (multi-trainers support)
 export function useMissionTrainers(missionId: number) {
   return useQuery({

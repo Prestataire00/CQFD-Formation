@@ -36,7 +36,6 @@ import {
   Star,
   Calendar,
   Edit,
-  ArrowRightLeft,
   Loader2,
   X,
   FileText,
@@ -44,6 +43,9 @@ import {
   ClipboardCheck,
   ExternalLink,
   Check,
+  UserPlus,
+  XCircle,
+  Users,
 } from "lucide-react";
 import { useClients, useCreateClient, useMissions, useInvoices, useUsers } from "@/hooks/use-missions";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -52,7 +54,8 @@ import { api } from "@shared/routes";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { Client, Mission, Invoice, ClientContractStatus, User } from "@shared/schema";
-import { UserCircle } from "lucide-react";
+import { UserCircle, Wand2 } from "lucide-react";
+import { InvoiceGenerator, ContractGenerator } from "@/components/documents";
 
 function getTypeBadge(type: string) {
   const styles: Record<string, { label: string; color: string }> = {
@@ -141,14 +144,13 @@ function ClientMiniRecap({ stats }: { stats: ClientStats }) {
   );
 }
 
+
 // Client Detail Dialog Component with inline editing
 function ClientDetailDialog({
   client,
   stats,
   isOpen,
   onClose,
-  onToggleStatus,
-  isToggling,
   trainers,
   onSave,
 }: {
@@ -156,17 +158,17 @@ function ClientDetailDialog({
   stats: ClientStats;
   isOpen: boolean;
   onClose: () => void;
-  onToggleStatus: () => void;
-  isToggling: boolean;
   trainers: User[];
   onSave: (data: any) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showInvoiceGenerator, setShowInvoiceGenerator] = useState(false);
+  const [showContractGenerator, setShowContractGenerator] = useState(false);
   const [editData, setEditData] = useState({
     name: client.name,
     type: client.type,
-    contractStatus: client.contractStatus || "negotiation",
+    contractStatus: client.contractStatus || "prospect",
     contractAmount: (client.contractAmount || 0) / 100,
     assignedTrainerId: client.assignedTrainerId || "",
     siret: client.siret || "",
@@ -184,7 +186,7 @@ function ClientDetailDialog({
     setEditData({
       name: client.name,
       type: client.type,
-      contractStatus: client.contractStatus || "negotiation",
+      contractStatus: client.contractStatus || "prospect",
       contractAmount: (client.contractAmount || 0) / 100,
       assignedTrainerId: client.assignedTrainerId || "",
       siret: client.siret || "",
@@ -215,8 +217,14 @@ function ClientDetailDialog({
     }
   };
 
-  const status = client.contractStatus || "negotiation";
-  const isAcquired = status === "acquired";
+  const status = client.contractStatus || "prospect";
+  const statusLabels: Record<ClientContractStatus, { label: string; color: string }> = {
+    prospect: { label: "Prospect", color: "bg-blue-100 text-blue-700" },
+    negotiation: { label: "En negociation", color: "bg-amber-100 text-amber-700" },
+    lost: { label: "Perdu", color: "bg-red-100 text-red-700" },
+    client: { label: "Client", color: "bg-green-100 text-green-700" },
+  };
+  const currentStatusInfo = statusLabels[status as ClientContractStatus] || statusLabels.prospect;
 
   const getTrainerName = (trainerId: string | null | undefined) => {
     if (!trainerId) return null;
@@ -225,6 +233,7 @@ function ClientDetailDialog({
   };
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -255,22 +264,11 @@ function ClientDetailDialog({
                 ) : (
                   getTypeBadge(client.type)
                 )}
-                <button
-                  onClick={onToggleStatus}
-                  disabled={isToggling}
-                  className={`inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full font-medium border transition-all cursor-pointer hover:scale-105 disabled:opacity-50 ${
-                    isAcquired
-                      ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-                      : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
-                  }`}
+                <span
+                  className={`inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full font-medium ${currentStatusInfo.color}`}
                 >
-                  {isToggling ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <ArrowRightLeft className="w-4 h-4" />
-                  )}
-                  {isAcquired ? "Acquis" : "En negociation"}
-                </button>
+                  {currentStatusInfo.label}
+                </span>
               </div>
             </div>
             {!isEditing ? (
@@ -551,6 +549,35 @@ function ClientDetailDialog({
           )}
         </div>
 
+        {/* Document Generation */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-violet-50 border border-blue-200 rounded-lg">
+          <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
+            <Wand2 className="w-5 h-5 text-violet-600" />
+            Generer des documents
+          </h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Generez automatiquement des factures et contrats avec toutes les informations du client pre-remplies.
+          </p>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 bg-white hover:bg-green-50 border-green-300"
+              onClick={() => setShowInvoiceGenerator(true)}
+            >
+              <Receipt className="w-4 h-4 mr-2 text-green-600" />
+              Generer une facture
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 bg-white hover:bg-blue-50 border-blue-300"
+              onClick={() => setShowContractGenerator(true)}
+            >
+              <FileText className="w-4 h-4 mr-2 text-blue-600" />
+              Generer un contrat
+            </Button>
+          </div>
+        </div>
+
         <DialogFooter className="mt-6">
           <Button variant="outline" onClick={onClose}>
             Fermer
@@ -558,6 +585,19 @@ function ClientDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Document Generators - Outside parent Dialog */}
+    <InvoiceGenerator
+      client={client}
+      open={showInvoiceGenerator}
+      onOpenChange={setShowInvoiceGenerator}
+    />
+    <ContractGenerator
+      client={client}
+      open={showContractGenerator}
+      onOpenChange={setShowContractGenerator}
+    />
+    </>
   );
 }
 
@@ -587,7 +627,7 @@ export default function Clients() {
   const [newClient, setNewClient] = useState({
     name: "",
     type: "entreprise" as "entreprise" | "opco" | "particulier" | "institution",
-    contractStatus: "negotiation" as ClientContractStatus,
+    contractStatus: "prospect" as ClientContractStatus,
     contractAmount: 0,
     assignedTrainerId: "" as string,
     siret: "",
@@ -668,28 +708,38 @@ export default function Clients() {
   // KPI calculations
   const kpis = useMemo(() => {
     if (!clients || clients.length === 0) {
-      return { prospects: 0, acquiredClients: 0, totalAcquiredRevenue: 0 };
+      return { prospects: 0, negotiation: 0, lost: 0, activeClients: 0, totalClientRevenue: 0 };
     }
 
     const prospects = clients.filter((c: Client) => {
-      const status = c.contractStatus || "negotiation";
+      const status = c.contractStatus || "prospect";
+      return status === "prospect";
+    }).length;
+
+    const negotiation = clients.filter((c: Client) => {
+      const status = c.contractStatus || "prospect";
       return status === "negotiation";
     }).length;
 
-    const acquiredClients = clients.filter((c: Client) => {
-      const status = c.contractStatus || "negotiation";
-      return status === "acquired";
+    const lost = clients.filter((c: Client) => {
+      const status = c.contractStatus || "prospect";
+      return status === "lost";
     }).length;
 
-    const totalAcquiredRevenue = clients
-      .filter((c: Client) => (c.contractStatus || "negotiation") === "acquired")
+    const activeClients = clients.filter((c: Client) => {
+      const status = c.contractStatus || "prospect";
+      return status === "client";
+    }).length;
+
+    const totalClientRevenue = clients
+      .filter((c: Client) => (c.contractStatus || "prospect") === "client")
       .reduce((sum: number, c: Client) => {
         const contractAmount = c.contractAmount || 0;
         const invoiceRevenue = clientStatsMap.get(c.id)?.totalRevenue || 0;
         return sum + contractAmount + invoiceRevenue;
       }, 0);
 
-    return { prospects, acquiredClients, totalAcquiredRevenue };
+    return { prospects, negotiation, lost, activeClients, totalClientRevenue };
   }, [clients, clientStatsMap]);
 
   const filteredClients = clients?.filter((client: Client) => {
@@ -699,7 +749,7 @@ export default function Clients() {
       client.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       client.demand?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = typeFilter === "all" || client.type === typeFilter;
-    const clientContractStatus = client.contractStatus || "negotiation";
+    const clientContractStatus = client.contractStatus || "prospect";
     const matchesContract =
       contractFilter === "all" || clientContractStatus === contractFilter;
     const matchesTrainer =
@@ -784,16 +834,8 @@ export default function Clients() {
     }
   };
 
-  // Quick toggle contract status
-  const handleToggleContractStatus = async (client: Client, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
-
-    const currentStatus = client.contractStatus || "negotiation";
-    const newStatus: ClientContractStatus =
-      currentStatus === "acquired" ? "negotiation" : "acquired";
-
+  // Change client status to a specific status
+  const handleChangeClientStatus = async (client: Client, newStatus: ClientContractStatus) => {
     setTogglingClientId(client.id);
     try {
       const response = await fetch(`/api/clients/${client.id}`, {
@@ -822,26 +864,27 @@ export default function Clients() {
         throw new Error(errorData.message || `Erreur ${response.status}`);
       }
 
-      // Get the updated client from the response
       const updatedClient = await response.json();
 
-      // Update selected client if it's the one being toggled
       if (selectedClient?.id === client.id) {
         setSelectedClient(updatedClient);
       }
 
-      // Force refresh - reset queries to bypass staleTime: Infinity
       await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
 
+      const statusLabels: Record<ClientContractStatus, string> = {
+        prospect: "Prospect",
+        negotiation: "En negociation",
+        lost: "Perdu",
+        client: "Client",
+      };
+
       toast({
-        title: newStatus === "acquired" ? "Client acquis !" : "Client en negociation",
-        description:
-          newStatus === "acquired"
-            ? `${client.name} est maintenant un client acquis.`
-            : `${client.name} est de nouveau en negociation.`,
+        title: `Statut modifie`,
+        description: `${client.name} est maintenant "${statusLabels[newStatus]}".`,
       });
     } catch (error: any) {
-      console.error("Failed to toggle contract status:", error);
+      console.error("Failed to change client status:", error);
       toast({
         title: "Erreur",
         description: error.message || "Impossible de changer le statut.",
@@ -856,7 +899,7 @@ export default function Clients() {
     setNewClient({
       name: client.name,
       type: client.type as any,
-      contractStatus: (client.contractStatus as ClientContractStatus) || "negotiation",
+      contractStatus: (client.contractStatus as ClientContractStatus) || "prospect",
       contractAmount: (client.contractAmount || 0) / 100,
       assignedTrainerId: client.assignedTrainerId || "",
       siret: client.siret || "",
@@ -876,7 +919,7 @@ export default function Clients() {
     setNewClient({
       name: "",
       type: "entreprise",
-      contractStatus: "negotiation",
+      contractStatus: "prospect",
       contractAmount: 0,
       assignedTrainerId: "",
       siret: "",
@@ -900,27 +943,41 @@ export default function Clients() {
 
         <div className="flex-1 p-6 space-y-6">
           {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatCard
               title="Prospects"
               value={kpis.prospects}
-              icon={TrendingUp}
-              color="bg-amber-100 text-amber-600"
-              subtitle="En negociation"
+              icon={UserPlus}
+              color="bg-blue-100 text-blue-600"
+              subtitle="Nouveaux contacts"
             />
             <StatCard
-              title="Clients acquis"
-              value={kpis.acquiredClients}
+              title="En negociation"
+              value={kpis.negotiation}
               icon={Handshake}
+              color="bg-amber-100 text-amber-600"
+              subtitle="Discussions en cours"
+            />
+            <StatCard
+              title="Perdus"
+              value={kpis.lost}
+              icon={XCircle}
+              color="bg-red-100 text-red-600"
+              subtitle="Non convertis"
+            />
+            <StatCard
+              title="Clients"
+              value={kpis.activeClients}
+              icon={Users}
               color="bg-green-100 text-green-600"
               subtitle="Contrats signes"
             />
             <StatCard
-              title="CA total acquis"
-              value={formatCurrency(kpis.totalAcquiredRevenue)}
+              title="CA Clients"
+              value={formatCurrency(kpis.totalClientRevenue)}
               icon={Euro}
-              color="bg-blue-100 text-blue-600"
-              subtitle="Contrats + factures payees"
+              color="bg-purple-100 text-purple-600"
+              subtitle="Contrats + factures"
             />
           </div>
 
@@ -954,8 +1011,10 @@ export default function Clients() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="prospect">Prospect</SelectItem>
                   <SelectItem value="negotiation">En negociation</SelectItem>
-                  <SelectItem value="acquired">Acquis</SelectItem>
+                  <SelectItem value="lost">Perdu</SelectItem>
+                  <SelectItem value="client">Client</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={trainerFilter} onValueChange={setTrainerFilter}>
@@ -1046,8 +1105,6 @@ export default function Clients() {
               }}
               isOpen={selectedClient !== null}
               onClose={() => setSelectedClient(null)}
-              onToggleStatus={() => handleToggleContractStatus(selectedClient)}
-              isToggling={togglingClientId === selectedClient.id}
               trainers={trainers}
               onSave={async (data) => {
                 const response = await fetch(`/api/clients/${selectedClient.id}`, {
@@ -1103,8 +1160,14 @@ export default function Clients() {
                 </thead>
                 <tbody>
                   {filteredClients.map((client: Client) => {
-                    const status = client.contractStatus || "negotiation";
-                    const isAcquired = status === "acquired";
+                    const status = client.contractStatus || "prospect";
+                    const statusStyles: Record<ClientContractStatus, { label: string; bg: string; text: string; border: string }> = {
+                      prospect: { label: "Prospect", bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
+                      negotiation: { label: "En negociation", bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-300" },
+                      lost: { label: "Perdu", bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
+                      client: { label: "Client", bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
+                    };
+                    const currentStatusStyle = statusStyles[status as ClientContractStatus] || statusStyles.prospect;
 
                     return (
                       <tr
@@ -1133,27 +1196,23 @@ export default function Clients() {
                           {getTypeBadge(client.type)}
                         </td>
                         <td className="p-4">
-                          <button
-                            onClick={(e) => handleToggleContractStatus(client, e)}
-                            disabled={togglingClientId === client.id}
-                            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full font-medium border transition-all cursor-pointer hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed ${
-                              isAcquired
-                                ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-                                : "bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200"
-                            }`}
-                            title={
-                              isAcquired
-                                ? "Cliquez pour repasser en negociation"
-                                : "Cliquez pour marquer comme acquis"
-                            }
+                          <Select
+                            value={status}
+                            onValueChange={(newStatus) => handleChangeClientStatus(client, newStatus as ClientContractStatus)}
                           >
-                            {togglingClientId === client.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <ArrowRightLeft className="w-3 h-3" />
-                            )}
-                            {isAcquired ? "Acquis" : "Negociation"}
-                          </button>
+                            <SelectTrigger
+                              className={`w-40 h-8 text-xs ${currentStatusStyle.bg} ${currentStatusStyle.text} ${currentStatusStyle.border}`}
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <SelectValue>{currentStatusStyle.label}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="prospect">Prospect</SelectItem>
+                              <SelectItem value="negotiation">En negociation</SelectItem>
+                              <SelectItem value="lost">Perdu</SelectItem>
+                              <SelectItem value="client">Client</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                       </tr>
                     );
@@ -1245,8 +1304,10 @@ function ClientForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="prospect">Prospect</SelectItem>
                 <SelectItem value="negotiation">En negociation</SelectItem>
-                <SelectItem value="acquired">Acquis</SelectItem>
+                <SelectItem value="lost">Perdu</SelectItem>
+                <SelectItem value="client">Client</SelectItem>
               </SelectContent>
             </Select>
           </div>
