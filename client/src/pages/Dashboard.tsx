@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
 import { Badge } from "@/components/ui/badge";
-import { useStats, useMissions, useInvoices } from "@/hooks/use-missions";
+import { useStats, useMissions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
 import {
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, Invoice, MissionStatus, InvoiceStatus, InAppNotification } from "@shared/schema";
+import type { Mission, MissionStatus, InAppNotification } from "@shared/schema";
 
 function getMissionStatusLabel(status: MissionStatus): { label: string; color: string } {
   const styles: Record<MissionStatus, { label: string; color: string }> = {
@@ -35,27 +35,15 @@ function getMissionStatusLabel(status: MissionStatus): { label: string; color: s
   return styles[status] || styles.draft;
 }
 
-function getInvoiceStatusLabel(status: InvoiceStatus): { label: string; color: string } {
-  const styles: Record<InvoiceStatus, { label: string; color: string }> = {
-    draft: { label: "Brouillon", color: "text-gray-500" },
-    submitted: { label: "Soumise", color: "text-orange-500" },
-    rejected: { label: "Refusee", color: "text-red-500" },
-    paid: { label: "Payee", color: "text-green-600" },
-  };
-  return styles[status] || styles.draft;
-}
-
 export default function Dashboard() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { data: stats } = useStats();
   const { data: missions } = useMissions();
-  const { data: invoices } = useInvoices();
   const { data: inAppNotifications } = useUnreadInAppNotifications();
   const markInAppAsRead = useMarkInAppNotificationRead();
 
   const isAdmin = user?.role === "admin";
-  const isPrestataire = user?.role === "prestataire";
 
   // Get 4 most recent notifications
   const recentNotifications = (inAppNotifications || []).slice(0, 4);
@@ -77,9 +65,6 @@ export default function Dashboard() {
       return dateA - dateB;
     })
     .slice(0, 5) || [];
-
-  // Get recent invoices
-  const recentInvoices = invoices?.slice(0, 4) || [];
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -198,62 +183,6 @@ export default function Dashboard() {
               </div>
             </GridCard>
 
-            {/* Factures */}
-            {(isAdmin || isPrestataire) && (
-              <GridCard
-                title={isAdmin ? "Factures en attente" : "Mes Factures"}
-                actionLabel="Gerer les factures"
-                actionLink="/invoices"
-              >
-                <div className="space-y-3">
-                  {recentInvoices.length > 0 ? (
-                    recentInvoices.map((invoice: Invoice) => {
-                      const { label, color } = getInvoiceStatusLabel(invoice.status as InvoiceStatus);
-                      return (
-                        <div
-                          key={invoice.id}
-                          className="flex items-center justify-between p-3 rounded-xl bg-muted/20 border border-border/50 hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer group"
-                          onClick={() => setLocation("/invoices")}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                              <Receipt className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium font-mono group-hover:text-primary transition-colors">{invoice.invoiceNumber}</p>
-                              {invoice.createdAt && (
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(invoice.createdAt), "d MMM yyyy", { locale: fr })}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right flex items-center gap-2">
-                            <div>
-                              <p className="font-bold text-sm">
-                                {new Intl.NumberFormat("fr-FR", {
-                                  style: "currency",
-                                  currency: "EUR",
-                                }).format(invoice.amount / 100)}
-                              </p>
-                              <span className={`text-xs font-medium ${color}`}>
-                                {label}
-                              </span>
-                            </div>
-                            <ArrowRight className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Aucune facture recente
-                    </div>
-                  )}
-                </div>
-              </GridCard>
-            )}
-
             {/* Alertes et Rappels for admin */}
             {isAdmin && recentNotifications.length > 0 && (
               <GridCard
@@ -336,12 +265,6 @@ export default function Dashboard() {
                         {stats?.completedMissions || 0} / {stats?.totalMissions || 0}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Factures en attente</span>
-                      <span className="font-semibold text-orange-500">
-                        {stats?.pendingInvoices || 0}
-                      </span>
-                    </div>
                   </div>
                 </GridCard>
 
@@ -396,12 +319,6 @@ export default function Dashboard() {
                     <span className="text-sm text-muted-foreground">Missions terminees</span>
                     <span className="font-bold text-lg">{stats?.completedMissions || 0}</span>
                   </div>
-                  {isPrestataire && (
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                      <span className="text-sm text-muted-foreground">Factures en attente</span>
-                      <span className="font-bold text-lg text-orange-500">{stats?.pendingInvoices || 0}</span>
-                    </div>
-                  )}
                 </div>
               </GridCard>
             )}
