@@ -54,8 +54,7 @@ import { api } from "@shared/routes";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { Client, Mission, Invoice, ClientContractStatus, User } from "@shared/schema";
-import { UserCircle, Wand2 } from "lucide-react";
-import { InvoiceGenerator, ContractGenerator } from "@/components/documents";
+import { UserCircle } from "lucide-react";
 
 function getTypeBadge(type: string) {
   const styles: Record<string, { label: string; color: string }> = {
@@ -163,8 +162,6 @@ function ClientDetailDialog({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [showInvoiceGenerator, setShowInvoiceGenerator] = useState(false);
-  const [showContractGenerator, setShowContractGenerator] = useState(false);
   const [editData, setEditData] = useState({
     name: client.name,
     type: client.type,
