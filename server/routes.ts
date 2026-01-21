@@ -884,7 +884,12 @@ export async function registerRoutes(
   });
 
   app.get(api.evaluations.get.path, isAuthenticated, async (req, res) => {
-    const evaluation = await storage.getEvaluation(Number(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "ID invalide" });
+      return;
+    }
+    const evaluation = await storage.getEvaluation(id);
     if (!evaluation) {
       res.status(404).json({ message: "Évaluation non trouvée" });
       return;
@@ -911,7 +916,12 @@ export async function registerRoutes(
   });
 
   app.get(api.invoices.get.path, isAuthenticated, async (req, res) => {
-    const invoice = await storage.getInvoice(Number(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "ID invalide" });
+      return;
+    }
+    const invoice = await storage.getInvoice(id);
     if (!invoice) {
       res.status(404).json({ message: "Facture non trouvée" });
       return;
@@ -1000,7 +1010,12 @@ export async function registerRoutes(
   });
 
   app.get(api.documents.get.path, isAuthenticated, async (req, res) => {
-    const doc = await storage.getDocument(Number(req.params.id));
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ message: "ID invalide" });
+      return;
+    }
+    const doc = await storage.getDocument(id);
     if (!doc) {
       res.status(404).json({ message: "Document non trouvé" });
       return;
