@@ -1,61 +1,38 @@
 import { useState, useMemo, useEffect } from "react";
-import { Sidebar } from "@/components/Sidebar";
+import { 
+  useClients, 
+  useMissions, 
+  useInvoices, 
+  useUsers 
+} from "@/hooks/use-missions";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { api } from "@shared/routes";
 import { Header } from "@/components/Header";
+import { Sidebar } from "@/components/Sidebar";
+import { 
+  Plus, Search, Building2, Mail, Phone, MapPin, 
+  ExternalLink, Briefcase, Receipt, X, Check, Loader2,
+  Users, Euro, UserPlus, Handshake, XCircle, ClipboardCheck,
+  Star, Calendar, UserCircle, Edit3, Fingerprint, UserCheck
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+import { 
+  Dialog, DialogContent, DialogHeader, DialogTitle, 
+  DialogTrigger, DialogFooter, DialogDescription 
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Plus,
-  Building2,
-  Search,
-  Mail,
-  Phone,
-  MapPin,
-  Handshake,
-  TrendingUp,
-  Euro,
-  Briefcase,
-  Star,
-  Calendar,
-  Edit,
-  Loader2,
-  X,
-  FileText,
-  Receipt,
-  ClipboardCheck,
-  ExternalLink,
-  Check,
-  UserPlus,
-  XCircle,
-  Users,
-} from "lucide-react";
-import { useClients, useCreateClient, useMissions, useInvoices, useUsers } from "@/hooks/use-missions";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { api } from "@shared/routes";
+import { 
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Client, Mission, Invoice, ClientContractStatus, User } from "@shared/schema";
-import { UserCircle } from "lucide-react";
+import type { Client, Mission, Invoice, User, ClientContractStatus } from "@shared/schema";
 
+// Helper functions
 function getTypeBadge(type: string) {
   const styles: Record<string, { label: string; color: string }> = {
     entreprise: { label: "Entreprise", color: "bg-blue-100 text-blue-700" },
@@ -92,7 +69,7 @@ function StatCard({
 }: {
   title: string;
   value: string | number;
-  icon: React.ElementType;
+  icon: any;
   color: string;
   subtitle?: string;
 }) {
@@ -114,37 +91,192 @@ function StatCard({
   );
 }
 
-function ClientMiniRecap({ stats }: { stats: ClientStats }) {
+// Client Form Component
+function ClientForm({
+  client,
+  onChange,
+  onSubmit,
+  onCancel,
+  isSubmitting,
+  submitLabel,
+  trainers,
+}: {
+  client: any;
+  onChange: (data: any) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+  submitLabel: string;
+  trainers: User[];
+}) {
   return (
-    <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border">
-      <div className="flex items-center gap-1.5 text-xs">
-        <Briefcase className="w-3.5 h-3.5 text-blue-500" />
-        <span className="text-muted-foreground">Realisees:</span>
-        <span className="font-medium">{stats.completedMissions}</span>
+    <div className="space-y-4 pt-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Nom de l'entreprise *</Label>
+          <Input 
+            value={client.name} 
+            onChange={(e) => onChange({ ...client, name: e.target.value })} 
+            placeholder="Nom du client"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Type *</Label>
+          <Select 
+            value={client.type} 
+            onValueChange={(v) => onChange({ ...client, type: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner un type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="entreprise">Entreprise</SelectItem>
+              <SelectItem value="opco">OPCO</SelectItem>
+              <SelectItem value="particulier">Particulier</SelectItem>
+              <SelectItem value="institution">Institution</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 text-xs">
-        <Calendar className="w-3.5 h-3.5 text-orange-500" />
-        <span className="text-muted-foreground">A venir:</span>
-        <span className="font-medium">{stats.upcomingMissions}</span>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Statut du contrat</Label>
+          <Select 
+            value={client.contractStatus} 
+            onValueChange={(v) => onChange({ ...client, contractStatus: v })}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="prospect">Prospect</SelectItem>
+              <SelectItem value="negotiation">En négociation</SelectItem>
+              <SelectItem value="lost">Perdu</SelectItem>
+              <SelectItem value="client">Client</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Montant du contrat (€)</Label>
+          <Input 
+            type="number" 
+            value={client.contractAmount} 
+            onChange={(e) => onChange({ ...client, contractAmount: parseFloat(e.target.value) || 0 })} 
+            placeholder="0.00"
+          />
+        </div>
       </div>
-      <div className="flex items-center gap-1.5 text-xs">
-        <Euro className="w-3.5 h-3.5 text-green-500" />
-        <span className="text-muted-foreground">CA:</span>
-        <span className="font-medium">{formatCurrency(stats.totalRevenue)}</span>
+
+      <div className="space-y-2">
+        <Label>Formateur assigné</Label>
+        <Select 
+          value={client.assignedTrainerId || "none"} 
+          onValueChange={(v) => onChange({ ...client, assignedTrainerId: v === "none" ? "" : v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Choisir un formateur" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Aucun</SelectItem>
+            {trainers.map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-      <div className="flex items-center gap-1.5 text-xs">
-        <Star className="w-3.5 h-3.5 text-yellow-500" />
-        <span className="text-muted-foreground">Satisfaction:</span>
-        <span className="font-medium">
-          {stats.avgSatisfaction !== null ? `${stats.avgSatisfaction.toFixed(1)}/5` : "-"}
-        </span>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Contact (Nom)</Label>
+          <Input 
+            value={client.contactName} 
+            onChange={(e) => onChange({ ...client, contactName: e.target.value })} 
+            placeholder="Jean Dupont"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Contact (Email)</Label>
+          <Input 
+            type="email" 
+            value={client.contactEmail} 
+            onChange={(e) => onChange({ ...client, contactEmail: e.target.value })} 
+            placeholder="jean@entreprise.com"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Contact (Téléphone)</Label>
+          <Input 
+            value={client.contactPhone} 
+            onChange={(e) => onChange({ ...client, contactPhone: e.target.value })} 
+            placeholder="01 23 45 67 89"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>SIRET</Label>
+          <Input 
+            value={client.siret} 
+            onChange={(e) => onChange({ ...client, siret: e.target.value })} 
+            placeholder="14 chiffres"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Adresse</Label>
+        <Input 
+          value={client.address} 
+          onChange={(e) => onChange({ ...client, address: e.target.value })} 
+          placeholder="12 rue des Fleurs"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Code Postal</Label>
+          <Input 
+            value={client.postalCode} 
+            onChange={(e) => onChange({ ...client, postalCode: e.target.value })} 
+            placeholder="75001"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Ville</Label>
+          <Input 
+            value={client.city} 
+            onChange={(e) => onChange({ ...client, city: e.target.value })} 
+            placeholder="Paris"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Demande spécifique</Label>
+        <Input 
+          value={client.demand} 
+          onChange={(e) => onChange({ ...client, demand: e.target.value })} 
+          placeholder="Détails de la demande..."
+        />
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          Annuler
+        </Button>
+        <Button onClick={onSubmit} disabled={isSubmitting}>
+          {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+          {submitLabel}
+        </Button>
       </div>
     </div>
   );
 }
 
-
-// Client Detail Dialog Component with inline editing
+// Client Detail Dialog
 function ClientDetailDialog({
   client,
   stats,
@@ -160,9 +292,10 @@ function ClientDetailDialog({
   trainers: User[];
   onSave: (data: any) => Promise<void>;
 }) {
+  const { data: users } = useUsers();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editData, setEditData] = useState({
+  const [editedClient, setEditedClient] = useState({
     name: client.name,
     type: client.type,
     contractStatus: client.contractStatus || "prospect",
@@ -178,9 +311,8 @@ function ClientDetailDialog({
     demand: client.demand || "",
   });
 
-  // Reset edit data when client changes
   useEffect(() => {
-    setEditData({
+    setEditedClient({
       name: client.name,
       type: client.type,
       contractStatus: client.contractStatus || "prospect",
@@ -202,85 +334,46 @@ function ClientDetailDialog({
     setIsSaving(true);
     try {
       await onSave({
-        ...editData,
-        contractAmount: editData.contractAmount * 100,
-        assignedTrainerId: editData.assignedTrainerId || null,
+        ...editedClient,
+        contractAmount: Math.round(editedClient.contractAmount * 100),
+        assignedTrainerId: editedClient.assignedTrainerId || null,
       });
       setIsEditing(false);
     } catch (error) {
-      console.error("Failed to save:", error);
+      console.error("Save error:", error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const status = client.contractStatus || "prospect";
-  const statusLabels: Record<ClientContractStatus, { label: string; color: string }> = {
-    prospect: { label: "Prospect", color: "bg-blue-100 text-blue-700" },
-    negotiation: { label: "En negociation", color: "bg-amber-100 text-amber-700" },
-    lost: { label: "Perdu", color: "bg-red-100 text-red-700" },
-    client: { label: "Client", color: "bg-green-100 text-green-700" },
-  };
-  const currentStatusInfo = statusLabels[status as ClientContractStatus] || statusLabels.prospect;
-
   const getTrainerName = (trainerId: string | null | undefined) => {
-    if (!trainerId) return null;
-    const trainer = trainers.find((t) => t.id === trainerId);
-    return trainer ? `${trainer.firstName} ${trainer.lastName}` : null;
+    if (!trainerId || !users) return "Non assigné";
+    const trainer = users.find((u: User) => u.id === trainerId);
+    return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigné";
   };
 
   return (
-    <>
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start justify-between">
-            <div>
-              {isEditing ? (
-                <Input
-                  value={editData.name}
-                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                  className="text-2xl font-semibold h-auto py-1 px-2"
-                />
-              ) : (
+            <div className="flex items-center gap-3">
+              <Building2 className="w-8 h-8 text-primary p-1.5 bg-primary/10 rounded-lg" />
+              <div>
                 <DialogTitle className="text-2xl">{client.name}</DialogTitle>
-              )}
-              <div className="flex items-center gap-2 mt-2">
-                {isEditing ? (
-                  <Select value={editData.type} onValueChange={(v) => setEditData({ ...editData, type: v })}>
-                    <SelectTrigger className="w-32 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="entreprise">Entreprise</SelectItem>
-                      <SelectItem value="opco">OPCO</SelectItem>
-                      <SelectItem value="particulier">Particulier</SelectItem>
-                      <SelectItem value="institution">Institution</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  getTypeBadge(client.type)
-                )}
-                <span
-                  className={`inline-flex items-center gap-1 text-sm px-3 py-1 rounded-full font-medium ${currentStatusInfo.color}`}
-                >
-                  {currentStatusInfo.label}
-                </span>
+                <DialogDescription>ID: {client.id}</DialogDescription>
               </div>
             </div>
             {!isEditing ? (
               <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                <Edit className="w-4 h-4 mr-2" />
+                <Edit3 className="w-4 h-4 mr-2" />
                 Modifier
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>
-                  <X className="w-4 h-4 mr-2" />
-                  Annuler
-                </Button>
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Annuler</Button>
                 <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                  {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                  {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Enregistrer
                 </Button>
               </div>
@@ -288,345 +381,186 @@ function ClientDetailDialog({
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-          {/* Client Info */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <Building2 className="w-5 h-5" />
-              Informations
-            </h3>
-
-            {isEditing ? (
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Montant du contrat (EUR)</Label>
-                  <Input
-                    type="number"
-                    value={editData.contractAmount || ""}
-                    onChange={(e) => setEditData({ ...editData, contractAmount: parseFloat(e.target.value) || 0 })}
-                    placeholder="0.00"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Formateur assigne</Label>
-                  <Select value={editData.assignedTrainerId || "none"} onValueChange={(v) => setEditData({ ...editData, assignedTrainerId: v === "none" ? "" : v })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Aucun" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun</SelectItem>
-                      {trainers.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">SIRET</Label>
-                  <Input value={editData.siret} onChange={(e) => setEditData({ ...editData, siret: e.target.value })} placeholder="12345678901234" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Contact</Label>
-                  <Input value={editData.contactName} onChange={(e) => setEditData({ ...editData, contactName: e.target.value })} placeholder="Nom du contact" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Email</Label>
-                  <Input type="email" value={editData.contactEmail} onChange={(e) => setEditData({ ...editData, contactEmail: e.target.value })} placeholder="email@example.com" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Telephone</Label>
-                  <Input value={editData.contactPhone} onChange={(e) => setEditData({ ...editData, contactPhone: e.target.value })} placeholder="01 23 45 67 89" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Adresse</Label>
-                  <Input value={editData.address} onChange={(e) => setEditData({ ...editData, address: e.target.value })} placeholder="Adresse" />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+          <div className="md:col-span-2 space-y-6">
+            <div className="grid grid-cols-2 gap-6 p-4 bg-muted/30 rounded-xl border">
+              {isEditing ? (
+                <div className="col-span-2 grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Code postal</Label>
-                    <Input value={editData.postalCode} onChange={(e) => setEditData({ ...editData, postalCode: e.target.value })} placeholder="75001" />
+                    <Label className="text-xs font-semibold">NOM</Label>
+                    <Input value={editedClient.name} onChange={(e) => setEditedClient({ ...editedClient, name: e.target.value })} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Ville</Label>
-                    <Input value={editData.city} onChange={(e) => setEditData({ ...editData, city: e.target.value })} placeholder="Paris" />
+                    <Label className="text-xs font-semibold">TYPE</Label>
+                    <Select value={editedClient.type} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="entreprise">Entreprise</SelectItem>
+                        <SelectItem value="opco">OPCO</SelectItem>
+                        <SelectItem value="particulier">Particulier</SelectItem>
+                        <SelectItem value="institution">Institution</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Demande</Label>
-                  <Input value={editData.demand} onChange={(e) => setEditData({ ...editData, demand: e.target.value })} placeholder="Details de la demande" />
-                </div>
-              </div>
-            ) : (
-              <>
-                {client.contractAmount && client.contractAmount > 0 && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <Euro className="w-5 h-5 text-green-600" />
-                      <span className="font-semibold text-green-800">
-                        Montant du contrat: {formatCurrency(client.contractAmount)}
-                      </span>
-                    </div>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Type</span>
+                    <div>{getTypeBadge(client.type)}</div>
                   </div>
-                )}
-
-                {client.assignedTrainerId && getTrainerName(client.assignedTrainerId) && (
-                  <div className="p-3 bg-violet-50 border border-violet-200 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <UserCircle className="w-5 h-5 text-violet-600" />
-                      <span className="font-semibold text-violet-800">
-                        Formateur: {getTrainerName(client.assignedTrainerId)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-3 text-sm">
-                  {client.siret && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">SIRET:</span>
-                      <span className="font-medium">{client.siret}</span>
-                    </div>
-                  )}
-                  {client.contactName && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">Contact:</span>
-                      <span className="font-medium">{client.contactName}</span>
-                    </div>
-                  )}
-                  {client.contactEmail && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">Email:</span>
-                      <a href={`mailto:${client.contactEmail}`} className="text-primary hover:underline flex items-center gap-1">
-                        <Mail className="w-4 h-4" />
-                        {client.contactEmail}
-                      </a>
-                    </div>
-                  )}
-                  {client.contactPhone && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">Telephone:</span>
-                      <span className="flex items-center gap-1">
-                        <Phone className="w-4 h-4" />
-                        {client.contactPhone}
-                      </span>
-                    </div>
-                  )}
-                  {(client.address || client.city) && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">Adresse:</span>
-                      <span className="flex items-start gap-1">
-                        <MapPin className="w-4 h-4 mt-0.5" />
-                        <span>
-                          {client.address && <>{client.address}<br /></>}
-                          {client.postalCode} {client.city}
-                        </span>
-                      </span>
-                    </div>
-                  )}
-                  {client.demand && (
-                    <div className="flex items-start gap-3">
-                      <span className="text-muted-foreground w-24">Demande:</span>
-                      <span>{client.demand}</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Statistics */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <ClipboardCheck className="w-5 h-5" />
-              Statistiques
-            </h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                <div className="text-2xl font-bold text-blue-700">{stats.completedMissions}</div>
-                <div className="text-xs text-blue-600">Missions realisees</div>
-              </div>
-              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
-                <div className="text-2xl font-bold text-orange-700">{stats.upcomingMissions}</div>
-                <div className="text-xs text-orange-600">Missions a venir</div>
-              </div>
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                <div className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</div>
-                <div className="text-xs text-green-600">CA cumule</div>
-              </div>
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                <div className="text-2xl font-bold text-yellow-700">
-                  {stats.avgSatisfaction !== null ? `${stats.avgSatisfaction.toFixed(1)}/5` : "-"}
-                </div>
-                <div className="text-xs text-yellow-600">Satisfaction</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Missions */}
-        <div className="mt-6">
-          <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
-            <Briefcase className="w-5 h-5" />
-            Missions ({stats.missions.length})
-          </h3>
-          {stats.missions.length > 0 ? (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {stats.missions.map((mission) => (
-                <div
-                  key={mission.id}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <div>
-                    <div className="font-medium">{mission.title}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {mission.reference} - {mission.startDate && format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Statut</span>
                     <Badge variant="outline" className={
-                      mission.status === "completed" ? "bg-green-100 text-green-700" :
-                      mission.status === "in_progress" ? "bg-blue-100 text-blue-700" :
-                      mission.status === "confirmed" ? "bg-violet-100 text-violet-700" :
-                      "bg-gray-100 text-gray-700"
+                      client.contractStatus === "client" ? "bg-green-100 text-green-700" :
+                      client.contractStatus === "negotiation" ? "bg-amber-100 text-amber-700" :
+                      client.contractStatus === "lost" ? "bg-red-100 text-red-700" :
+                      "bg-blue-100 text-blue-700"
                     }>
-                      {mission.status === "completed" ? "Terminee" :
-                       mission.status === "in_progress" ? "En cours" :
-                       mission.status === "confirmed" ? "Confirmee" :
-                       mission.status === "cancelled" ? "Annulee" : "Brouillon"}
-                    </Badge>
-                    <a href={`/missions/${mission.id}`} className="text-primary hover:underline">
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">Aucune mission pour ce client</p>
-          )}
-        </div>
-
-        {/* Invoices / Documents */}
-        <div className="mt-6">
-          <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
-            <Receipt className="w-5 h-5" />
-            Factures ({stats.invoices.length})
-          </h3>
-          {stats.invoices.length > 0 ? (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {stats.invoices.map((invoice) => (
-                <div
-                  key={invoice.id}
-                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                >
-                  <div>
-                    <div className="font-medium">{invoice.invoiceNumber}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {invoice.invoiceDate && format(new Date(invoice.invoiceDate), "d MMM yyyy", { locale: fr })}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold">{formatCurrency(invoice.amount)}</span>
-                    <Badge variant="outline" className={
-                      invoice.status === "paid" ? "bg-green-100 text-green-700" :
-                      invoice.status === "submitted" ? "bg-blue-100 text-blue-700" :
-                      invoice.status === "rejected" ? "bg-red-100 text-red-700" :
-                      "bg-gray-100 text-gray-700"
-                    }>
-                      {invoice.status === "paid" ? "Payee" :
-                       invoice.status === "submitted" ? "Soumise" :
-                       invoice.status === "rejected" ? "Rejetee" : "Brouillon"}
+                      {client.contractStatus === "client" ? "Client" :
+                       client.contractStatus === "negotiation" ? "En négociation" :
+                       client.contractStatus === "lost" ? "Perdu" : "Prospect"}
                     </Badge>
                   </div>
+                </>
+              )}
+              
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">SIRET</span>
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                  <span>{client.siret || "-"}</span>
                 </div>
-              ))}
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Formateur assigné</span>
+                <div className="flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-muted-foreground" />
+                  <span>{getTrainerName(client.assignedTrainerId)}</span>
+                </div>
+              </div>
             </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">Aucune facture pour ce client</p>
-          )}
-        </div>
 
-        {/* Document Generation */}
-        <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-violet-50 border border-blue-200 rounded-lg">
-          <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
-            <Wand2 className="w-5 h-5 text-violet-600" />
-            Generer des documents
-          </h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Generez automatiquement des factures et contrats avec toutes les informations du client pre-remplies.
-          </p>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1 bg-white hover:bg-green-50 border-green-300"
-              onClick={() => setShowInvoiceGenerator(true)}
-            >
-              <Receipt className="w-4 h-4 mr-2 text-green-600" />
-              Generer une facture
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1 bg-white hover:bg-blue-50 border-blue-300"
-              onClick={() => setShowContractGenerator(true)}
-            >
-              <FileText className="w-4 h-4 mr-2 text-blue-600" />
-              Generer un contrat
-            </Button>
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <MapPin className="w-5 h-5" /> Coordonnées
+              </h3>
+              <div className="grid grid-cols-1 gap-3 p-4 bg-muted/30 rounded-xl border text-sm">
+                <div className="flex items-start gap-3">
+                  <Mail className="w-4 h-4 text-muted-foreground mt-1" />
+                  <div>
+                    <div className="font-medium">Contact: {client.contactName || "-"}</div>
+                    <div className="text-primary underline">{client.contactEmail || "-"}</div>
+                    <div className="text-muted-foreground">{client.contactPhone || "-"}</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 border-t pt-3">
+                  <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
+                  <div>
+                    {client.address || "-"}
+                    <br />
+                    {client.postalCode} {client.city}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5" /> Statistiques
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-blue-700">{stats.completedMissions}</div>
+                  <div className="text-xs text-blue-600">Missions réalisées</div>
+                </div>
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-orange-700">{stats.upcomingMissions}</div>
+                  <div className="text-xs text-orange-600">Missions à venir</div>
+                </div>
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</div>
+                  <div className="text-xs text-green-600">CA cumulé</div>
+                </div>
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-yellow-700">
+                    {stats.avgSatisfaction !== null ? `${stats.avgSatisfaction.toFixed(1)}/5` : "-"}
+                  </div>
+                  <div className="text-xs text-yellow-600">Satisfaction</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
+                <Briefcase className="w-5 h-5" /> Missions ({stats.missions.length})
+              </h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {stats.missions.map((mission) => (
+                  <div key={mission.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <div className="font-medium truncate">{mission.title}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {mission.startDate && format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
+                      </div>
+                    </div>
+                    <a href={`/missions/${mission.id}`} className="text-primary hover:underline"><ExternalLink className="w-4 h-4" /></a>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
+                <Receipt className="w-5 h-5" /> Factures ({stats.invoices.length})
+              </h3>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                {stats.invoices.map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm">
+                    <div className="min-w-0 flex-1 mr-2">
+                      <div className="font-medium truncate">{invoice.invoiceNumber}</div>
+                      <div className="text-[10px] font-semibold">{formatCurrency(invoice.amount)}</div>
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] ${invoice.status === "paid" ? "bg-green-100 text-green-700" : ""}`}>
+                      {invoice.status === "paid" ? "Payée" : "En cours"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
-
         <DialogFooter className="mt-6">
-          <Button variant="outline" onClick={onClose}>
-            Fermer
-          </Button>
+          <Button variant="outline" onClick={onClose}>Fermer</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-
-    {/* Document Generators - Outside parent Dialog */}
-    <InvoiceGenerator
-      client={client}
-      open={showInvoiceGenerator}
-      onOpenChange={setShowInvoiceGenerator}
-    />
-    <ContractGenerator
-      client={client}
-      open={showContractGenerator}
-      onOpenChange={setShowContractGenerator}
-    />
-    </>
   );
 }
 
 export default function Clients() {
-  const { data: clients, isLoading: clientsLoading, refetch } = useClients();
+  const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: missions } = useMissions();
   const { data: invoices } = useInvoices();
   const { data: users } = useUsers();
-  const createClient = useCreateClient();
   const { toast } = useToast();
 
-  // Filter trainers from users (role = formateur or prestataire)
-  const trainers = useMemo(() => {
-    if (!users) return [];
-    return users.filter((u: User) => u.role === "formateur" || u.role === "prestataire");
-  }, [users]);
-
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [contractFilter, setContractFilter] = useState<string>("all");
-  const [trainerFilter, setTrainerFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [contractFilter, setContractFilter] = useState("all");
+  const [trainerFilter, setTrainerFilter] = useState("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [togglingClientId, setTogglingClientId] = useState<number | null>(null);
 
   const [newClient, setNewClient] = useState({
     name: "",
-    type: "entreprise" as "entreprise" | "opco" | "particulier" | "institution",
+    type: "entreprise" as any,
     contractStatus: "prospect" as ClientContractStatus,
     contractAmount: 0,
-    assignedTrainerId: "" as string,
+    assignedTrainerId: "",
     siret: "",
     address: "",
     city: "",
@@ -637,30 +571,14 @@ export default function Clients() {
     demand: "",
   });
 
-  // Check if any filter is active
-  const hasActiveFilters = searchTerm !== "" || typeFilter !== "all" || contractFilter !== "all" || trainerFilter !== "all";
+  const trainers = useMemo(() => {
+    if (!users) return [];
+    return users.filter((u: User) => u.role === "formateur" || u.role === "prestataire");
+  }, [users]);
 
-  // Clear all filters
-  const clearAllFilters = () => {
-    setSearchTerm("");
-    setTypeFilter("all");
-    setContractFilter("all");
-    setTrainerFilter("all");
-  };
-
-  // Helper to get trainer name
-  const getTrainerName = (trainerId: string | null | undefined) => {
-    if (!trainerId || !users) return null;
-    const trainer = users.find((u: User) => u.id === trainerId);
-    return trainer ? `${trainer.firstName} ${trainer.lastName}` : null;
-  };
-
-  // Calculate client statistics
   const clientStatsMap = useMemo(() => {
     const statsMap = new Map<number, ClientStats>();
     if (!clients) return statsMap;
-
-    const now = new Date();
 
     clients.forEach((client: Client) => {
       const clientMissions = missions?.filter((m: Mission) => m.clientId === client.id) || [];
@@ -669,247 +587,80 @@ export default function Clients() {
         return mission?.clientId === client.id;
       }) || [];
 
-      const completedMissions = clientMissions.filter(
-        (m: Mission) => m.status === "completed"
-      ).length;
-
-      const upcomingMissions = clientMissions.filter((m: Mission) => {
-        if (!m.startDate) return false;
-        return (
-          new Date(m.startDate) > now &&
-          (m.status === "confirmed" || m.status === "in_progress")
-        );
-      }).length;
-
-      const paidInvoices = clientInvoices.filter((inv: Invoice) => inv.status === "paid");
-      const totalRevenue = paidInvoices.reduce(
-        (sum: number, inv: Invoice) => sum + (inv.amount || 0),
-        0
-      );
-
-      const avgSatisfaction = null;
+      const completedMissions = clientMissions.filter(m => m.status === "completed").length;
+      const upcomingMissions = clientMissions.filter(m => m.status !== "completed" && m.status !== "cancelled").length;
+      const totalRevenue = clientInvoices.filter(inv => inv.status === "paid").reduce((sum, inv) => sum + (inv.amount || 0), 0);
 
       statsMap.set(client.id, {
         completedMissions,
         upcomingMissions,
         totalRevenue,
-        avgSatisfaction,
+        avgSatisfaction: null,
         missions: clientMissions,
         invoices: clientInvoices,
       });
     });
-
     return statsMap;
   }, [clients, missions, invoices]);
 
-  // KPI calculations
   const kpis = useMemo(() => {
-    if (!clients || clients.length === 0) {
-      return { prospects: 0, negotiation: 0, lost: 0, activeClients: 0, totalClientRevenue: 0 };
-    }
-
-    const prospects = clients.filter((c: Client) => {
-      const status = c.contractStatus || "prospect";
-      return status === "prospect";
-    }).length;
-
-    const negotiation = clients.filter((c: Client) => {
-      const status = c.contractStatus || "prospect";
-      return status === "negotiation";
-    }).length;
-
-    const lost = clients.filter((c: Client) => {
-      const status = c.contractStatus || "prospect";
-      return status === "lost";
-    }).length;
-
-    const activeClients = clients.filter((c: Client) => {
-      const status = c.contractStatus || "prospect";
-      return status === "client";
-    }).length;
-
-    const totalClientRevenue = clients
-      .filter((c: Client) => (c.contractStatus || "prospect") === "client")
-      .reduce((sum: number, c: Client) => {
-        const contractAmount = c.contractAmount || 0;
-        const invoiceRevenue = clientStatsMap.get(c.id)?.totalRevenue || 0;
-        return sum + contractAmount + invoiceRevenue;
-      }, 0);
-
-    return { prospects, negotiation, lost, activeClients, totalClientRevenue };
+    if (!clients) return { prospects: 0, negotiation: 0, lost: 0, activeClients: 0, totalRevenue: 0 };
+    return {
+      prospects: clients.filter(c => (c.contractStatus || "prospect") === "prospect").length,
+      negotiation: clients.filter(c => c.contractStatus === "negotiation").length,
+      lost: clients.filter(c => c.contractStatus === "lost").length,
+      activeClients: clients.filter(c => c.contractStatus === "client").length,
+      totalRevenue: Array.from(clientStatsMap.values()).reduce((sum, s) => sum + s.totalRevenue, 0),
+    };
   }, [clients, clientStatsMap]);
 
-  const filteredClients = clients?.filter((client: Client) => {
-    const matchesSearch =
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.demand?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = typeFilter === "all" || client.type === typeFilter;
-    const clientContractStatus = client.contractStatus || "prospect";
-    const matchesContract =
-      contractFilter === "all" || clientContractStatus === contractFilter;
-    const matchesTrainer =
-      trainerFilter === "all" || client.assignedTrainerId === trainerFilter;
-    return matchesSearch && matchesType && matchesContract && matchesTrainer;
-  }) || [];
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    return clients.filter(c => {
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          c.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = typeFilter === "all" || c.type === typeFilter;
+      const matchesContract = contractFilter === "all" || (c.contractStatus || "prospect") === contractFilter;
+      const matchesTrainer = trainerFilter === "all" || c.assignedTrainerId === trainerFilter;
+      return matchesSearch && matchesType && matchesContract && matchesTrainer;
+    });
+  }, [clients, searchTerm, typeFilter, contractFilter, trainerFilter]);
 
   const handleCreateClient = async () => {
-    if (!newClient.name || !newClient.type) return;
-
     try {
-      await createClient.mutateAsync({
-        ...newClient,
-        contractAmount: newClient.contractAmount * 100,
-        assignedTrainerId: newClient.assignedTrainerId || null,
-      });
-      setIsCreateOpen(false);
-      resetForm();
-      // Force refresh - reset queries to bypass staleTime: Infinity
-      await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
-      toast({
-        title: "Client cree",
-        description: "Le client a ete ajoute avec succes.",
-      });
-    } catch (error) {
-      console.error("Failed to create client:", error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de creer le client.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateClient = async () => {
-    if (!editingClient) return;
-
-    const dataToSend = {
-      name: newClient.name,
-      type: newClient.type,
-      contractStatus: newClient.contractStatus,
-      contractAmount: newClient.contractAmount * 100,
-      assignedTrainerId: newClient.assignedTrainerId || null,
-      siret: newClient.siret || null,
-      address: newClient.address || null,
-      city: newClient.city || null,
-      postalCode: newClient.postalCode || null,
-      contactName: newClient.contactName || null,
-      contactEmail: newClient.contactEmail || null,
-      contactPhone: newClient.contactPhone || null,
-      demand: newClient.demand || null,
-    };
-
-    try {
-      const response = await fetch(`/api/clients/${editingClient.id}`, {
-        method: "PUT",
+      const res = await fetch("/api/clients", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(dataToSend),
-      });
-
-      const responseData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(responseData.message || "Erreur lors de la mise à jour");
-      }
-
-      setEditingClient(null);
-      resetForm();
-      await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
-      toast({
-        title: "Client mis à jour",
-        description: "Les modifications ont été enregistrées.",
-      });
-    } catch (error: any) {
-      console.error("Failed to update client:", error);
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de mettre a jour le client.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Change client status to a specific status
-  const handleChangeClientStatus = async (client: Client, newStatus: ClientContractStatus) => {
-    setTogglingClientId(client.id);
-    try {
-      const response = await fetch(`/api/clients/${client.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
-          name: client.name,
-          type: client.type,
-          contractStatus: newStatus,
-          contractAmount: client.contractAmount || 0,
-          assignedTrainerId: client.assignedTrainerId || "",
-          siret: client.siret || "",
-          address: client.address || "",
-          city: client.city || "",
-          postalCode: client.postalCode || "",
-          contactName: client.contactName || "",
-          contactEmail: client.contactEmail || "",
-          contactPhone: client.contactPhone || "",
-          demand: client.demand || "",
+          ...newClient,
+          contractAmount: Math.round(newClient.contractAmount * 100),
+          assignedTrainerId: newClient.assignedTrainerId || null,
         }),
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Erreur ${response.status}`);
-      }
-
-      const updatedClient = await response.json();
-
-      if (selectedClient?.id === client.id) {
-        setSelectedClient(updatedClient);
-      }
-
-      await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
-
-      const statusLabels: Record<ClientContractStatus, string> = {
-        prospect: "Prospect",
-        negotiation: "En negociation",
-        lost: "Perdu",
-        client: "Client",
-      };
-
-      toast({
-        title: `Statut modifie`,
-        description: `${client.name} est maintenant "${statusLabels[newStatus]}".`,
-      });
-    } catch (error: any) {
-      console.error("Failed to change client status:", error);
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de changer le statut.",
-        variant: "destructive",
-      });
-    } finally {
-      setTogglingClientId(null);
+      if (!res.ok) throw new Error();
+      setIsCreateOpen(false);
+      resetForm();
+      await queryClient.invalidateQueries({ queryKey: [api.clients.list.path] });
+      toast({ title: "Client créé", description: "Le client a été ajouté avec succès." });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de créer le client.", variant: "destructive" });
     }
   };
 
-  const openEditDialog = (client: Client) => {
-    setNewClient({
-      name: client.name,
-      type: client.type as any,
-      contractStatus: (client.contractStatus as ClientContractStatus) || "prospect",
-      contractAmount: (client.contractAmount || 0) / 100,
-      assignedTrainerId: client.assignedTrainerId || "",
-      siret: client.siret || "",
-      address: client.address || "",
-      city: client.city || "",
-      postalCode: client.postalCode || "",
-      contactName: client.contactName || "",
-      contactEmail: client.contactEmail || "",
-      contactPhone: client.contactPhone || "",
-      demand: client.demand || "",
-    });
-    setSelectedClient(null);
-    setEditingClient(client);
+  const handleUpdateClient = async (data: any) => {
+    if (!selectedClient) return;
+    try {
+      const response = await fetch(`/api/clients/${selectedClient.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error();
+      await queryClient.invalidateQueries({ queryKey: [api.clients.list.path] });
+      toast({ title: "Client mis à jour" });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
   };
 
   const resetForm = () => {
@@ -930,70 +681,28 @@ export default function Clients() {
     });
   };
 
-  const isLoading = clientsLoading;
-
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
         <Header title="Clients" />
-
         <div className="flex-1 p-6 space-y-6">
-          {/* KPIs */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <StatCard
-              title="Prospects"
-              value={kpis.prospects}
-              icon={UserPlus}
-              color="bg-blue-100 text-blue-600"
-              subtitle="Nouveaux contacts"
-            />
-            <StatCard
-              title="En negociation"
-              value={kpis.negotiation}
-              icon={Handshake}
-              color="bg-amber-100 text-amber-600"
-              subtitle="Discussions en cours"
-            />
-            <StatCard
-              title="Perdus"
-              value={kpis.lost}
-              icon={XCircle}
-              color="bg-red-100 text-red-600"
-              subtitle="Non convertis"
-            />
-            <StatCard
-              title="Clients"
-              value={kpis.activeClients}
-              icon={Users}
-              color="bg-green-100 text-green-600"
-              subtitle="Contrats signes"
-            />
-            <StatCard
-              title="CA Clients"
-              value={formatCurrency(kpis.totalClientRevenue)}
-              icon={Euro}
-              color="bg-purple-100 text-purple-600"
-              subtitle="Contrats + factures"
-            />
+            <StatCard title="Prospects" value={kpis.prospects} icon={UserPlus} color="bg-blue-100 text-blue-600" />
+            <StatCard title="Négociation" value={kpis.negotiation} icon={Handshake} color="bg-amber-100 text-amber-600" />
+            <StatCard title="Perdus" value={kpis.lost} icon={XCircle} color="bg-red-100 text-red-600" />
+            <StatCard title="Clients" value={kpis.activeClients} icon={Users} color="bg-green-100 text-green-600" />
+            <StatCard title="CA Total" value={formatCurrency(kpis.totalRevenue)} icon={Euro} color="bg-purple-100 text-purple-600" />
           </div>
 
-          {/* Actions bar */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="flex flex-1 gap-3 flex-wrap items-center">
               <div className="relative flex-1 min-w-[200px] max-w-md">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher un client..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+                <Input placeholder="Rechercher..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
+                <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les types</SelectItem>
                   <SelectItem value="entreprise">Entreprise</SelectItem>
@@ -1003,451 +712,56 @@ export default function Clients() {
                 </SelectContent>
               </Select>
               <Select value={contractFilter} onValueChange={setContractFilter}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Statut contrat" />
-                </SelectTrigger>
+                <SelectTrigger className="w-44"><SelectValue placeholder="Contrat" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les statuts</SelectItem>
                   <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="negotiation">En negociation</SelectItem>
+                  <SelectItem value="negotiation">Négociation</SelectItem>
                   <SelectItem value="lost">Perdu</SelectItem>
                   <SelectItem value="client">Client</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={trainerFilter} onValueChange={setTrainerFilter}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Formateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les formateurs</SelectItem>
-                  {trainers.map((trainer: User) => (
-                    <SelectItem key={trainer.id} value={trainer.id}>
-                      {trainer.firstName} {trainer.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {/* Clear all filters button - always visible */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={clearAllFilters}
-                disabled={!hasActiveFilters}
-                className={hasActiveFilters ? "border-red-300 text-red-600 hover:bg-red-50" : ""}
-              >
-                <X className="w-4 h-4 mr-1" />
-                Effacer filtres
-              </Button>
             </div>
-
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={() => resetForm()}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau client
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Ajouter un client</DialogTitle>
-                  <DialogDescription>
-                    Remplissez les informations pour ajouter un nouveau client.
-                  </DialogDescription>
-                </DialogHeader>
-                <ClientForm
-                  client={newClient}
-                  onChange={setNewClient}
-                  onSubmit={handleCreateClient}
-                  onCancel={() => setIsCreateOpen(false)}
-                  isSubmitting={createClient.isPending}
-                  submitLabel="Ajouter le client"
-                  trainers={trainers}
-                />
+              <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Nouveau client</Button></DialogTrigger>
+              <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Ajouter un client</DialogTitle></DialogHeader>
+                <ClientForm client={newClient} onChange={setNewClient} onSubmit={handleCreateClient} onCancel={() => setIsCreateOpen(false)} isSubmitting={false} submitLabel="Ajouter" trainers={trainers} />
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Edit Dialog */}
-          <Dialog open={editingClient !== null} onOpenChange={(open) => !open && setEditingClient(null)}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Modifier le client</DialogTitle>
-                <DialogDescription>
-                  Modifiez les informations du client.
-                </DialogDescription>
-              </DialogHeader>
-              <ClientForm
-                client={newClient}
-                onChange={setNewClient}
-                onSubmit={handleUpdateClient}
-                onCancel={() => setEditingClient(null)}
-                isSubmitting={false}
-                submitLabel="Enregistrer"
-                trainers={trainers}
-              />
-            </DialogContent>
-          </Dialog>
-
-          {/* Client Detail Dialog */}
-          {selectedClient && (
-            <ClientDetailDialog
-              client={selectedClient}
-              stats={clientStatsMap.get(selectedClient.id) || {
-                completedMissions: 0,
-                upcomingMissions: 0,
-                totalRevenue: 0,
-                avgSatisfaction: null,
-                missions: [],
-                invoices: [],
-              }}
-              isOpen={selectedClient !== null}
-              onClose={() => setSelectedClient(null)}
-              trainers={trainers}
-              onSave={async (data) => {
-                const response = await fetch(`/api/clients/${selectedClient.id}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
-                  credentials: "include",
-                  body: JSON.stringify(data),
-                });
-                if (!response.ok) {
-                  throw new Error("Erreur lors de la mise à jour");
-                }
-                const updatedClient = await response.json();
-                setSelectedClient(updatedClient);
-                await queryClient.resetQueries({ queryKey: [api.clients.list.path] });
-                toast({
-                  title: "Client mis à jour",
-                  description: "Les modifications ont été enregistrées.",
-                });
-              }}
-            />
-          )}
-
-          {/* Clients list */}
-          {isLoading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </div>
-          ) : filteredClients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Building2 className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold">Aucun client</h3>
-              <p className="text-muted-foreground">
-                {hasActiveFilters
-                  ? "Aucun client ne correspond aux filtres."
-                  : "Commencez par ajouter un nouveau client."}
-              </p>
-              {hasActiveFilters && (
-                <Button variant="link" onClick={clearAllFilters} className="mt-2">
-                  Effacer les filtres
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="bg-card rounded-lg border shadow-sm">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="text-left p-4 font-medium text-sm">Nom</th>
-                    <th className="text-left p-4 font-medium text-sm">Email</th>
-                    <th className="text-left p-4 font-medium text-sm">Type</th>
-                    <th className="text-left p-4 font-medium text-sm">Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredClients.map((client: Client) => {
-                    const status = client.contractStatus || "prospect";
-                    const statusStyles: Record<ClientContractStatus, { label: string; bg: string; text: string; border: string }> = {
-                      prospect: { label: "Prospect", bg: "bg-blue-100", text: "text-blue-700", border: "border-blue-300" },
-                      negotiation: { label: "En negociation", bg: "bg-amber-100", text: "text-amber-700", border: "border-amber-300" },
-                      lost: { label: "Perdu", bg: "bg-red-100", text: "text-red-700", border: "border-red-300" },
-                      client: { label: "Client", bg: "bg-green-100", text: "text-green-700", border: "border-green-300" },
-                    };
-                    const currentStatusStyle = statusStyles[status as ClientContractStatus] || statusStyles.prospect;
-
-                    return (
-                      <tr
-                        key={client.id}
-                        className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
-                        onClick={() => setSelectedClient(client)}
-                      >
-                        <td className="p-4">
-                          <span className="font-medium">{client.name}</span>
-                        </td>
-                        <td className="p-4">
-                          {client.contactEmail ? (
-                            <a
-                              href={`mailto:${client.contactEmail}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-sm text-primary hover:underline flex items-center gap-1"
-                            >
-                              <Mail className="w-3 h-3" />
-                              {client.contactEmail}
-                            </a>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="p-4">
-                          {getTypeBadge(client.type)}
-                        </td>
-                        <td className="p-4">
-                          <Select
-                            value={status}
-                            onValueChange={(newStatus) => handleChangeClientStatus(client, newStatus as ClientContractStatus)}
-                          >
-                            <SelectTrigger
-                              className={`w-40 h-8 text-xs ${currentStatusStyle.bg} ${currentStatusStyle.text} ${currentStatusStyle.border}`}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <SelectValue>{currentStatusStyle.label}</SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="prospect">Prospect</SelectItem>
-                              <SelectItem value="negotiation">En negociation</SelectItem>
-                              <SelectItem value="lost">Perdu</SelectItem>
-                              <SelectItem value="client">Client</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredClients.map((client) => (
+              <Card key={client.id} className="hover-elevate cursor-pointer overflow-visible" onClick={() => setSelectedClient(client)}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-lg truncate flex-1 mr-2">{client.name}</h3>
+                    {getTypeBadge(client.type)}
+                  </div>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2"><Mail className="w-4 h-4" /> {client.contactEmail || "-"}</div>
+                    <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {client.city || "-"}</div>
+                    <div className="pt-2 border-t mt-2 grid grid-cols-2 gap-2 text-xs">
+                      <div>Missions: {clientStatsMap.get(client.id)?.completedMissions || 0}</div>
+                      <div>CA: {formatCurrency(clientStatsMap.get(client.id)?.totalRevenue || 0)}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
+        {selectedClient && (
+          <ClientDetailDialog
+            client={selectedClient}
+            stats={clientStatsMap.get(selectedClient.id)!}
+            isOpen={true}
+            onClose={() => setSelectedClient(null)}
+            trainers={trainers}
+            onSave={handleUpdateClient}
+          />
+        )}
       </main>
     </div>
-  );
-}
-
-// Client Form Component
-function ClientForm({
-  client,
-  onChange,
-  onSubmit,
-  onCancel,
-  isSubmitting,
-  submitLabel,
-  trainers,
-}: {
-  client: {
-    name: string;
-    type: string;
-    contractStatus: ClientContractStatus;
-    contractAmount: number;
-    assignedTrainerId: string;
-    siret: string;
-    address: string;
-    city: string;
-    postalCode: string;
-    contactName: string;
-    contactEmail: string;
-    contactPhone: string;
-    demand: string;
-  };
-  onChange: (client: any) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-  isSubmitting: boolean;
-  submitLabel: string;
-  trainers: User[];
-}) {
-  return (
-    <>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nom *</Label>
-            <Input
-              id="name"
-              placeholder="TechCorp SAS"
-              value={client.name}
-              onChange={(e) => onChange({ ...client, name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="type">Type *</Label>
-            <Select
-              value={client.type}
-              onValueChange={(value) => onChange({ ...client, type: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="entreprise">Entreprise</SelectItem>
-                <SelectItem value="opco">OPCO</SelectItem>
-                <SelectItem value="particulier">Particulier</SelectItem>
-                <SelectItem value="institution">Institution</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="contractStatus">Statut du contrat</Label>
-            <Select
-              value={client.contractStatus}
-              onValueChange={(value) =>
-                onChange({ ...client, contractStatus: value as ClientContractStatus })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="prospect">Prospect</SelectItem>
-                <SelectItem value="negotiation">En negociation</SelectItem>
-                <SelectItem value="lost">Perdu</SelectItem>
-                <SelectItem value="client">Client</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contractAmount">Montant du contrat (EUR)</Label>
-            <Input
-              id="contractAmount"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="0.00"
-              value={client.contractAmount || ""}
-              onChange={(e) =>
-                onChange({
-                  ...client,
-                  contractAmount: parseFloat(e.target.value) || 0,
-                })
-              }
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="assignedTrainer">
-            Formateur assigne ({trainers.length} disponibles)
-          </Label>
-          {trainers.length === 0 ? (
-            <p className="text-sm text-red-500">Aucun formateur disponible</p>
-          ) : (
-            <Select
-              value={client.assignedTrainerId || "none"}
-              onValueChange={(value) => {
-                const newValue = value === "none" ? "" : value;
-                onChange({ ...client, assignedTrainerId: newValue });
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selectionner un formateur" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Aucun formateur</SelectItem>
-                {trainers.map((trainer) => (
-                  <SelectItem key={trainer.id} value={trainer.id}>
-                    {trainer.firstName} {trainer.lastName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="siret">SIRET</Label>
-            <Input
-              id="siret"
-              placeholder="12345678901234"
-              value={client.siret}
-              onChange={(e) => onChange({ ...client, siret: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactName">Contact</Label>
-            <Input
-              id="contactName"
-              placeholder="Sophie Leroy"
-              value={client.contactName}
-              onChange={(e) => onChange({ ...client, contactName: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="contactEmail">Email</Label>
-            <Input
-              id="contactEmail"
-              type="email"
-              placeholder="contact@example.fr"
-              value={client.contactEmail}
-              onChange={(e) => onChange({ ...client, contactEmail: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="contactPhone">Telephone</Label>
-            <Input
-              id="contactPhone"
-              placeholder="01 23 45 67 89"
-              value={client.contactPhone}
-              onChange={(e) => onChange({ ...client, contactPhone: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="address">Adresse</Label>
-          <Input
-            id="address"
-            placeholder="15 rue de la Formation"
-            value={client.address}
-            onChange={(e) => onChange({ ...client, address: e.target.value })}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="postalCode">Code postal</Label>
-            <Input
-              id="postalCode"
-              placeholder="75001"
-              value={client.postalCode}
-              onChange={(e) => onChange({ ...client, postalCode: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="city">Ville</Label>
-            <Input
-              id="city"
-              placeholder="Paris"
-              value={client.city}
-              onChange={(e) => onChange({ ...client, city: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="demand">Demande</Label>
-          <Input
-            id="demand"
-            placeholder="Details de la demande..."
-            value={client.demand}
-            onChange={(e) => onChange({ ...client, demand: e.target.value })}
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>
-          Annuler
-        </Button>
-        <Button onClick={onSubmit} disabled={isSubmitting}>
-          {isSubmitting ? "En cours..." : submitLabel}
-        </Button>
-      </DialogFooter>
-    </>
   );
 }
