@@ -1767,6 +1767,31 @@ export async function registerRoutes(
     }
   });
 
+  // Create a test notification (for testing purposes)
+  app.post('/api/in-app-notifications/test', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const notification = await storage.createInAppNotification({
+        userId: user.id,
+        type: 'reminder',
+        title: 'Rappel J-7 : Formation Test',
+        message: 'Formation "React Avancé" prévue dans 7 jours',
+        missionId: null,
+        reminderId: null,
+        metadata: {
+          daysBefore: 7,
+          trainerName: 'Jean Dupont',
+          location: 'Paris',
+          startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      });
+      res.status(201).json(notification);
+    } catch (err) {
+      console.error('Error creating test notification:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
   // Duplicate mission for another trainer
   app.post('/api/missions/:id/duplicate', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
     try {

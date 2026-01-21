@@ -15,7 +15,6 @@ import Clients from "@/pages/Clients";
 import Participants from "@/pages/Participants";
 import Feedback from "@/pages/Feedback";
 import QuestionnaireResponse from "@/pages/QuestionnaireResponse";
-import Invoices from "@/pages/Invoices";
 import Users from "@/pages/Users";
 import DocumentTemplates from "@/pages/DocumentTemplates";
 import Calendar from "@/pages/Calendar";
@@ -119,10 +118,6 @@ function Router() {
       <Route path="/feedback">
         <ProtectedRoute component={Feedback} adminOnly />
       </Route>
-      <Route path="/invoices">
-        <ProtectedRoute component={Invoices} />
-      </Route>
-
       {/* Admin only routes */}
       <Route path="/users">
         <ProtectedRoute component={Users} adminOnly />
