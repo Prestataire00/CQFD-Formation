@@ -74,16 +74,17 @@ export default function Dashboard() {
 
         <div className="p-6 lg:p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
-          {/* Welcome message */}
-          <div className="bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
-            <h2 className="text-2xl font-bold text-foreground mb-2">
-              Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
-            </h2>
-            <p className="text-muted-foreground">
-              {isAdmin
-                ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
-                : "Consultez vos missions assignees et suivez votre activite."}
-            </p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-gradient-to-r from-primary/10 to-violet-100/50 rounded-2xl p-6 border border-primary/10">
+              <h2 className="text-2xl font-bold text-foreground mb-2">
+                Bienvenue{user?.firstName ? `, ${user.firstName}` : ""} !
+              </h2>
+              <p className="text-muted-foreground">
+                {isAdmin
+                  ? "Gerez vos missions, formateurs et clients depuis votre tableau de bord."
+                  : "Consultez vos missions assignees et suivez votre activite."}
+              </p>
+            </div>
           </div>
 
           {/* Stats Row */}
@@ -238,69 +239,40 @@ export default function Dashboard() {
               </GridCard>
             )}
 
-            {/* Stats cards for admin */}
+            {/* Actions cards for admin */}
             {isAdmin && (
-              <>
-                <GridCard
-                  title="Indicateurs Qualiopi"
-                  actionLabel="Voir les rapports"
-                  actionLink="/reports"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Taux de satisfaction</span>
-                      <span className="font-semibold text-green-600">
-                        {stats?.averageRating ? `${(stats.averageRating * 20).toFixed(0)}%` : "N/A"}
-                      </span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2">
-                      <div
-                        className="bg-green-500 h-2 rounded-full transition-all duration-500"
-                        style={{ width: `${stats?.averageRating ? stats.averageRating * 20 : 0}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between pt-2">
-                      <span className="text-sm text-muted-foreground">Missions completees</span>
-                      <span className="font-semibold">
-                        {stats?.completedMissions || 0} / {stats?.totalMissions || 0}
-                      </span>
-                    </div>
-                  </div>
-                </GridCard>
-
-                <GridCard
-                  title="Actions Rapides"
-                  actionLabel=""
-                  actionLink=""
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <Link href="/missions">
-                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                        <Briefcase className="w-5 h-5 text-primary" />
-                        <span className="text-xs">Nouvelle Mission</span>
-                      </Button>
-                    </Link>
-                    <Link href="/clients">
-                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                        <Users className="w-5 h-5 text-primary" />
-                        <span className="text-xs">Nouveau Client</span>
-                      </Button>
-                    </Link>
-                    <Link href="/participants">
-                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                        <Users className="w-5 h-5 text-primary" />
-                        <span className="text-xs">Participants</span>
-                      </Button>
-                    </Link>
-                    <Link href="/documents">
-                      <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                        <Receipt className="w-5 h-5 text-primary" />
-                        <span className="text-xs">Documents</span>
-                      </Button>
-                    </Link>
-                  </div>
-                </GridCard>
-              </>
+              <GridCard
+                title="Actions Rapides"
+                actionLabel=""
+                actionLink=""
+              >
+                <div className="grid grid-cols-2 gap-3">
+                  <Link href="/missions">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                      <Briefcase className="w-5 h-5 text-primary" />
+                      <span className="text-xs">Nouvelle Mission</span>
+                    </Button>
+                  </Link>
+                  <Link href="/clients">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      <span className="text-xs">Nouveau Client</span>
+                    </Button>
+                  </Link>
+                  <Link href="/participants">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                      <Users className="w-5 h-5 text-primary" />
+                      <span className="text-xs">Participants</span>
+                    </Button>
+                  </Link>
+                  <Link href="/documents">
+                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
+                      <Receipt className="w-5 h-5 text-primary" />
+                      <span className="text-xs">Documents</span>
+                    </Button>
+                  </Link>
+                </div>
+              </GridCard>
             )}
 
             {/* For trainers/prestataires */}
