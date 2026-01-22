@@ -602,21 +602,10 @@ export default function TrainerSpace() {
               {/* Calendar */}
               <Card>
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
+                  <CardTitle className="text-lg flex items-center gap-2">
                       <CalendarDays className="w-5 h-5" />
                       Mes Missions
                     </CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={exportToIcal}
-                      disabled={trainerMissions.filter((m: Mission) => m.status === "confirmed" || m.status === "in_progress").length === 0}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Exporter (.ics)
-                    </Button>
-                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="h-[calc(100vh-420px)] min-h-[500px]">

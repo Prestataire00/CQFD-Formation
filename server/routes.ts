@@ -10,6 +10,7 @@ import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationRemind
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
+import { seedDefaultTemplates } from "./seed-templates";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -18,6 +19,12 @@ import fs from "fs";
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Create templates directory for automatic document attachments
+const templatesDir = path.join(uploadDir, "templates");
+if (!fs.existsSync(templatesDir)) {
+  fs.mkdirSync(templatesDir, { recursive: true });
 }
 
 const storageConfig = multer.diskStorage({
@@ -2014,6 +2021,7 @@ export async function registerRoutes(
   // Seed Data
   await seedDatabase().catch(err => console.error('Error seeding database:', err));
   await seedBadges().catch(err => console.error('Error seeding badges:', err));
+  await seedDefaultTemplates().catch(err => console.error('Error seeding default templates:', err));
 
   return httpServer;
 }

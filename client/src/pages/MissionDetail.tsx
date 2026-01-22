@@ -310,10 +310,10 @@ function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, on
                     <SelectTrigger className="w-40 h-8 text-sm">
                       <SelectValue placeholder="Assigner a..." />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unassigned">Non assigne</SelectItem>
+                    <SelectContent className="bg-violet-100 border-violet-300">
+                      <SelectItem value="unassigned" className="focus:bg-violet-200">Non assigne</SelectItem>
                       {users?.map((u: any) => (
-                        <SelectItem key={u.id} value={u.id}>
+                        <SelectItem key={u.id} value={u.id} className="focus:bg-violet-200">
                           {u.firstName} {u.lastName}
                         </SelectItem>
                       ))}
@@ -843,10 +843,10 @@ export default function MissionDetail() {
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="presentiel">Presentiel</SelectItem>
-                      <SelectItem value="distanciel">Distanciel</SelectItem>
-                      <SelectItem value="hybride">Hybride</SelectItem>
+                    <SelectContent className="bg-violet-100 border-violet-300">
+                      <SelectItem value="presentiel" className="focus:bg-violet-200">Presentiel</SelectItem>
+                      <SelectItem value="distanciel" className="focus:bg-violet-200">Distanciel</SelectItem>
+                      <SelectItem value="hybride" className="focus:bg-violet-200">Hybride</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -888,9 +888,9 @@ export default function MissionDetail() {
                 <SelectTrigger>
                   <SelectValue placeholder="Selectionner un client" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-violet-100 border-violet-300">
                   {clients?.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
+                    <SelectItem key={c.id} value={c.id.toString()} className="focus:bg-violet-200">
                       {c.name}
                     </SelectItem>
                   ))}
@@ -918,9 +918,9 @@ export default function MissionDetail() {
                 <SelectTrigger>
                   <SelectValue placeholder="Selectionner un formateur" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-violet-100 border-violet-300">
                   {trainers?.map((t: any) => (
-                    <SelectItem key={t.id} value={t.id}>
+                    <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">
                       {t.firstName} {t.lastName}
                     </SelectItem>
                   ))}
@@ -1411,13 +1411,13 @@ export default function MissionDetail() {
                   <SelectTrigger>
                     <SelectValue placeholder="Selectionner un type" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Programme">Programme</SelectItem>
-                    <SelectItem value="Convocation">Convocation</SelectItem>
-                    <SelectItem value="Emargement">Emargement</SelectItem>
-                    <SelectItem value="Evaluation">Evaluation</SelectItem>
-                    <SelectItem value="Attestation">Attestation</SelectItem>
-                    <SelectItem value="Autre">Autre</SelectItem>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="Programme" className="focus:bg-violet-200">Programme</SelectItem>
+                    <SelectItem value="Convocation" className="focus:bg-violet-200">Convocation</SelectItem>
+                    <SelectItem value="Emargement" className="focus:bg-violet-200">Emargement</SelectItem>
+                    <SelectItem value="Evaluation" className="focus:bg-violet-200">Evaluation</SelectItem>
+                    <SelectItem value="Attestation" className="focus:bg-violet-200">Attestation</SelectItem>
+                    <SelectItem value="Autre" className="focus:bg-violet-200">Autre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

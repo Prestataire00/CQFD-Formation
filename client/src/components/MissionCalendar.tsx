@@ -394,10 +394,10 @@ export function MissionCalendar({
           <SelectTrigger className="w-36">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="day">Jour</SelectItem>
-            <SelectItem value="week">Semaine</SelectItem>
-            <SelectItem value="month">Mois</SelectItem>
+          <SelectContent className="bg-violet-100 border-violet-300">
+            <SelectItem value="day" className="focus:bg-violet-200">Jour</SelectItem>
+            <SelectItem value="week" className="focus:bg-violet-200">Semaine</SelectItem>
+            <SelectItem value="month" className="focus:bg-violet-200">Mois</SelectItem>
           </SelectContent>
         </Select>
       </div>

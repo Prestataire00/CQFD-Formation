@@ -58,7 +58,7 @@ export default function Dashboard() {
 
   // Get upcoming missions (next 5)
   const upcomingMissions = missions
-    ?.filter((m: Mission) => m.status === "confirmed" || m.status === "in_progress")
+    ?.filter((m: Mission) => m.status === "draft" || m.status === "confirmed" || m.status === "in_progress")
     .sort((a: Mission, b: Mission) => {
       const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
       const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;

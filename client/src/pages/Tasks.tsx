@@ -73,9 +73,9 @@ export default function Tasks() {
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un projet" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-violet-100 border-violet-300">
                         {projects?.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                          <SelectItem key={p.id} value={p.id.toString()} className="focus:bg-violet-200">{p.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

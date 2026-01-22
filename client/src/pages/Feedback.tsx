@@ -41,7 +41,6 @@ import {
   ChevronRight,
   BarChart3,
   Copy,
-  ExternalLink,
   Eye,
   Edit,
   Plus,
@@ -857,7 +856,7 @@ export default function Feedback() {
                   alt="QR Code"
                   className="w-64 h-64 border rounded-lg"
                 />
-                <div className="mt-4 flex gap-2">
+                <div className="mt-4">
                   <Button
                     variant="outline"
                     size="sm"
@@ -866,15 +865,6 @@ export default function Feedback() {
                   >
                     <Copy className="w-4 h-4" />
                     Copier le lien
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => window.open(qrCodeUrl, '_blank')}
-                    className="gap-2"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Ouvrir
                   </Button>
                 </div>
               </>
@@ -1018,11 +1008,11 @@ export default function Feedback() {
                                   <SelectTrigger>
                                     <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="rating">Note (1-5)</SelectItem>
-                                    <SelectItem value="text">Texte libre</SelectItem>
-                                    <SelectItem value="yes_no">Oui/Non</SelectItem>
-                                    <SelectItem value="multiple_choice">Choix multiple</SelectItem>
+                                  <SelectContent className="bg-violet-100 border-violet-300">
+                                    <SelectItem value="rating" className="focus:bg-violet-200">Note (1-5)</SelectItem>
+                                    <SelectItem value="text" className="focus:bg-violet-200">Texte libre</SelectItem>
+                                    <SelectItem value="yes_no" className="focus:bg-violet-200">Oui/Non</SelectItem>
+                                    <SelectItem value="multiple_choice" className="focus:bg-violet-200">Choix multiple</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>

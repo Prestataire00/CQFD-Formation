@@ -53,6 +53,28 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { DocumentTemplate } from "@shared/schema";
 
+// Types de documents disponibles pour les missions
+const DOCUMENT_TYPES = [
+  // Documents automatiques selon le statut du formateur
+  { value: "consignes_formateurs", label: "Consignes formateurs (Salarié)" },
+  { value: "cahier_charges", label: "Cahier des charges (Prestataire)" },
+  { value: "bonnes_pratiques", label: "Bonnes pratiques (Prestataire)" },
+  // Documents standard
+  { value: "programme", label: "Programme" },
+  { value: "compte_rendu", label: "Compte rendu" },
+  { value: "sequencage", label: "Séquençage" },
+  { value: "livret_annexes", label: "Livret et ses annexes" },
+  { value: "contrat", label: "Contrat" },
+  { value: "questionnaire_preparation", label: "Questionnaire de préparation" },
+  { value: "questionnaire_positionnement", label: "Questionnaire de positionnement" },
+  { value: "questionnaire_satisfaction", label: "Questionnaire de satisfaction" },
+  { value: "bilan_formation", label: "Bilan de formation" },
+  { value: "synthese_evaluations", label: "Synthèse des évaluations" },
+  { value: "feuille_presence", label: "Feuille de présence" },
+  { value: "facture", label: "Facture" },
+  { value: "autre", label: "Autre" },
+];
+
 export default function DocumentTemplates() {
   const { toast } = useToast();
   const { data: templates, isLoading } = useDocumentTemplates();
@@ -71,26 +93,32 @@ export default function DocumentTemplates() {
   const [formData, setFormData] = useState({
     title: "",
     type: "",
+    customType: "",
     forRole: "formateur",
     description: "",
     clientId: "",
     changeNotes: "",
+    depositDate: "",
   });
 
   const resetForm = () => {
     setFormData({
       title: "",
       type: "",
+      customType: "",
       forRole: "formateur",
       description: "",
       clientId: "",
       changeNotes: "",
+      depositDate: "",
     });
     setSelectedFile(null);
   };
 
   const handleCreate = async () => {
-    if (!formData.title || !formData.type || !formData.forRole) {
+    const effectiveType = formData.type === "autre" ? formData.customType : formData.type;
+
+    if (!formData.title || !effectiveType || !formData.forRole) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs obligatoires",
@@ -99,12 +127,22 @@ export default function DocumentTemplates() {
       return;
     }
 
+    if (formData.type === "autre" && !formData.customType) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez spécifier le type de document",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const data = new FormData();
     data.append("title", formData.title);
-    data.append("type", formData.type);
+    data.append("type", effectiveType);
     data.append("forRole", formData.forRole);
     if (formData.description) data.append("description", formData.description);
     if (formData.clientId) data.append("clientId", formData.clientId);
+    if (formData.depositDate) data.append("depositDate", formData.depositDate);
     if (selectedFile) data.append("file", selectedFile);
 
     try {
@@ -127,12 +165,15 @@ export default function DocumentTemplates() {
   const handleEdit = async () => {
     if (!selectedTemplate) return;
 
+    const effectiveType = formData.type === "autre" ? formData.customType : formData.type;
+
     const data = new FormData();
     if (formData.title) data.append("title", formData.title);
-    if (formData.type) data.append("type", formData.type);
+    if (effectiveType) data.append("type", effectiveType);
     if (formData.forRole) data.append("forRole", formData.forRole);
     if (formData.description !== undefined) data.append("description", formData.description);
     if (formData.clientId !== undefined) data.append("clientId", formData.clientId);
+    if (formData.depositDate) data.append("depositDate", formData.depositDate);
     if (formData.changeNotes) data.append("changeNotes", formData.changeNotes);
     if (selectedFile) data.append("file", selectedFile);
 
@@ -174,13 +215,17 @@ export default function DocumentTemplates() {
 
   const openEditDialog = (template: DocumentTemplate) => {
     setSelectedTemplate(template);
+    // Vérifier si le type est dans la liste prédéfinie
+    const isPredefinedType = DOCUMENT_TYPES.some(dt => dt.value === template.type);
     setFormData({
       title: template.title,
-      type: template.type,
+      type: isPredefinedType ? template.type : "autre",
+      customType: isPredefinedType ? "" : template.type,
       forRole: template.forRole,
       description: template.description || "",
       clientId: template.clientId?.toString() || "",
       changeNotes: "",
+      depositDate: (template as any).depositDate || "",
     });
     setShowEditDialog(true);
   };
@@ -238,6 +283,7 @@ export default function DocumentTemplates() {
                   <TableRow>
                     <TableHead>Titre</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Date de dépôt</TableHead>
                     <TableHead>Rôle</TableHead>
                     <TableHead>Client</TableHead>
                     <TableHead>Version</TableHead>
@@ -254,7 +300,16 @@ export default function DocumentTemplates() {
                           {template.title}
                         </div>
                       </TableCell>
-                      <TableCell>{template.type}</TableCell>
+                      <TableCell>
+                        {DOCUMENT_TYPES.find(dt => dt.value === template.type)?.label || template.type}
+                      </TableCell>
+                      <TableCell>
+                        {(template as any).depositDate ? (
+                          format(new Date((template as any).depositDate), "dd/MM/yyyy", { locale: fr })
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline">
                           {template.forRole === "formateur" ? "Formateur" : "Prestataire"}
@@ -355,12 +410,43 @@ export default function DocumentTemplates() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="type">Type *</Label>
-              <Input
-                id="type"
+              <Label htmlFor="type">Type de document *</Label>
+              <Select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                placeholder="Ex: consignes_formateurs"
+                onValueChange={(value) => setFormData({ ...formData, type: value, customType: value === "autre" ? formData.customType : "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez un type" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  {DOCUMENT_TYPES.map((docType) => (
+                    <SelectItem key={docType.value} value={docType.value} className="focus:bg-violet-200">
+                      {docType.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.type === "autre" && (
+              <div className="space-y-2">
+                <Label htmlFor="customType">Précisez le type *</Label>
+                <Input
+                  id="customType"
+                  value={formData.customType}
+                  onChange={(e) => setFormData({ ...formData, customType: e.target.value })}
+                  placeholder="Ex: Attestation de formation"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="depositDate">Date de dépôt</Label>
+              <Input
+                id="depositDate"
+                type="date"
+                value={formData.depositDate}
+                onChange={(e) => setFormData({ ...formData, depositDate: e.target.value })}
               />
             </div>
 
@@ -373,9 +459,9 @@ export default function DocumentTemplates() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="formateur">Formateur</SelectItem>
-                  <SelectItem value="prestataire">Prestataire</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="formateur" className="focus:bg-violet-200">Formateur</SelectItem>
+                  <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -389,10 +475,10 @@ export default function DocumentTemplates() {
                 <SelectTrigger>
                   <SelectValue placeholder="Global (tous les clients)" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_global_">Global</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="_global_" className="focus:bg-violet-200">Global</SelectItem>
                   {clients?.map((client: { id: number; name: string }) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
+                    <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                       {client.name}
                     </SelectItem>
                   ))}
@@ -452,11 +538,43 @@ export default function DocumentTemplates() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="edit-type">Type</Label>
-              <Input
-                id="edit-type"
+              <Label htmlFor="edit-type">Type de document</Label>
+              <Select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                onValueChange={(value) => setFormData({ ...formData, type: value, customType: value === "autre" ? formData.customType : "" })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionnez un type" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  {DOCUMENT_TYPES.map((docType) => (
+                    <SelectItem key={docType.value} value={docType.value} className="focus:bg-violet-200">
+                      {docType.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {formData.type === "autre" && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-customType">Précisez le type</Label>
+                <Input
+                  id="edit-customType"
+                  value={formData.customType}
+                  onChange={(e) => setFormData({ ...formData, customType: e.target.value })}
+                  placeholder="Ex: Attestation de formation"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-depositDate">Date de dépôt</Label>
+              <Input
+                id="edit-depositDate"
+                type="date"
+                value={formData.depositDate}
+                onChange={(e) => setFormData({ ...formData, depositDate: e.target.value })}
               />
             </div>
 
@@ -469,9 +587,9 @@ export default function DocumentTemplates() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="formateur">Formateur</SelectItem>
-                  <SelectItem value="prestataire">Prestataire</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="formateur" className="focus:bg-violet-200">Formateur</SelectItem>
+                  <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -485,10 +603,10 @@ export default function DocumentTemplates() {
                 <SelectTrigger>
                   <SelectValue placeholder="Global (tous les clients)" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_global_">Global</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="_global_" className="focus:bg-violet-200">Global</SelectItem>
                   {clients?.map((client: { id: number; name: string }) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
+                    <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                       {client.name}
                     </SelectItem>
                   ))}

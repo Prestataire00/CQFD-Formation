@@ -272,10 +272,10 @@ export default function Users() {
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">Administrateur</SelectItem>
-                        <SelectItem value="formateur">Formateur salarié</SelectItem>
-                        <SelectItem value="prestataire">Prestataire</SelectItem>
+                      <SelectContent className="bg-violet-100 border-violet-300">
+                        <SelectItem value="admin" className="focus:bg-violet-200">Administrateur</SelectItem>
+                        <SelectItem value="formateur" className="focus:bg-violet-200">Formateur salarié</SelectItem>
+                        <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -317,22 +317,22 @@ export default function Users() {
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filtrer par rôle" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les rôles</SelectItem>
-                <SelectItem value="admin">Administrateur</SelectItem>
-                <SelectItem value="formateur">Formateur</SelectItem>
-                <SelectItem value="prestataire">Prestataire</SelectItem>
+              <SelectContent className="bg-violet-100 border-violet-300">
+                <SelectItem value="all" className="focus:bg-violet-200">Tous les rôles</SelectItem>
+                <SelectItem value="admin" className="focus:bg-violet-200">Administrateur</SelectItem>
+                <SelectItem value="formateur" className="focus:bg-violet-200">Formateur</SelectItem>
+                <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-48">
                 <SelectValue placeholder="Filtrer par statut" />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="ACTIF">Actif</SelectItem>
-                <SelectItem value="INACTIF">Inactif</SelectItem>
-                <SelectItem value="SUPPRIME">Supprimé</SelectItem>
+              <SelectContent className="bg-violet-100 border-violet-300">
+                <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
+                <SelectItem value="ACTIF" className="focus:bg-violet-200">Actif</SelectItem>
+                <SelectItem value="INACTIF" className="focus:bg-violet-200">Inactif</SelectItem>
+                <SelectItem value="SUPPRIME" className="focus:bg-violet-200">Supprimé</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -493,10 +493,10 @@ export default function Users() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Administrateur</SelectItem>
-                  <SelectItem value="formateur">Formateur salarié</SelectItem>
-                  <SelectItem value="prestataire">Prestataire</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="admin" className="focus:bg-violet-200">Administrateur</SelectItem>
+                  <SelectItem value="formateur" className="focus:bg-violet-200">Formateur salarié</SelectItem>
+                  <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -352,10 +352,10 @@ export function InvoiceGenerator({ client, open, onOpenChange, existingInvoice }
                   <SelectTrigger>
                     <SelectValue placeholder="S\u00e9lectionner une mission" />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="" className="focus:bg-violet-200">Aucune</SelectItem>
                     {clientMissions.map((mission) => (
-                      <SelectItem key={mission.id} value={mission.id.toString()}>
+                      <SelectItem key={mission.id} value={mission.id.toString()} className="focus:bg-violet-200">
                         {mission.title}
                       </SelectItem>
                     ))}

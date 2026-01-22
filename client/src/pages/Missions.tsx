@@ -340,9 +340,9 @@ export default function Missions() {
                               <SelectTrigger>
                                 <SelectValue placeholder="Ajouter des clients" />
                               </SelectTrigger>
-                              <SelectContent>
+                              <SelectContent className="bg-violet-100 border-violet-300">
                                 {clients?.map((client: any) => (
-                                  <SelectItem key={client.id} value={client.id.toString()}>
+                                  <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                                     {client.name}
                                   </SelectItem>
                                 ))}
@@ -373,9 +373,9 @@ export default function Missions() {
                             <SelectTrigger>
                               <SelectValue placeholder="Selectionner un client" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-violet-100 border-violet-300">
                               {clients?.map((client: any) => (
-                                <SelectItem key={client.id} value={client.id.toString()}>
+                                <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                                   {client.name}
                                 </SelectItem>
                               ))}
@@ -392,9 +392,9 @@ export default function Missions() {
                           <SelectTrigger>
                             <SelectValue placeholder="Selectionner un formateur" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-violet-100 border-violet-300">
                             {trainers?.map((trainer: any) => (
-                              <SelectItem key={trainer.id} value={trainer.id}>
+                              <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
                                 {trainer.firstName} {trainer.lastName}
                               </SelectItem>
                             ))}
@@ -412,9 +412,9 @@ export default function Missions() {
                           <SelectTrigger>
                             <SelectValue placeholder="Selectionner une formation" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-violet-100 border-violet-300">
                             {programs?.map((program: any) => (
-                              <SelectItem key={program.id} value={program.id.toString()}>
+                              <SelectItem key={program.id} value={program.id.toString()} className="focus:bg-violet-200">
                                 {program.title}
                               </SelectItem>
                             ))}
@@ -430,11 +430,11 @@ export default function Missions() {
                           <SelectTrigger>
                             <SelectValue placeholder="Selectionner une typologie" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Intra">Intra</SelectItem>
-                            <SelectItem value="Inter">Inter</SelectItem>
-                            <SelectItem value="Conseil">Conseil</SelectItem>
-                            <SelectItem value="Conference">Conference</SelectItem>
+                          <SelectContent className="bg-violet-100 border-violet-300">
+                            <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                            <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                            <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                            <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -449,10 +449,10 @@ export default function Missions() {
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="presentiel">Presentiel</SelectItem>
-                            <SelectItem value="distanciel">Distanciel</SelectItem>
-                            <SelectItem value="hybride">Hybride</SelectItem>
+                          <SelectContent className="bg-violet-100 border-violet-300">
+                            <SelectItem value="presentiel" className="focus:bg-violet-200">Presentiel</SelectItem>
+                            <SelectItem value="distanciel" className="focus:bg-violet-200">Distanciel</SelectItem>
+                            <SelectItem value="hybride" className="focus:bg-violet-200">Hybride</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

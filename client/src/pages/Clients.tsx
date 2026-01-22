@@ -130,11 +130,11 @@ function ClientForm({
             <SelectTrigger>
               <SelectValue placeholder="Sélectionner un type" />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="entreprise">Entreprise</SelectItem>
-              <SelectItem value="opco">OPCO</SelectItem>
-              <SelectItem value="particulier">Particulier</SelectItem>
-              <SelectItem value="institution">Institution</SelectItem>
+            <SelectContent className="bg-violet-100 border-violet-300">
+              <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
+              <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+              <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
+              <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -150,11 +150,11 @@ function ClientForm({
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="prospect">Prospect</SelectItem>
-              <SelectItem value="negotiation">En négociation</SelectItem>
-              <SelectItem value="lost">Perdu</SelectItem>
-              <SelectItem value="client">Client</SelectItem>
+            <SelectContent className="bg-violet-100 border-violet-300">
+              <SelectItem value="prospect" className="focus:bg-violet-200">Prospect</SelectItem>
+              <SelectItem value="negotiation" className="focus:bg-violet-200">En négociation</SelectItem>
+              <SelectItem value="lost" className="focus:bg-violet-200">Perdu</SelectItem>
+              <SelectItem value="client" className="focus:bg-violet-200">Client</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -178,10 +178,10 @@ function ClientForm({
           <SelectTrigger>
             <SelectValue placeholder="Choisir un formateur" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none">Aucun</SelectItem>
+          <SelectContent className="bg-violet-100 border-violet-300">
+            <SelectItem value="none" className="focus:bg-violet-200">Aucun</SelectItem>
             {trainers.map((t) => (
-              <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+              <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">{t.firstName} {t.lastName}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -394,11 +394,11 @@ function ClientDetailDialog({
                     <Label className="text-xs font-semibold">TYPE</Label>
                     <Select value={editedClient.type} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="entreprise">Entreprise</SelectItem>
-                        <SelectItem value="opco">OPCO</SelectItem>
-                        <SelectItem value="particulier">Particulier</SelectItem>
-                        <SelectItem value="institution">Institution</SelectItem>
+                      <SelectContent className="bg-violet-100 border-violet-300">
+                        <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
+                        <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+                        <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
+                        <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -703,22 +703,22 @@ export default function Clients() {
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
                 <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="entreprise">Entreprise</SelectItem>
-                  <SelectItem value="opco">OPCO</SelectItem>
-                  <SelectItem value="particulier">Particulier</SelectItem>
-                  <SelectItem value="institution">Institution</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Tous les types</SelectItem>
+                  <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
+                  <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+                  <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
+                  <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={contractFilter} onValueChange={setContractFilter}>
                 <SelectTrigger className="w-44"><SelectValue placeholder="Contrat" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="negotiation">Négociation</SelectItem>
-                  <SelectItem value="lost">Perdu</SelectItem>
-                  <SelectItem value="client">Client</SelectItem>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
+                  <SelectItem value="prospect" className="focus:bg-violet-200">Prospect</SelectItem>
+                  <SelectItem value="negotiation" className="focus:bg-violet-200">Négociation</SelectItem>
+                  <SelectItem value="lost" className="focus:bg-violet-200">Perdu</SelectItem>
+                  <SelectItem value="client" className="focus:bg-violet-200">Client</SelectItem>
                 </SelectContent>
               </Select>
             </div>
