@@ -308,10 +308,22 @@ export async function registerRoutes(
       // Envoyer un email au formateur si assigné à la création
       if (mission.trainerId) {
         const trainer = await storage.getUser(mission.trainerId);
-        if (trainer && trainer.email) {
-          const documents = await storage.getDocumentsByMission(mission.id);
-          const trainerDocuments = documents.filter(doc => doc.userId === mission.trainerId);
-          await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+        if (trainer) {
+          // 1. Notification interne (toujours)
+          await storage.createInAppNotification({
+            userId: trainer.id,
+            type: 'mission_assignment',
+            title: 'Nouvelle mission assignée',
+            message: `Vous avez été assigné à la mission : ${mission.title}`,
+            missionId: mission.id,
+          });
+
+          // 2. Email (si configuré)
+          if (trainer.email) {
+            const documents = await storage.getDocumentsByMission(mission.id);
+            const trainerDocuments = documents.filter(doc => doc.userId === mission.trainerId);
+            await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+          }
         }
       }
 
@@ -494,14 +506,26 @@ export async function registerRoutes(
         isPrimary: isPrimary || false,
       });
 
-      // Envoyer un email au formateur avec les détails de la mission et les documents
+      // Envoyer une notification au formateur
       const trainer = await storage.getUser(trainerId);
       const mission = await storage.getMission(missionId);
-      if (trainer && mission && trainer.email) {
-        const documents = await storage.getDocumentsByMission(missionId);
-        // Filtrer les documents appartenant à ce formateur
-        const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
-        await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+      if (trainer && mission) {
+        // 1. Notification interne
+        await storage.createInAppNotification({
+          userId: trainer.id,
+          type: 'mission_assignment',
+          title: 'Nouvelle mission assignée',
+          message: `Vous avez été assigné à la mission : ${mission.title}`,
+          missionId: mission.id,
+        });
+
+        // 2. Email (si configuré)
+        if (trainer.email) {
+          const documents = await storage.getDocumentsByMission(missionId);
+          // Filtrer les documents appartenant à ce formateur
+          const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+          await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+        }
       }
 
       res.status(201).json(result);
@@ -544,12 +568,24 @@ export async function registerRoutes(
             isPrimary: false,
           });
 
-          // Envoyer un email au formateur
+          // Envoyer une notification au formateur
           const trainer = await storage.getUser(trainerId);
-          if (trainer && trainer.email) {
-            const documents = await storage.getDocumentsByMission(missionId);
-            const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
-            await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+          if (trainer) {
+            // 1. Notification interne
+            await storage.createInAppNotification({
+              userId: trainer.id,
+              type: 'mission_assignment',
+              title: 'Nouvelle mission assignée',
+              message: `Vous avez été assigné à la mission : ${mission.title}`,
+              missionId: mission.id,
+            });
+
+            // 2. Email (si configuré)
+            if (trainer.email) {
+              const documents = await storage.getDocumentsByMission(missionId);
+              const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+              await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+            }
           }
 
           results.assigned.push(trainerId);
