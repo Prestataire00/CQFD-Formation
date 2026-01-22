@@ -3,13 +3,13 @@ import { useLocation } from "wouter";
 import { Search, Bell, Menu, FileText, CheckCheck, Clock, AlertTriangle, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -108,8 +108,8 @@ export function Header({ title }: { title: string }) {
           </div>
 
           {showNotifications && (
-            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-              <DropdownMenuTrigger asChild>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
                   <Bell className="h-5 w-5" />
                   {totalUnreadCount > 0 && (
@@ -118,108 +118,121 @@ export function Header({ title }: { title: string }) {
                     </span>
                   )}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-96">
-                <div className="flex items-center justify-between px-2 py-1">
-                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[400px] sm:w-[450px] p-0">
+                <SheetHeader className="p-6 pb-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <SheetTitle className="text-xl">Notifications</SheetTitle>
+                    {totalUnreadCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleMarkAllAsRead}
+                        className="text-xs h-8"
+                      >
+                        <CheckCheck className="w-4 h-4 mr-1" />
+                        Tout lire
+                      </Button>
+                    )}
+                  </div>
                   {totalUnreadCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleMarkAllAsRead}
-                      className="text-xs h-7"
-                    >
-                      <CheckCheck className="w-3 h-3 mr-1" />
-                      Tout lire
-                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      {totalUnreadCount} notification{totalUnreadCount > 1 ? 's' : ''} non lue{totalUnreadCount > 1 ? 's' : ''}
+                    </p>
                   )}
-                </div>
-                <DropdownMenuSeparator />
-                {totalUnreadCount === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    Aucune notification
-                  </div>
-                ) : (
-                  <div className="max-h-[400px] overflow-y-auto">
-                    {/* In-App Notifications (reminders, alerts, etc.) */}
-                    {inAppNotifications?.map((notification: InAppNotification) => (
-                      <DropdownMenuItem
-                        key={`in-app-${notification.id}`}
-                        className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-muted/50"
-                        onClick={() => handleMarkInAppAsRead(notification)}
-                      >
-                        <div className="flex items-start gap-2 w-full">
-                          {getNotificationIcon(notification.type)}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium truncate">
-                                {notification.title}
-                              </p>
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                                Nouveau
-                              </Badge>
+                </SheetHeader>
+                <ScrollArea className="h-[calc(100vh-120px)]">
+                  {totalUnreadCount === 0 ? (
+                    <div className="py-16 text-center text-sm text-muted-foreground">
+                      <Bell className="h-12 w-12 mx-auto mb-4 opacity-20" />
+                      <p>Aucune notification</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {/* In-App Notifications (reminders, alerts, etc.) */}
+                      {inAppNotifications?.map((notification: InAppNotification) => (
+                        <div
+                          key={`in-app-${notification.id}`}
+                          className="flex flex-col items-start gap-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => handleMarkInAppAsRead(notification)}
+                        >
+                          <div className="flex items-start gap-3 w-full">
+                            <div className="mt-0.5">
+                              {getNotificationIcon(notification.type)}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                              {notification.message}
-                            </p>
-                            {notification.metadata && (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {notification.metadata.location && (
-                                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                    {notification.metadata.location}
-                                  </span>
-                                )}
-                                {notification.metadata.trainerName && (
-                                  <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                    {notification.metadata.trainerName}
-                                  </span>
-                                )}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium">
+                                  {notification.title}
+                                </p>
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                                  Nouveau
+                                </Badge>
                               </div>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {notification.createdAt && format(new Date(notification.createdAt), "PPP à HH:mm", {
-                                locale: fr,
-                              })}
-                            </p>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-
-                    {/* Template Notifications */}
-                    {templateNotifications?.filter((n: any) => !n.isRead).map((notification: any) => (
-                      <DropdownMenuItem
-                        key={`template-${notification.id}`}
-                        className="flex flex-col items-start gap-1 p-3 cursor-pointer hover:bg-muted/50"
-                        onClick={() => handleMarkTemplateAsRead(notification.id)}
-                      >
-                        <div className="flex items-start gap-2 w-full">
-                          <FileText className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="text-sm font-medium">
-                                Mise à jour du template
+                              <p className="text-sm text-muted-foreground mt-1">
+                                {notification.message}
                               </p>
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                                Nouveau
-                              </Badge>
+                              {notification.metadata && (
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {notification.metadata.location && (
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                      {notification.metadata.location}
+                                    </span>
+                                  )}
+                                  {notification.metadata.trainerName && (
+                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                      {notification.metadata.trainerName}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {notification.createdAt && format(new Date(notification.createdAt), "PPP à HH:mm", {
+                                  locale: fr,
+                                })}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Un template de document a été mis à jour
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {format(new Date(notification.createdAt), "PPP à HH:mm", {
-                                locale: fr,
-                              })}
-                            </p>
                           </div>
                         </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                      ))}
+
+                      {/* Template Notifications */}
+                      {templateNotifications?.filter((n: any) => !n.isRead).map((notification: any) => (
+                        <div
+                          key={`template-${notification.id}`}
+                          className="flex flex-col items-start gap-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => handleMarkTemplateAsRead(notification.id)}
+                        >
+                          <div className="flex items-start gap-3 w-full">
+                            <div className="mt-0.5">
+                              <FileText className="w-4 h-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-medium">
+                                  Mise à jour du template
+                                </p>
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                                  Nouveau
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Un template de document a été mis à jour
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-2">
+                                {format(new Date(notification.createdAt), "PPP à HH:mm", {
+                                  locale: fr,
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
           )}
         </div>
       </div>
