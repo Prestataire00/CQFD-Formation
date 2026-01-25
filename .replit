@@ -44,5 +44,5 @@ integrations = ["javascript_log_in_with_replit:2.0.0"]
 [userenv]
 
 [userenv.shared]
-SMTP_HOST = "smtp.gmail.com  "
+SMTP_HOST = "smtp.gmail.com"
 # Using Replit's built-in PostgreSQL database

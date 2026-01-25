@@ -30,14 +30,18 @@ export function getSession() {
     tableName: "sessions",
   });
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  
   return session({
     secret: process.env.SESSION_SECRET || 'cqfd-formation-secret-key',
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    proxy: isProduction,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: sessionTtl,
     },
   });
