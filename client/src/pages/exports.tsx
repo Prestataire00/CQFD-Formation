@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, RefreshCw, FileSpreadsheet, Calendar, HardDrive } from "lucide-react";
+import { Download, RefreshCw, FileSpreadsheet, Calendar, HardDrive, ArrowLeft } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -67,6 +68,14 @@ export default function ExportsPage() {
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-4xl">
+      <div className="mb-4">
+        <Link href="/">
+          <Button variant="ghost" size="sm" data-testid="button-back-dashboard">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Retour au tableau de bord
+          </Button>
+        </Link>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Exports Excel</h1>
