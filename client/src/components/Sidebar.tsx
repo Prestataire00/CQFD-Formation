@@ -131,11 +131,11 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card/50 backdrop-blur-xl hidden lg:flex flex-col">
       {/* Logo */}
-      <div className="h-16 flex items-center px-6 border-b border-border/50">
+      <div className="h-16 flex items-center px-4 border-b border-border/50 bg-[#0a1128]">
         <img 
-          src="https://www.cqfd-formation.fr/images/logo.png" 
+          src="/src/assets/logo.png" 
           alt="CQFD Formation" 
-          className="h-10 w-auto"
+          className="h-10 w-auto object-contain"
         />
       </div>
 
