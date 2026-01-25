@@ -145,13 +145,13 @@ export function Sidebar() {
               {/* Bottom Right Leaf - Lime */}
               <rect x="53" y="53" width="32" height="32" rx="12" fill="#84cc16" transform="rotate(-5 69 69)" />
               {/* Center Text "CQ" */}
-              <text x="50" y="52" fontFamily="Arial" fontSize="18" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">CQ</text>
+              <text x="50" y="52" fontFamily="Arial" fontSize="22" fontWeight="900" fill="black" textAnchor="middle" dominantBaseline="middle">CQ</text>
             </svg>
           </div>
           
           <div className="flex flex-col leading-tight">
-            <span className="text-xl font-black italic tracking-tighter text-slate-800 dark:text-white uppercase">CQFD</span>
-            <span className="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Formation</span>
+            <span className="text-2xl font-black italic tracking-tighter text-slate-800 dark:text-white uppercase">CQFD</span>
+            <span className="text-[12px] font-bold tracking-[0.2em] text-primary uppercase">Formation</span>
           </div>
         </div>
       </div>
