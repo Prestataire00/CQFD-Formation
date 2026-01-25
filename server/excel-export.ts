@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { db } from './db';
-import { missions, users, clients, participants, missionSessions, missionParticipants, invoices, attendanceRecords } from '@shared/schema';
+import { missions, users, clients, participants, missionSessions, missionParticipants, attendanceRecords } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -73,7 +73,6 @@ export async function generateMissionsExcel(): Promise<string> {
   const allParticipants = await db.select().from(participants);
   const allMissionParticipants = await db.select().from(missionParticipants);
   const allSessions = await db.select().from(missionSessions);
-  const allInvoices = await db.select().from(invoices);
   const allAttendance = await db.select().from(attendanceRecords);
 
   const usersMap = new Map(allUsers.map(u => [u.id, u]));
@@ -225,47 +224,6 @@ export async function generateMissionsExcel(): Promise<string> {
     });
   }
 
-  const invoicesSheet = workbook.addWorksheet('Factures');
-  invoicesSheet.columns = [
-    { header: 'Numéro', key: 'invoiceNumber', width: 20 },
-    { header: 'Mission', key: 'mission', width: 25 },
-    { header: 'Formateur', key: 'trainer', width: 25 },
-    { header: 'Montant HT (€)', key: 'amount', width: 15 },
-    { header: 'TVA (€)', key: 'vatAmount', width: 12 },
-    { header: 'Montant TTC (€)', key: 'totalAmount', width: 15 },
-    { header: 'Statut', key: 'status', width: 15 },
-    { header: 'Date facture', key: 'invoiceDate', width: 15 },
-    { header: 'Date paiement', key: 'paidDate', width: 15 },
-  ];
-
-  const invoicesHeader = invoicesSheet.getRow(1);
-  invoicesHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  invoicesHeader.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF0055A4' }
-  };
-
-  for (const invoice of allInvoices) {
-    const mission = allMissions.find(m => m.id === invoice.missionId);
-    const trainer = invoice.userId ? usersMap.get(invoice.userId) : null;
-    const amountHT = invoice.amount / 100;
-    const vatAmount = (invoice.vatAmount || 0) / 100;
-    const totalAmount = amountHT + vatAmount;
-
-    invoicesSheet.addRow({
-      invoiceNumber: invoice.invoiceNumber,
-      mission: mission?.reference || '',
-      trainer: trainer ? `${trainer.firstName} ${trainer.lastName}` : '',
-      amount: amountHT.toFixed(2),
-      vatAmount: vatAmount.toFixed(2),
-      totalAmount: totalAmount.toFixed(2),
-      status: translateStatus(invoice.status),
-      invoiceDate: formatDate(invoice.invoiceDate),
-      paidDate: formatDate(invoice.paidDate),
-    });
-  }
-
   const statsSheet = workbook.addWorksheet('Statistiques');
   statsSheet.columns = [
     { header: 'Indicateur', key: 'indicator', width: 35 },
@@ -280,11 +238,6 @@ export async function generateMissionsExcel(): Promise<string> {
     fgColor: { argb: 'FF0055A4' }
   };
 
-  const totalInvoiceAmount = allInvoices.reduce((sum, inv) => sum + inv.amount + (inv.vatAmount || 0), 0) / 100;
-  const paidInvoiceAmount = allInvoices
-    .filter(inv => inv.status === 'paid')
-    .reduce((sum, inv) => sum + inv.amount + (inv.vatAmount || 0), 0) / 100;
-
   const stats = [
     { indicator: 'Total missions', value: allMissions.length.toString() },
     { indicator: 'Missions en attente', value: allMissions.filter(m => m.status === 'pending').length.toString() },
@@ -294,11 +247,6 @@ export async function generateMissionsExcel(): Promise<string> {
     { indicator: 'Missions annulées', value: allMissions.filter(m => m.status === 'cancelled').length.toString() },
     { indicator: 'Total participants inscrits', value: allMissionParticipants.length.toString() },
     { indicator: 'Total sessions planifiées', value: allSessions.length.toString() },
-    { indicator: 'Total factures', value: allInvoices.length.toString() },
-    { indicator: 'Factures payées', value: allInvoices.filter(i => i.status === 'paid').length.toString() },
-    { indicator: 'Factures en attente', value: allInvoices.filter(i => i.status === 'sent' || i.status === 'draft').length.toString() },
-    { indicator: 'Montant total facturé (€)', value: totalInvoiceAmount.toFixed(2) },
-    { indicator: 'Montant payé (€)', value: paidInvoiceAmount.toFixed(2) },
     { indicator: 'Total formateurs', value: allUsers.filter(u => u.role === 'formateur' || u.role === 'prestataire').length.toString() },
     { indicator: 'Total clients', value: allClients.length.toString() },
     { indicator: "Date d'extraction", value: format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr }) },

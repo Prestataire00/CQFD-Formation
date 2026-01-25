@@ -205,16 +205,10 @@ export default function ExportsPage() {
                 Détail des sessions de formation avec horaires, lieu et statistiques de présence.
               </p>
             </div>
-            <div className="p-4 rounded-lg border">
-              <h4 className="font-medium mb-2">Onglet Factures</h4>
-              <p className="text-sm text-muted-foreground">
-                Liste des factures avec montants, statuts et dates de paiement.
-              </p>
-            </div>
             <div className="p-4 rounded-lg border md:col-span-2">
               <h4 className="font-medium mb-2">Onglet Statistiques</h4>
               <p className="text-sm text-muted-foreground">
-                Résumé global : nombre de missions par statut, total participants, factures, montants facturés et payés.
+                Résumé global : nombre de missions par statut, total participants, formateurs et clients.
               </p>
             </div>
           </div>
