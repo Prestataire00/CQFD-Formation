@@ -131,12 +131,29 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card/50 backdrop-blur-xl hidden lg:flex flex-col">
       {/* Logo */}
-      <div className="h-16 flex items-center px-4 border-b border-border/50 bg-[#0a1128]">
-        <img 
-          src="/src/assets/logo.png" 
-          alt="CQFD Formation" 
-          className="h-10 w-auto object-contain"
-        />
+      <div className="h-20 flex items-center px-6 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          {/* Custom SVG Flower Logo */}
+          <div className="relative w-10 h-10 flex-shrink-0">
+            <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
+              {/* Top Left Leaf - Blue */}
+              <rect x="15" y="15" width="32" height="32" rx="12" fill="#3b82f6" transform="rotate(-5 31 31)" />
+              {/* Top Right Leaf - Green */}
+              <rect x="53" y="15" width="32" height="32" rx="12" fill="#10b981" transform="rotate(5 69 31)" />
+              {/* Bottom Left Leaf - Cyan */}
+              <rect x="15" y="53" width="32" height="32" rx="12" fill="#22d3ee" transform="rotate(5 31 69)" />
+              {/* Bottom Right Leaf - Lime */}
+              <rect x="53" y="53" width="32" height="32" rx="12" fill="#84cc16" transform="rotate(-5 69 69)" />
+              {/* Center Text "CQ" */}
+              <text x="50" y="52" fontFamily="Arial" fontSize="18" fontWeight="bold" fill="white" textAnchor="middle" dominantBaseline="middle">CQ</text>
+            </svg>
+          </div>
+          
+          <div className="flex flex-col leading-tight">
+            <span className="text-xl font-black italic tracking-tighter text-slate-800 dark:text-white uppercase">CQFD</span>
+            <span className="text-[10px] font-bold tracking-[0.2em] text-primary uppercase">Formation</span>
+          </div>
+        </div>
       </div>
 
       {/* Navigation */}
