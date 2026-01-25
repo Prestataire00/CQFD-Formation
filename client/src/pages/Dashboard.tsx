@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   Clock,
   Users,
-  Receipt,
   Star,
   Calendar,
   MapPin,
@@ -263,12 +262,6 @@ export default function Dashboard() {
                     <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
                       <Users className="w-5 h-5 text-primary" />
                       <span className="text-xs">Participants</span>
-                    </Button>
-                  </Link>
-                  <Link href="/documents">
-                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                      <Receipt className="w-5 h-5 text-primary" />
-                      <span className="text-xs">Documents</span>
                     </Button>
                   </Link>
                 </div>

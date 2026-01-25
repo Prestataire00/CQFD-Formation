@@ -684,8 +684,22 @@ export async function notifyOtherParty(
 ): Promise<void> {
   const isModifierAdmin = modifiedBy.role === 'admin';
 
+  // Toujours notifier tous les admins (sauf celui qui a fait la modification)
+  for (const admin of admins) {
+    if (admin.email && admin.id !== modifiedBy.id) {
+      await sendMissionNotificationEmail({
+        mission,
+        modifiedBy,
+        recipient: admin,
+        client,
+        changeType,
+        ...options,
+      });
+    }
+  }
+
+  // Si c'est un admin qui modifie, notifier aussi le formateur
   if (isModifierAdmin) {
-    // Admin a modifié -> notifier le formateur
     if (trainer && trainer.email && trainer.id !== modifiedBy.id) {
       await sendMissionNotificationEmail({
         mission,
@@ -695,20 +709,6 @@ export async function notifyOtherParty(
         changeType,
         ...options,
       });
-    }
-  } else {
-    // Formateur a modifié -> notifier tous les admins
-    for (const admin of admins) {
-      if (admin.email && admin.id !== modifiedBy.id) {
-        await sendMissionNotificationEmail({
-          mission,
-          modifiedBy,
-          recipient: admin,
-          client,
-          changeType,
-          ...options,
-        });
-      }
     }
   }
 }
