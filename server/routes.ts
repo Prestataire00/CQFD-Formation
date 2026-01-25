@@ -11,6 +11,7 @@ import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamifi
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
 import { seedDefaultTemplates } from "./seed-templates";
+import { generateMissionsExcel, listExports, getLatestExport } from "./excel-export";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -2168,6 +2169,88 @@ export async function registerRoutes(
 
   // Register Documents routes (contracts, invoices)
   app.use('/api/documents', isAuthenticated, documentsRouter);
+
+  // =============================================
+  // Excel Export Routes
+  // =============================================
+  
+  // List all available exports
+  app.get('/api/exports', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const exports = listExports();
+      const formattedExports = exports.map(exp => ({
+        name: exp.name,
+        date: exp.date.toISOString(),
+        size: exp.size,
+        downloadUrl: `/api/exports/download/${encodeURIComponent(exp.name)}`
+      }));
+      res.json(formattedExports);
+    } catch (error) {
+      console.error('[Export] Error listing exports:', error);
+      res.status(500).json({ message: 'Erreur lors de la récupération des exports' });
+    }
+  });
+
+  // Trigger manual export
+  app.post('/api/exports/generate', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const filepath = await generateMissionsExcel();
+      const filename = path.basename(filepath);
+      res.json({
+        success: true,
+        message: 'Export généré avec succès',
+        filename,
+        downloadUrl: `/api/exports/download/${encodeURIComponent(filename)}`
+      });
+    } catch (error) {
+      console.error('[Export] Error generating export:', error);
+      res.status(500).json({ message: 'Erreur lors de la génération de l\'export' });
+    }
+  });
+
+  // Download latest export
+  app.get('/api/exports/latest', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const filepath = getLatestExport();
+      if (!filepath || !fs.existsSync(filepath)) {
+        return res.status(404).json({ message: 'Aucun export disponible' });
+      }
+      
+      const filename = path.basename(filepath);
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.sendFile(filepath);
+    } catch (error) {
+      console.error('[Export] Error downloading latest export:', error);
+      res.status(500).json({ message: 'Erreur lors du téléchargement' });
+    }
+  });
+
+  // Download specific export by filename
+  app.get('/api/exports/download/:filename', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const filename = decodeURIComponent(req.params.filename);
+      
+      // Security: only allow .xlsx files and prevent path traversal
+      if (!filename.endsWith('.xlsx') || filename.includes('..') || filename.includes('/')) {
+        return res.status(400).json({ message: 'Nom de fichier invalide' });
+      }
+      
+      const exportsDir = path.join(process.cwd(), 'exports');
+      const filepath = path.join(exportsDir, filename);
+      
+      if (!fs.existsSync(filepath)) {
+        return res.status(404).json({ message: 'Fichier non trouvé' });
+      }
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.sendFile(filepath);
+    } catch (error) {
+      console.error('[Export] Error downloading export:', error);
+      res.status(500).json({ message: 'Erreur lors du téléchargement' });
+    }
+  });
 
   // Seed Data
   await seedDatabase().catch(err => console.error('Error seeding database:', err));

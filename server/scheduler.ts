@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { storage } from './storage';
 import { sendReminderEmail, sendAdminFormationReminderEmail } from './email';
 import { log } from './index';
+import { generateMissionsExcel, cleanOldExports } from './excel-export';
 
 // Variable pour suivre si le scheduler est actif
 let isSchedulerRunning = false;
@@ -280,6 +281,23 @@ async function runReminderTask(): Promise<void> {
 }
 
 /**
+ * Génère l'export Excel quotidien des missions
+ */
+async function runDailyExportTask(): Promise<void> {
+  log('[Scheduler] Démarrage de l\'export Excel quotidien', 'scheduler');
+  
+  try {
+    const filepath = await generateMissionsExcel();
+    log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
+    
+    await cleanOldExports(7);
+    log('[Scheduler] Nettoyage des anciens exports terminé', 'scheduler');
+  } catch (error) {
+    log(`[Scheduler] Erreur lors de l'export Excel: ${error instanceof Error ? error.message : 'Unknown error'}`, 'scheduler');
+  }
+}
+
+/**
  * Initialise et démarre le scheduler de rappels
  * Exécute toutes les heures à la minute 0
  */
@@ -292,13 +310,20 @@ export function startReminderScheduler(): void {
     await runReminderTask();
   });
 
+  // Export Excel quotidien à 6h00 du matin
+  cron.schedule('0 6 * * *', async () => {
+    await runDailyExportTask();
+  });
+
   // Exécuter immédiatement au démarrage (après un délai de 30 secondes pour laisser le serveur démarrer)
   setTimeout(async () => {
     log('[Scheduler] Exécution initiale après démarrage', 'scheduler');
     await runReminderTask();
+    // Générer aussi un export initial
+    await runDailyExportTask();
   }, 30000);
 
-  log('[Scheduler] Scheduler démarré - exécution toutes les heures', 'scheduler');
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 6h00', 'scheduler');
 }
 
 /**

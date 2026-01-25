@@ -11,12 +11,13 @@ export async function seedDefaultAdmin() {
     if (existingAdmins.length === 0) {
       console.log('[seed-admin] Aucun admin trouvé, création d\'un admin par défaut...');
       
-      const defaultPassword = 'admin123';
+      const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@cqfd-formation.fr';
+      const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || 'admin123';
       const passwordHash = await bcrypt.hash(defaultPassword, 12);
       
       await db.insert(users).values({
         id: randomUUID(),
-        email: 'admin@cqfd-formation.fr',
+        email: defaultEmail,
         passwordHash,
         firstName: 'Admin',
         lastName: 'CQFD',
@@ -28,8 +29,12 @@ export async function seedDefaultAdmin() {
       });
       
       console.log('[seed-admin] Admin par défaut créé avec succès');
-      console.log('[seed-admin] Email: admin@cqfd-formation.fr');
-      console.log('[seed-admin] Mot de passe: admin123');
+      console.log(`[seed-admin] Email: ${defaultEmail}`);
+      
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`[seed-admin] Mot de passe: ${defaultPassword}`);
+      }
+      
       console.log('[seed-admin] IMPORTANT: Changez ce mot de passe immédiatement après la première connexion!');
     } else {
       console.log('[seed-admin] Un admin existe déjà, pas de création nécessaire');

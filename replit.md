@@ -9,7 +9,7 @@ The application serves three user roles:
 - **Formateur (Employee Trainer)**: Access only to assigned missions, can complete steps and upload documents
 - **Prestataire (Independent Contractor)**: Same as formateur, with additional SIRET number for invoicing
 
-Key features include mission lifecycle management, participant tracking, attendance/signature recording, document generation from templates, invoice management, and automated reminder notifications.
+Key features include mission lifecycle management, participant tracking, attendance/signature recording, document generation from templates, invoice management, automated reminder notifications, and daily Excel exports of planning data.
 
 ## User Preferences
 
@@ -67,6 +67,7 @@ Preferred communication style: Simple, everyday language.
 2. **Shared schema**: Database types are shared with frontend for type safety
 3. **Role-based UI**: Navigation and features adapt based on user role
 4. **Document templates**: Reusable document templates with version control for training materials
+5. **Automatic Excel exports**: Daily Excel extraction at 6:00 AM with missions, participants, sessions, invoices and statistics (files kept for 7 days)
 
 ## External Dependencies
 

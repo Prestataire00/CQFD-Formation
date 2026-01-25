@@ -8,6 +8,7 @@ import {
   MessageSquareText,
   UserCog,
   FileText,
+  FileSpreadsheet,
   Settings,
   LogOut,
   Calendar,
@@ -87,6 +88,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileText,
     label: "Templates",
     href: "/document-templates",
+    roles: ["admin"],
+  },
+  {
+    icon: FileSpreadsheet,
+    label: "Exports Excel",
+    href: "/exports",
     roles: ["admin"],
   },
   {
