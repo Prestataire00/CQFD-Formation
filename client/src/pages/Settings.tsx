@@ -16,7 +16,6 @@ import {
   Lock,
   Bell,
   Building2,
-  Palette,
   Save,
   Loader2,
   Mail,
@@ -356,7 +355,7 @@ export default function Settings() {
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
                       }
-                      placeholder="••••••••"
+                      placeholder="********"
                     />
                   </div>
 
@@ -369,7 +368,7 @@ export default function Settings() {
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, newPassword: e.target.value })
                       }
-                      placeholder="••••••••"
+                      placeholder="********"
                     />
                     <p className="text-xs text-muted-foreground">
                       Minimum 8 caracteres
@@ -385,7 +384,7 @@ export default function Settings() {
                       onChange={(e) =>
                         setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
                       }
-                      placeholder="••••••••"
+                      placeholder="********"
                     />
                   </div>
 

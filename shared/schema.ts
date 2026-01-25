@@ -539,6 +539,18 @@ export const feedbackResponses = pgTable("feedback_responses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// --- PERSONAL NOTES ---
+export const personalNotes = pgTable("personal_notes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  content: text("content"),
+  color: text("color").default("default"), // default, yellow, green, blue, pink, purple
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // --- SCHEMAS ---
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientSchema = createInsertSchema(clients).omit({ id: true, createdAt: true, updatedAt: true });
@@ -575,6 +587,7 @@ export const insertFeedbackResponseSchema = createInsertSchema(feedbackResponses
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true, updatedAt: true });
 export const insertClientContractSchema = createInsertSchema(clientContracts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPersonalNoteSchema = createInsertSchema(personalNotes).omit({ id: true, createdAt: true, updatedAt: true });
 
 // --- TYPES ---
 export type User = typeof users.$inferSelect;
@@ -649,3 +662,5 @@ export type ClientInvoice = typeof clientInvoices.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type InsertClientContract = z.infer<typeof insertClientContractSchema>;
 export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;
+export type PersonalNote = typeof personalNotes.$inferSelect;
+export type InsertPersonalNote = z.infer<typeof insertPersonalNoteSchema>;

@@ -5,7 +5,7 @@ import {
   messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
   xpTransactions, badges, userBadges, inAppNotifications,
   feedbackQuestionnaires, feedbackQuestions, feedbackResponseTokens, feedbackResponses,
-  companySettings, clientContracts, clientInvoices,
+  companySettings, clientContracts, clientInvoices, personalNotes,
   type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
@@ -14,7 +14,7 @@ import {
   type ReminderSetting, type Reminder, type InAppNotification,
   type XPTransaction, type Badge, type UserBadge,
   type FeedbackQuestionnaire, type FeedbackQuestion, type FeedbackResponseToken, type FeedbackResponse,
-  type CompanySettings, type ClientContract, type ClientInvoice,
+  type CompanySettings, type ClientContract, type ClientInvoice, type PersonalNote,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
   type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
   type InsertMissionParticipant, type InsertAttendanceRecord,
@@ -24,7 +24,7 @@ import {
   type InsertReminderSetting, type InsertReminder, type InsertInAppNotification,
   type InsertXPTransaction, type InsertBadge, type InsertUserBadge,
   type InsertFeedbackQuestionnaire, type InsertFeedbackQuestion, type InsertFeedbackResponseToken, type InsertFeedbackResponse,
-  type InsertCompanySettings, type InsertClientContract, type InsertClientInvoice,
+  type InsertCompanySettings, type InsertClientContract, type InsertClientInvoice, type InsertPersonalNote,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
@@ -264,6 +264,13 @@ export interface IStorage {
   getFeedbackResponsesByToken(tokenId: number): Promise<FeedbackResponse[]>;
   getFeedbackResponsesByQuestion(questionId: number): Promise<FeedbackResponse[]>;
   createFeedbackResponse(response: InsertFeedbackResponse): Promise<FeedbackResponse>;
+
+  // Personal Notes
+  getPersonalNotes(userId: string): Promise<PersonalNote[]>;
+  getPersonalNote(id: number): Promise<PersonalNote | undefined>;
+  createPersonalNote(note: InsertPersonalNote): Promise<PersonalNote>;
+  updatePersonalNote(id: number, data: Partial<PersonalNote>): Promise<PersonalNote | undefined>;
+  deletePersonalNote(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1785,6 +1792,37 @@ export class DatabaseStorage implements IStorage {
 
     const nextNumber = (invoicesList.length + 1).toString().padStart(4, '0');
     return `${prefix}-${year}-${nextNumber}`;
+  }
+
+  // ==================== PERSONAL NOTES ====================
+  async getPersonalNotes(userId: string): Promise<PersonalNote[]> {
+    return db.select()
+      .from(personalNotes)
+      .where(eq(personalNotes.userId, userId))
+      .orderBy(desc(personalNotes.isPinned), desc(personalNotes.updatedAt));
+  }
+
+  async getPersonalNote(id: number): Promise<PersonalNote | undefined> {
+    const [note] = await db.select().from(personalNotes).where(eq(personalNotes.id, id));
+    return note;
+  }
+
+  async createPersonalNote(note: InsertPersonalNote): Promise<PersonalNote> {
+    const [created] = await db.insert(personalNotes).values(note).returning();
+    return created;
+  }
+
+  async updatePersonalNote(id: number, data: Partial<PersonalNote>): Promise<PersonalNote | undefined> {
+    const [updated] = await db.update(personalNotes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(personalNotes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePersonalNote(id: number): Promise<boolean> {
+    await db.delete(personalNotes).where(eq(personalNotes.id, id));
+    return true;
   }
 }
 

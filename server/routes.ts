@@ -605,7 +605,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/missions/:missionId/trainers/:trainerId', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+  app.delete('/api/missions/:missionId/trainers/:trainerId', isAuthenticated, requireRole('admin'), async (req, res) => {
     await storage.removeTrainerFromMission(
       Number(req.params.missionId),
       req.params.trainerId
@@ -2046,6 +2046,121 @@ export async function registerRoutes(
   // Get XP configuration
   app.get('/api/gamification/xp-config', isAuthenticated, async (req, res) => {
     res.json(XP_CONFIG);
+  });
+
+  // ==================== PERSONAL NOTES ====================
+  // Get all notes for current user
+  app.get('/api/personal-notes', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const notes = await storage.getPersonalNotes(user.id);
+      res.json(notes);
+    } catch (err) {
+      console.error('Error fetching personal notes:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Get a single note
+  app.get('/api/personal-notes/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const note = await storage.getPersonalNote(Number(req.params.id));
+      if (!note) {
+        res.status(404).json({ message: 'Note non trouvee' });
+        return;
+      }
+      // Check ownership
+      if (note.userId !== user.id) {
+        res.status(403).json({ message: 'Acces refuse' });
+        return;
+      }
+      res.json(note);
+    } catch (err) {
+      console.error('Error fetching personal note:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Create a new note
+  app.post('/api/personal-notes', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const { title, content, color, isPinned } = req.body;
+
+      if (!title || title.trim() === '') {
+        res.status(400).json({ message: 'Le titre est requis' });
+        return;
+      }
+
+      const note = await storage.createPersonalNote({
+        userId: user.id,
+        title: title.trim(),
+        content: content || '',
+        color: color || 'default',
+        isPinned: isPinned || false,
+      });
+      res.status(201).json(note);
+    } catch (err) {
+      console.error('Error creating personal note:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Update a note
+  app.put('/api/personal-notes/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const noteId = Number(req.params.id);
+
+      // Check ownership
+      const existingNote = await storage.getPersonalNote(noteId);
+      if (!existingNote) {
+        res.status(404).json({ message: 'Note non trouvee' });
+        return;
+      }
+      if (existingNote.userId !== user.id) {
+        res.status(403).json({ message: 'Acces refuse' });
+        return;
+      }
+
+      const { title, content, color, isPinned } = req.body;
+      const updated = await storage.updatePersonalNote(noteId, {
+        title: title !== undefined ? title : existingNote.title,
+        content: content !== undefined ? content : existingNote.content,
+        color: color !== undefined ? color : existingNote.color,
+        isPinned: isPinned !== undefined ? isPinned : existingNote.isPinned,
+      });
+      res.json(updated);
+    } catch (err) {
+      console.error('Error updating personal note:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Delete a note
+  app.delete('/api/personal-notes/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user!;
+      const noteId = Number(req.params.id);
+
+      // Check ownership
+      const existingNote = await storage.getPersonalNote(noteId);
+      if (!existingNote) {
+        res.status(404).json({ message: 'Note non trouvee' });
+        return;
+      }
+      if (existingNote.userId !== user.id) {
+        res.status(403).json({ message: 'Acces refuse' });
+        return;
+      }
+
+      await storage.deletePersonalNote(noteId);
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting personal note:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
   });
 
   // Register Feedback routes

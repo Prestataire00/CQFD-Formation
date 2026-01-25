@@ -20,6 +20,7 @@ import DocumentTemplates from "@/pages/DocumentTemplates";
 import Calendar from "@/pages/Calendar";
 import TrainerSpace from "@/pages/TrainerSpace";
 import Settings from "@/pages/Settings";
+import MyNotes from "@/pages/MyNotes";
 import { Sidebar } from "@/components/Sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -132,6 +133,11 @@ function Router() {
       {/* Trainer/Prestataire only routes */}
       <Route path="/my-space">
         <ProtectedRoute component={TrainerSpace} trainerOnly />
+      </Route>
+
+      {/* Personal notes - accessible to all authenticated users */}
+      <Route path="/my-notes">
+        <ProtectedRoute component={MyNotes} />
       </Route>
 
       {/* Placeholder pages */}
