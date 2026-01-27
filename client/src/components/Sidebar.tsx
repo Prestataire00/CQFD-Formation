@@ -158,8 +158,8 @@ export function Sidebar() {
               <rect x="15" y="53" width="32" height="32" rx="12" fill="#22d3ee" transform="rotate(5 31 69)" />
               {/* Bottom Right Leaf - Lime */}
               <rect x="53" y="53" width="32" height="32" rx="12" fill="#84cc16" transform="rotate(-5 69 69)" />
-              {/* Center Text "CQ" */}
-              <text x="50" y="52" fontFamily="Arial" fontSize="22" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQ</text>
+              {/* Center Text "CQFD" */}
+              <text x="50" y="52" fontFamily="Arial" fontSize="16" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQFD</text>
             </svg>
           </div>
           
