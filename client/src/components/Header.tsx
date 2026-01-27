@@ -35,6 +35,8 @@ function getNotificationIcon(type: string) {
       return <AlertTriangle className="w-4 h-4 mt-0.5 text-red-500 flex-shrink-0" />;
     case 'mission_assignment':
       return <Briefcase className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />;
+    case 'mission_update':
+      return <Briefcase className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" />;
     case 'template_update':
     default:
       return <FileText className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />;

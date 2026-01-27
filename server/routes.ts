@@ -354,14 +354,46 @@ export async function registerRoutes(
         return;
       }
 
-      // Envoyer notification par email à l'autre partie
+      // Créer des notifications internes et emails
       try {
         const currentUser = req.user!;
         const modifiedBy = await storage.getUser(currentUser.id);
         const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
         const admins = await storage.getUsersByRole('admin');
         const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+        
+        // Récupérer tous les formateurs assignés à cette mission
+        const missionTrainers = await storage.getMissionTrainers(mission.id);
+        const modifierName = modifiedBy ? `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || modifiedBy.email : 'Un utilisateur';
 
+        // 1. Notifications internes pour tous les formateurs assignés
+        for (const mt of missionTrainers) {
+          // Ne pas notifier le modificateur lui-même
+          if (mt.trainerId !== currentUser.id) {
+            await storage.createInAppNotification({
+              userId: mt.trainerId,
+              type: 'mission_update',
+              title: 'Mission modifiée',
+              message: `La mission "${mission.title}" a été modifiée par ${modifierName}`,
+              missionId: mission.id,
+            });
+          }
+        }
+
+        // 2. Notifier les admins (sauf le modificateur)
+        for (const admin of admins) {
+          if (admin.id !== currentUser.id) {
+            await storage.createInAppNotification({
+              userId: admin.id,
+              type: 'mission_update',
+              title: 'Mission modifiée',
+              message: `La mission "${mission.title}" a été modifiée par ${modifierName}`,
+              missionId: mission.id,
+            });
+          }
+        }
+
+        // 3. Email (en complément des notifications internes)
         if (modifiedBy) {
           await notifyOtherParty(
             mission,
@@ -374,8 +406,8 @@ export async function registerRoutes(
           );
         }
       } catch (emailErr) {
-        console.error('[Email] Erreur notification mission update:', emailErr);
-        // Ne pas bloquer la réponse si l'email échoue
+        console.error('[Notification] Erreur notification mission update:', emailErr);
+        // Ne pas bloquer la réponse si la notification échoue
       }
 
       res.json(mission);
@@ -396,6 +428,53 @@ export async function registerRoutes(
       if (!mission) {
         res.status(404).json({ message: "Mission non trouvée" });
         return;
+      }
+
+      // Traduire les statuts en français pour les notifications
+      const statusLabels: Record<string, string> = {
+        'draft': 'Brouillon',
+        'confirmed': 'Confirmée',
+        'in_progress': 'En cours',
+        'completed': 'Terminée',
+        'cancelled': 'Annulée',
+      };
+      const statusLabel = statusLabels[input.status] || input.status;
+
+      // Créer des notifications internes pour tous les formateurs et admins concernés
+      try {
+        const currentUser = req.user!;
+        const modifiedBy = await storage.getUser(currentUser.id);
+        const missionTrainers = await storage.getMissionTrainers(mission.id);
+        const admins = await storage.getUsersByRole('admin');
+        const modifierName = modifiedBy ? `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || modifiedBy.email : 'Un utilisateur';
+
+        // Notifier tous les formateurs assignés (sauf le modificateur)
+        for (const mt of missionTrainers) {
+          if (mt.trainerId !== currentUser.id) {
+            await storage.createInAppNotification({
+              userId: mt.trainerId,
+              type: 'mission_update',
+              title: `Statut mission: ${statusLabel}`,
+              message: `La mission "${mission.title}" est maintenant "${statusLabel}" (modifié par ${modifierName})`,
+              missionId: mission.id,
+            });
+          }
+        }
+
+        // Notifier les admins (sauf le modificateur)
+        for (const admin of admins) {
+          if (admin.id !== currentUser.id) {
+            await storage.createInAppNotification({
+              userId: admin.id,
+              type: 'mission_update',
+              title: `Statut mission: ${statusLabel}`,
+              message: `La mission "${mission.title}" est maintenant "${statusLabel}" (modifié par ${modifierName})`,
+              missionId: mission.id,
+            });
+          }
+        }
+      } catch (notifErr) {
+        console.error('[Notification] Erreur notification changement statut:', notifErr);
       }
 
       // Award XP for completing a mission
