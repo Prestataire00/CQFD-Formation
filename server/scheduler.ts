@@ -19,19 +19,39 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
   let created = 0;
   let skipped = 0;
 
-  // Filtrer les missions actives (pas annulées, pas terminées, avec une date de début future)
+  // Filtrer les missions actives (pas annulées, pas terminées)
   const activeMissions = missions.filter(m =>
     m.status !== 'cancelled' &&
-    m.status !== 'completed' &&
-    m.startDate &&
-    new Date(m.startDate) > new Date()
+    m.status !== 'completed'
   );
 
   for (const mission of activeMissions) {
     // Générer les rappels configurés
     for (const setting of activeSettings) {
-      const missionStartDate = new Date(mission.startDate!);
-      const scheduledDate = new Date(missionStartDate);
+      // Déterminer la date de référence selon le type de rappel
+      let referenceDate: Date | null = null;
+      
+      if (setting.reminderType === 'mission_end' && mission.endDate) {
+        // Rappels de fin de mission basés sur endDate
+        referenceDate = new Date(mission.endDate);
+      } else if (setting.reminderType !== 'mission_end' && mission.startDate) {
+        // Rappels de début de mission basés sur startDate
+        referenceDate = new Date(mission.startDate);
+      }
+      
+      // Ignorer si pas de date de référence
+      if (!referenceDate) {
+        skipped++;
+        continue;
+      }
+      
+      // Ignorer si la date de référence est dans le passé
+      if (referenceDate < new Date()) {
+        skipped++;
+        continue;
+      }
+
+      const scheduledDate = new Date(referenceDate);
       scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
 
       // Ignorer si la date est dans le passé
