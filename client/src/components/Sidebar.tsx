@@ -143,9 +143,9 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card/50 backdrop-blur-xl hidden lg:flex flex-col">
+    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700 bg-slate-800 hidden lg:flex flex-col">
       {/* Logo */}
-      <div className="h-20 flex items-center px-6 border-b border-border/50">
+      <div className="h-20 flex items-center px-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
           {/* Custom SVG Flower Logo */}
           <div className="relative w-10 h-10 flex-shrink-0">
@@ -159,13 +159,13 @@ export function Sidebar() {
               {/* Bottom Right Leaf - Lime */}
               <rect x="53" y="53" width="32" height="32" rx="12" fill="#84cc16" transform="rotate(-5 69 69)" />
               {/* Center Text "CQ" */}
-              <text x="50" y="52" fontFamily="Arial" fontSize="22" fontWeight="900" fill="black" textAnchor="middle" dominantBaseline="middle">CQ</text>
+              <text x="50" y="52" fontFamily="Arial" fontSize="22" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQ</text>
             </svg>
           </div>
           
           <div className="flex flex-col leading-tight">
-            <span className="text-2xl font-black italic tracking-tighter text-slate-800 dark:text-white uppercase">CQFD</span>
-            <span className="text-[12px] font-bold tracking-[0.2em] text-primary uppercase">Formation</span>
+            <span className="text-2xl font-black italic tracking-tighter text-white uppercase">CQFD</span>
+            <span className="text-[12px] font-bold tracking-[0.2em] text-blue-400 uppercase">Formation</span>
           </div>
         </div>
       </div>
@@ -182,8 +182,8 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer group",
                   isActive
-                    ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    ? "bg-primary text-white shadow-lg shadow-primary/25"
+                    : "text-slate-300 hover:bg-slate-700 hover:text-white"
                 )}
               >
                 <item.icon
@@ -191,7 +191,7 @@ export function Sidebar() {
                     "w-5 h-5",
                     isActive
                       ? "text-white"
-                      : "text-muted-foreground group-hover:text-primary"
+                      : "text-slate-400 group-hover:text-white"
                   )}
                 />
                 {item.label}
@@ -202,9 +202,9 @@ export function Sidebar() {
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-border/50 space-y-3">
-        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-muted/30 border border-border/50">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+      <div className="p-4 border-t border-slate-700 space-y-3">
+        <div className="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-700/50 border border-slate-600">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-blue-400 font-bold">
             {user?.profileImageUrl ? (
               <img
                 src={user.profileImageUrl}
@@ -216,7 +216,7 @@ export function Sidebar() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate">
+            <p className="text-sm font-semibold truncate text-white">
               {user?.firstName && user?.lastName
                 ? `${user.firstName} ${user.lastName}`
                 : user?.email || "Utilisateur"}
@@ -236,7 +236,7 @@ export function Sidebar() {
           <button
             onClick={() => logout()}
             disabled={isLoggingOut}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />
             {isLoggingOut ? "Deconnexion..." : "Se deconnecter"}
