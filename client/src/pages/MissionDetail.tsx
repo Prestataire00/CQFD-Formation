@@ -14,7 +14,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft,
@@ -53,6 +67,8 @@ import {
   Square,
   CheckSquare,
   Zap,
+  Search,
+  ChevronsUpDown,
 } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "@/components/ui/rich-text-editor";
 import {
@@ -102,7 +118,6 @@ import { useUsers } from "@/hooks/use-users";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { MissionStatus } from "@shared/schema";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // Step configuration
@@ -457,7 +472,12 @@ export default function MissionDetail() {
   const [isAddStepOpen, setIsAddStepOpen] = useState(false);
   const [isAddingStep, setIsAddingStep] = useState(false);
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+  const [participantSearchTerm, setParticipantSearchTerm] = useState("");
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
+  const [trainerComboOpen, setTrainerComboOpen] = useState(false);
+  const [trainerSearchTerm, setTrainerSearchTerm] = useState("");
+  const [clientComboOpen, setClientComboOpen] = useState(false);
+  const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [newStepTitle, setNewStepTitle] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocType, setNewDocType] = useState("");
@@ -989,21 +1009,74 @@ export default function MissionDetail() {
           </CardHeader>
           <CardContent>
             {isEditingInfo ? (
-              <Select
-                value={editForm.clientId}
-                onValueChange={(value) => setEditForm({ ...editForm, clientId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selectionner un client" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  {clients?.map((c: any) => (
-                    <SelectItem key={c.id} value={c.id.toString()} className="focus:bg-violet-200">
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={clientComboOpen} onOpenChange={setClientComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={clientComboOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {editForm.clientId ? (
+                      (() => {
+                        const c = clients?.find((c: any) => c.id.toString() === editForm.clientId);
+                        return c ? c.name : "Selectionner...";
+                      })()
+                    ) : (
+                      <span className="text-muted-foreground">Taper pour rechercher...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Rechercher un client..."
+                      value={clientSearchTerm}
+                      onValueChange={setClientSearchTerm}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Aucun client trouve</CommandEmpty>
+                      <CommandGroup>
+                        {clients?.filter((c: any) => {
+                          if (!clientSearchTerm) return true;
+                          const search = clientSearchTerm.toLowerCase();
+                          return (
+                            c.name?.toLowerCase().includes(search) ||
+                            c.contactEmail?.toLowerCase().includes(search) ||
+                            c.city?.toLowerCase().includes(search)
+                          );
+                        }).map((c: any) => (
+                          <CommandItem
+                            key={c.id}
+                            value={c.id.toString()}
+                            onSelect={() => {
+                              setEditForm({ ...editForm, clientId: c.id.toString() });
+                              setClientComboOpen(false);
+                              setClientSearchTerm("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                editForm.clientId === c.id.toString() ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{c.name}</span>
+                              {(c.contactEmail || c.city) && (
+                                <span className="text-xs text-muted-foreground">
+                                  {[c.contactEmail, c.city].filter(Boolean).join(" • ")}
+                                </span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             ) : (
               <p className="font-medium">{client?.name || "Non defini"}</p>
             )}
@@ -1019,21 +1092,71 @@ export default function MissionDetail() {
           </CardHeader>
           <CardContent>
             {isEditingInfo ? (
-              <Select
-                value={editForm.trainerId}
-                onValueChange={(value) => setEditForm({ ...editForm, trainerId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selectionner un formateur" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  {trainers?.map((t: any) => (
-                    <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">
-                      {t.firstName} {t.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={trainerComboOpen} onOpenChange={setTrainerComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={trainerComboOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {editForm.trainerId ? (
+                      (() => {
+                        const t = trainers?.find((t: any) => t.id === editForm.trainerId);
+                        return t ? `${t.firstName} ${t.lastName}` : "Selectionner...";
+                      })()
+                    ) : (
+                      <span className="text-muted-foreground">Taper pour rechercher...</span>
+                    )}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Rechercher un formateur..."
+                      value={trainerSearchTerm}
+                      onValueChange={setTrainerSearchTerm}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Aucun formateur trouve</CommandEmpty>
+                      <CommandGroup>
+                        {trainers?.filter((t: any) => {
+                          if (!trainerSearchTerm) return true;
+                          const search = trainerSearchTerm.toLowerCase();
+                          return (
+                            `${t.firstName} ${t.lastName}`.toLowerCase().includes(search) ||
+                            t.email?.toLowerCase().includes(search)
+                          );
+                        }).map((t: any) => (
+                          <CommandItem
+                            key={t.id}
+                            value={t.id}
+                            onSelect={() => {
+                              setEditForm({ ...editForm, trainerId: t.id });
+                              setTrainerComboOpen(false);
+                              setTrainerSearchTerm("");
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                editForm.trainerId === t.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{t.firstName} {t.lastName}</span>
+                              {t.email && (
+                                <span className="text-xs text-muted-foreground">{t.email}</span>
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             ) : (
               <p className="font-medium">
                 {trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigne"}
@@ -1467,34 +1590,75 @@ export default function MissionDetail() {
         </div>
 
         {/* Add participant dialog */}
-        <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
+        <Dialog open={isAddParticipantOpen} onOpenChange={(open) => {
+          setIsAddParticipantOpen(open);
+          if (!open) setParticipantSearchTerm("");
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Ajouter un participant</DialogTitle>
             </DialogHeader>
-            <div className="max-h-[300px] overflow-y-auto space-y-2 py-4">
-              {availableParticipants && availableParticipants.length > 0 ? (
-                availableParticipants.map((p: any) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                    onClick={() => {
-                      handleAddParticipant(p.id);
-                      setIsAddParticipantOpen(false);
-                    }}
-                  >
-                    <div>
-                      <p className="font-medium">{p.firstName} {p.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{p.email}</p>
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, email ou entreprise..."
+                value={participantSearchTerm}
+                onChange={(e) => setParticipantSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto space-y-2 py-2">
+              {(() => {
+                const searchLower = participantSearchTerm.toLowerCase();
+                const filteredParticipants = availableParticipants?.filter((p: any) => {
+                  if (!participantSearchTerm) return true;
+                  return (
+                    `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchLower) ||
+                    p.email?.toLowerCase().includes(searchLower) ||
+                    p.company?.toLowerCase().includes(searchLower)
+                  );
+                }) || [];
+
+                if (filteredParticipants.length > 0) {
+                  return filteredParticipants.map((p: any) => (
+                    <div
+                      key={p.id}
+                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                      onClick={() => {
+                        handleAddParticipant(p.id);
+                        setIsAddParticipantOpen(false);
+                        setParticipantSearchTerm("");
+                      }}
+                    >
+                      <div>
+                        <p className="font-medium">{p.firstName} {p.lastName}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>{p.email}</span>
+                          {p.company && (
+                            <>
+                              <span>•</span>
+                              <span>{p.company}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <Plus className="w-4 h-4 text-primary" />
                     </div>
-                    <Plus className="w-4 h-4 text-primary" />
-                  </div>
-                ))
-              ) : (
-                <p className="text-center text-muted-foreground py-4">
-                  Tous les participants sont deja assignes
-                </p>
-              )}
+                  ));
+                } else if (participantSearchTerm) {
+                  return (
+                    <p className="text-center text-muted-foreground py-4">
+                      Aucun participant correspondant a "{participantSearchTerm}"
+                    </p>
+                  );
+                } else {
+                  return (
+                    <p className="text-center text-muted-foreground py-4">
+                      Tous les participants sont deja assignes
+                    </p>
+                  );
+                }
+              })()}
             </div>
           </DialogContent>
         </Dialog>

@@ -1,261 +1,192 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Plus,
   Users,
   Search,
   Mail,
   Phone,
-  Building2,
+  UserCog,
+  GraduationCap,
   Briefcase,
 } from "lucide-react";
-import { useParticipants, useCreateParticipant } from "@/hooks/use-missions";
-import type { Participant } from "@shared/schema";
+import { useUsers } from "@/hooks/use-users";
+
+interface User {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string;
+  status: string;
+  phone?: string | null;
+  specialties?: string[] | null;
+}
+
+function UserCard({ user }: { user: User }) {
+  const initials = user.firstName && user.lastName
+    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
+    : user.email?.substring(0, 2).toUpperCase() || "U";
+
+  const fullName = user.firstName && user.lastName
+    ? `${user.firstName} ${user.lastName}`
+    : user.email || "Utilisateur";
+
+  return (
+    <div className="p-4 bg-muted/30 rounded-lg border border-border hover:bg-muted/50 transition-colors">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0">
+          {initials}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium truncate">{fullName}</p>
+          {user.email && (
+            <a
+              href={`mailto:${user.email}`}
+              className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
+            >
+              <Mail className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{user.email}</span>
+            </a>
+          )}
+          {user.phone && (
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
+              <Phone className="w-3 h-3 flex-shrink-0" />
+              {user.phone}
+            </p>
+          )}
+          {user.specialties && user.specialties.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {user.specialties.slice(0, 2).map((specialty, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {specialty}
+                </Badge>
+              ))}
+              {user.specialties.length > 2 && (
+                <Badge variant="outline" className="text-xs">
+                  +{user.specialties.length - 2}
+                </Badge>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Participants() {
-  const { data: participants, isLoading } = useParticipants();
-  const createParticipant = useCreateParticipant();
-
+  const { data: users, isLoading } = useUsers();
   const [searchTerm, setSearchTerm] = useState("");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  const [newParticipant, setNewParticipant] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    company: "",
-    function: "",
-  });
-
-  const filteredParticipants = participants?.filter((participant: Participant) => {
-    const fullName = `${participant.firstName} ${participant.lastName}`.toLowerCase();
+  // Filter users based on search term
+  const filteredUsers = users?.filter((user: User) => {
+    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.toLowerCase();
+    const searchLower = searchTerm.toLowerCase();
     return (
-      fullName.includes(searchTerm.toLowerCase()) ||
-      participant.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      participant.company?.toLowerCase().includes(searchTerm.toLowerCase())
+      fullName.includes(searchLower) ||
+      user.email?.toLowerCase().includes(searchLower) ||
+      user.phone?.toLowerCase().includes(searchLower)
     );
   }) || [];
 
-  const handleCreateParticipant = async () => {
-    if (!newParticipant.firstName || !newParticipant.lastName || !newParticipant.email) return;
+  // Separate users by role
+  const prestataires = filteredUsers.filter((u: User) => u.role === "prestataire");
+  const formateurs = filteredUsers.filter((u: User) => u.role === "formateur");
+  const admins = filteredUsers.filter((u: User) => u.role === "admin");
 
-    try {
-      await createParticipant.mutateAsync(newParticipant);
-      setIsCreateOpen(false);
-      setNewParticipant({
-        firstName: "",
-        lastName: "",
-        email: "",
-        phone: "",
-        company: "",
-        function: "",
-      });
-    } catch (error) {
-      console.error("Failed to create participant:", error);
-    }
+  const roleConfig = {
+    prestataire: {
+      title: "Prestataires",
+      icon: Briefcase,
+      color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+      users: prestataires,
+    },
+    formateur: {
+      title: "Formateurs Salaries",
+      icon: GraduationCap,
+      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      users: formateurs,
+    },
+    admin: {
+      title: "Administrateurs",
+      icon: UserCog,
+      color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+      users: admins,
+    },
   };
 
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <Header title="Participants" />
+        <Header title="Equipe" />
 
         <div className="flex-1 p-6 space-y-6">
-          {/* Actions bar */}
+          {/* Search bar */}
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un participant..."
+                placeholder="Rechercher un membre..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
-
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Nouveau participant
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Ajouter un participant</DialogTitle>
-                  <DialogDescription>
-                    Remplissez les informations pour ajouter un nouveau participant.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">Prenom *</Label>
-                      <Input
-                        id="firstName"
-                        placeholder="Alice"
-                        value={newParticipant.firstName}
-                        onChange={(e) => setNewParticipant({ ...newParticipant, firstName: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Nom *</Label>
-                      <Input
-                        id="lastName"
-                        placeholder="Dupont"
-                        value={newParticipant.lastName}
-                        onChange={(e) => setNewParticipant({ ...newParticipant, lastName: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="alice.dupont@example.fr"
-                      value={newParticipant.email}
-                      onChange={(e) => setNewParticipant({ ...newParticipant, email: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Telephone</Label>
-                    <Input
-                      id="phone"
-                      placeholder="06 12 34 56 78"
-                      value={newParticipant.phone}
-                      onChange={(e) => setNewParticipant({ ...newParticipant, phone: e.target.value })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="company">Entreprise</Label>
-                      <Input
-                        id="company"
-                        placeholder="TechCorp SAS"
-                        value={newParticipant.company}
-                        onChange={(e) => setNewParticipant({ ...newParticipant, company: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="function">Poste</Label>
-                      <Input
-                        id="function"
-                        placeholder="Chef de projet"
-                        value={newParticipant.function}
-                        onChange={(e) => setNewParticipant({ ...newParticipant, function: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
-                    Annuler
-                  </Button>
-                  <Button onClick={handleCreateParticipant} disabled={createParticipant.isPending}>
-                    {createParticipant.isPending ? "Creation..." : "Ajouter"}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
 
-          {/* Participants table */}
+          {/* Loading state */}
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredParticipants.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Users className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold">Aucun participant</h3>
+              <h3 className="text-lg font-semibold">Aucun membre trouve</h3>
               <p className="text-muted-foreground">
-                Commencez par ajouter un nouveau participant.
+                {searchTerm ? "Essayez avec un autre terme de recherche." : "Aucun utilisateur enregistre."}
               </p>
             </div>
           ) : (
-            <div className="bg-card rounded-xl border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Participant</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Entreprise</TableHead>
-                    <TableHead>Poste</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredParticipants.map((participant: Participant) => (
-                    <TableRow key={participant.id} className="cursor-pointer hover:bg-muted/50">
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                            {participant.firstName[0]}{participant.lastName[0]}
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {participant.firstName} {participant.lastName}
-                            </p>
-                          </div>
+            /* Users by role columns */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Object.entries(roleConfig).map(([role, config]) => {
+                const Icon = config.icon;
+                return (
+                  <Card key={role} className="flex flex-col">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-lg">
+                        <div className={`p-2 rounded-lg ${config.color}`}>
+                          <Icon className="w-4 h-4" />
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <a href={`mailto:${participant.email}`} className="text-sm flex items-center gap-1 text-primary hover:underline">
-                            <Mail className="w-3 h-3" />
-                            {participant.email}
-                          </a>
-                          {participant.phone && (
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              {participant.phone}
-                            </p>
-                          )}
+                        {config.title}
+                        <Badge variant="secondary" className="ml-auto">
+                          {config.users.length}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1">
+                      {config.users.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
+                          <Icon className="w-8 h-8 mb-2 opacity-50" />
+                          <p className="text-sm">Aucun {config.title.toLowerCase()}</p>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {participant.company && (
-                          <p className="text-sm flex items-center gap-1">
-                            <Building2 className="w-3 h-3 text-muted-foreground" />
-                            {participant.company}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {participant.function && (
-                          <p className="text-sm flex items-center gap-1">
-                            <Briefcase className="w-3 h-3 text-muted-foreground" />
-                            {participant.function}
-                          </p>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      ) : (
+                        <div className="space-y-3">
+                          {config.users.map((user: User) => (
+                            <UserCard key={user.id} user={user} />
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>

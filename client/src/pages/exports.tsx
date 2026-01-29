@@ -4,7 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Download, RefreshCw, FileSpreadsheet, Calendar, HardDrive, ArrowLeft } from "lucide-react";
+import { Download, RefreshCw, FileSpreadsheet, Calendar, HardDrive, ArrowLeft, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -53,6 +64,48 @@ export default function ExportsPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (filename: string) => {
+      const response = await apiRequest('DELETE', `/api/exports/${encodeURIComponent(filename)}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Export supprimé",
+        description: "Le fichier a été supprimé avec succès.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/exports'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer l'export",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('DELETE', '/api/exports');
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Exports supprimés",
+        description: data.message || "Tous les exports ont été supprimés.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/exports'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de supprimer les exports",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -92,6 +145,34 @@ export default function ExportsPage() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Actualiser
           </Button>
+          {exports && exports.length > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive hover:text-destructive">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Tout supprimer
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Supprimer tous les exports ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action supprimera définitivement {exports.length} fichier(s) d'export.
+                    Cette action est irréversible.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteAllMutation.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Supprimer tout
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
           <Button
             onClick={handleGenerate}
             disabled={isGenerating || generateMutation.isPending}
@@ -168,6 +249,35 @@ export default function ExportsPage() {
                       <Download className="w-4 h-4 mr-2" />
                       Télécharger
                     </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          data-testid={`button-delete-${index}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer cet export ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Le fichier "{file.name}" sera définitivement supprimé.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate(file.name)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Supprimer
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               ))}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
@@ -24,6 +24,19 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Plus,
   Calendar,
   MapPin,
@@ -40,15 +53,19 @@ import {
   X,
   LayoutGrid,
   List,
+  Check,
+  ChevronsUpDown,
+  Users,
 } from "lucide-react";
-import { useMissions, useClients, useTrainers, usePrograms, useCreateMission, useUpdateMissionStatus } from "@/hooks/use-missions";
+import { useMissions, useClients, useTrainers, usePrograms, useParticipants, useCreateMission, useUpdateMissionStatus } from "@/hooks/use-missions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, MissionStatus, LocationType } from "@shared/schema";
+import type { Mission, MissionStatus, LocationType, Participant } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,6 +110,7 @@ export default function Missions() {
   const { data: clients } = useClients();
   const { data: trainers } = useTrainers();
   const { data: programs } = usePrograms();
+  const { data: participants } = useParticipants();
   const createMission = useCreateMission();
   const updateMissionStatus = useUpdateMissionStatus();
 
@@ -107,6 +125,14 @@ export default function Missions() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [missionToDelete, setMissionToDelete] = useState<number | null>(null);
 
+  // Combobox states
+  const [trainerOpen, setTrainerOpen] = useState(false);
+  const [trainerSearch, setTrainerSearch] = useState("");
+  const [participantOpen, setParticipantOpen] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [clientOpen, setClientOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+
   const [newMission, setNewMission] = useState<{
     reference: string;
     title: string;
@@ -118,7 +144,8 @@ export default function Missions() {
     locationType: LocationType;
     location: string;
     typology: string;
-    generateReminders: boolean;
+    reminderDays: number | null;
+    participantIds: number[];
   }>({
     reference: "",
     title: "",
@@ -130,8 +157,44 @@ export default function Missions() {
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
-    generateReminders: true,
+    reminderDays: 7,
+    participantIds: [],
   });
+
+  // Filter trainers based on search
+  const filteredTrainers = useMemo(() => {
+    if (!trainers) return [];
+    if (!trainerSearch) return trainers;
+    const search = trainerSearch.toLowerCase();
+    return trainers.filter((t: any) =>
+      `${t.firstName} ${t.lastName}`.toLowerCase().includes(search) ||
+      t.email?.toLowerCase().includes(search)
+    );
+  }, [trainers, trainerSearch]);
+
+  // Filter clients based on search
+  const filteredClients = useMemo(() => {
+    if (!clients) return [];
+    if (!clientSearch) return clients;
+    const search = clientSearch.toLowerCase();
+    return clients.filter((c: any) =>
+      c.name?.toLowerCase().includes(search) ||
+      c.contactEmail?.toLowerCase().includes(search) ||
+      c.city?.toLowerCase().includes(search)
+    );
+  }, [clients, clientSearch]);
+
+  // Filter participants based on search
+  const filteredParticipants = useMemo(() => {
+    if (!participants) return [];
+    if (!participantSearch) return participants;
+    const search = participantSearch.toLowerCase();
+    return participants.filter((p: Participant) =>
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(search) ||
+      p.email?.toLowerCase().includes(search) ||
+      p.company?.toLowerCase().includes(search)
+    );
+  }, [participants, participantSearch]);
 
   const isAdmin = user?.role === "admin";
 
@@ -245,12 +308,25 @@ export default function Missions() {
         }
       }
 
-      // Générer les rappels automatiques si demandé
-      if (newMission.generateReminders) {
+      // Ajouter les participants a la mission
+      for (const participantId of newMission.participantIds) {
         try {
-          await apiRequest("POST", `/api/missions/${createdMission.id}/generate-reminders`);
+          await apiRequest("POST", `/api/missions/${createdMission.id}/participants`, {
+            participantId
+          });
         } catch (err) {
-          console.error("Erreur lors de la génération des rappels:", err);
+          console.error("Erreur lors de l'ajout du participant:", err);
+        }
+      }
+
+      // Créer le rappel avec le J-X choisi
+      if (newMission.reminderDays !== null && newMission.reminderDays > 0) {
+        try {
+          await apiRequest("POST", `/api/missions/${createdMission.id}/create-reminder`, {
+            daysBefore: newMission.reminderDays,
+          });
+        } catch (err) {
+          console.error("Erreur lors de la création du rappel:", err);
         }
       }
 
@@ -266,11 +342,13 @@ export default function Missions() {
         locationType: "presentiel",
         location: "",
         typology: "Intra",
-        generateReminders: true,
+        reminderDays: 7,
+        participantIds: [],
       });
+      const participantCount = newMission.participantIds.length;
       toast({
         title: "Mission creee",
-        description: `La mission a ete creee avec ${validDays.length} jour(s) de formation.${newMission.generateReminders ? " Rappels programmes." : ""}`,
+        description: `La mission a ete creee avec ${validDays.length} jour(s) de formation${participantCount > 0 ? ` et ${participantCount} participant(s)` : ""}.${newMission.reminderDays ? ` Rappel J-${newMission.reminderDays} programme.` : ""}`,
       });
     } catch (error) {
       console.error("Failed to create mission:", error);
@@ -332,7 +410,7 @@ export default function Missions() {
                     Nouvelle mission
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Creer une mission</DialogTitle>
                     <DialogDescription>
@@ -363,78 +441,171 @@ export default function Missions() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="client">{newMission.typology === "Inter" ? "Clients *" : "Client *"}</Label>
-                        {newMission.typology === "Inter" ? (
-                          <div className="space-y-2">
-                            <Select
-                              onValueChange={(value) => {
-                                if (!newMission.clientIds.includes(value)) {
-                                  setNewMission({ ...newMission, clientIds: [...newMission.clientIds, value] });
-                                }
-                              }}
+                        <Popover open={clientOpen} onOpenChange={setClientOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={clientOpen}
+                              className="w-full justify-between font-normal"
                             >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Ajouter des clients" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-violet-100 border-violet-300">
-                                {clients?.map((client: any) => (
-                                  <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
-                                    {client.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <div className="flex flex-wrap gap-2">
-                              {newMission.clientIds.map(id => {
-                                const client = clients?.find((c: any) => c.id.toString() === id);
-                                return (
-                                  <Badge key={id} variant="secondary" className="flex items-center gap-1">
-                                    {client?.name}
-                                    <button 
-                                      onClick={() => setNewMission({ ...newMission, clientIds: newMission.clientIds.filter(cid => cid !== id) })}
-                                      className="ml-1 hover:text-destructive"
-                                    >
-                                      ×
-                                    </button>
-                                  </Badge>
-                                );
-                              })}
-                            </div>
+                              {newMission.typology === "Inter" ? (
+                                <span className="text-muted-foreground flex items-center gap-2">
+                                  <Building2 className="w-4 h-4" />
+                                  Taper pour ajouter des clients...
+                                </span>
+                              ) : newMission.clientIds[0] ? (
+                                (() => {
+                                  const client = clients?.find((c: any) => c.id.toString() === newMission.clientIds[0]);
+                                  return client ? client.name : "Selectionner...";
+                                })()
+                              ) : (
+                                <span className="text-muted-foreground">Taper pour rechercher...</span>
+                              )}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[350px] p-0" align="start">
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Rechercher un client (nom, email, ville)..."
+                                value={clientSearch}
+                                onValueChange={setClientSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>Aucun client trouve</CommandEmpty>
+                                <CommandGroup>
+                                  {filteredClients
+                                    .filter((c: any) => newMission.typology === "Inter" ? !newMission.clientIds.includes(c.id.toString()) : true)
+                                    .map((client: any) => (
+                                      <CommandItem
+                                        key={client.id}
+                                        value={client.id.toString()}
+                                        onSelect={() => {
+                                          if (newMission.typology === "Inter") {
+                                            if (!newMission.clientIds.includes(client.id.toString())) {
+                                              setNewMission({ ...newMission, clientIds: [...newMission.clientIds, client.id.toString()] });
+                                            }
+                                          } else {
+                                            setNewMission({ ...newMission, clientIds: [client.id.toString()] });
+                                            setClientOpen(false);
+                                          }
+                                          setClientSearch("");
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            newMission.clientIds.includes(client.id.toString()) ? "opacity-100" : "opacity-0"
+                                          )}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span>{client.name}</span>
+                                          {(client.contactEmail || client.city) && (
+                                            <span className="text-xs text-muted-foreground">
+                                              {[client.contactEmail, client.city].filter(Boolean).join(" • ")}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </CommandItem>
+                                    ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {newMission.clientIds.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {newMission.clientIds.map(id => {
+                              const client = clients?.find((c: any) => c.id.toString() === id);
+                              return (
+                                <Badge key={id} variant="secondary" className="flex items-center gap-1">
+                                  {client?.name}
+                                  <button
+                                    type="button"
+                                    onClick={() => setNewMission({ ...newMission, clientIds: newMission.clientIds.filter(cid => cid !== id) })}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              );
+                            })}
                           </div>
-                        ) : (
-                          <Select
-                            value={newMission.clientIds[0] || ""}
-                            onValueChange={(value) => setNewMission({ ...newMission, clientIds: [value] })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Selectionner un client" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-violet-100 border-violet-300">
-                              {clients?.map((client: any) => (
-                                <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
-                                  {client.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="trainer">Formateur</Label>
-                        <Select
-                          value={newMission.trainerId}
-                          onValueChange={(value) => setNewMission({ ...newMission, trainerId: value })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selectionner un formateur" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-violet-100 border-violet-300">
-                            {trainers?.map((trainer: any) => (
-                              <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
-                                {trainer.firstName} {trainer.lastName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Popover open={trainerOpen} onOpenChange={setTrainerOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={trainerOpen}
+                              className="w-full justify-between font-normal"
+                            >
+                              {newMission.trainerId ? (
+                                (() => {
+                                  const trainer = trainers?.find((t: any) => t.id === newMission.trainerId);
+                                  return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Selectionner...";
+                                })()
+                              ) : (
+                                <span className="text-muted-foreground">Taper pour rechercher...</span>
+                              )}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[300px] p-0" align="start">
+                            <Command shouldFilter={false}>
+                              <CommandInput
+                                placeholder="Rechercher un formateur..."
+                                value={trainerSearch}
+                                onValueChange={setTrainerSearch}
+                              />
+                              <CommandList>
+                                <CommandEmpty>Aucun formateur trouve</CommandEmpty>
+                                <CommandGroup>
+                                  {filteredTrainers.map((trainer: any) => (
+                                    <CommandItem
+                                      key={trainer.id}
+                                      value={trainer.id}
+                                      onSelect={() => {
+                                        setNewMission({ ...newMission, trainerId: trainer.id });
+                                        setTrainerOpen(false);
+                                        setTrainerSearch("");
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          newMission.trainerId === trainer.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      <div className="flex flex-col">
+                                        <span>{trainer.firstName} {trainer.lastName}</span>
+                                        {trainer.email && (
+                                          <span className="text-xs text-muted-foreground">{trainer.email}</span>
+                                        )}
+                                      </div>
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {newMission.trainerId && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-muted-foreground"
+                            onClick={() => setNewMission({ ...newMission, trainerId: "" })}
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            Retirer le formateur
+                          </Button>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -471,7 +642,98 @@ export default function Missions() {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Participants</Label>
+                      <Popover open={participantOpen} onOpenChange={setParticipantOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={participantOpen}
+                            className="w-full justify-between font-normal"
+                          >
+                            <span className="text-muted-foreground flex items-center gap-2">
+                              <Users className="w-4 h-4" />
+                              Taper pour ajouter des participants...
+                            </span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0" align="start">
+                          <Command shouldFilter={false}>
+                            <CommandInput
+                              placeholder="Rechercher un participant (nom, email, entreprise)..."
+                              value={participantSearch}
+                              onValueChange={setParticipantSearch}
+                            />
+                            <CommandList>
+                              <CommandEmpty>Aucun participant trouve</CommandEmpty>
+                              <CommandGroup>
+                                {filteredParticipants
+                                  .filter((p: Participant) => !newMission.participantIds.includes(p.id))
+                                  .slice(0, 10)
+                                  .map((participant: Participant) => (
+                                    <CommandItem
+                                      key={participant.id}
+                                      value={participant.id.toString()}
+                                      onSelect={() => {
+                                        setNewMission({
+                                          ...newMission,
+                                          participantIds: [...newMission.participantIds, participant.id]
+                                        });
+                                        setParticipantSearch("");
+                                      }}
+                                    >
+                                      <div className="flex flex-col flex-1">
+                                        <span className="font-medium">
+                                          {participant.firstName} {participant.lastName}
+                                        </span>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                          {participant.email && <span>{participant.email}</span>}
+                                          {participant.company && (
+                                            <>
+                                              <span>•</span>
+                                              <span>{participant.company}</span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <Plus className="w-4 h-4 text-muted-foreground" />
+                                    </CommandItem>
+                                  ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                      {newMission.participantIds.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {newMission.participantIds.map((id) => {
+                            const participant = participants?.find((p: Participant) => p.id === id);
+                            if (!participant) return null;
+                            return (
+                              <Badge key={id} variant="secondary" className="flex items-center gap-1 py-1">
+                                <span>{participant.firstName} {participant.lastName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewMission({
+                                    ...newMission,
+                                    participantIds: newMission.participantIds.filter(pid => pid !== id)
+                                  })}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {newMission.participantIds.length} participant(s) selectionne(s)
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="typology">Typologie *</Label>
                         <Select
@@ -479,7 +741,7 @@ export default function Missions() {
                           onValueChange={(value) => setNewMission({ ...newMission, typology: value })}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="Selectionner une typologie" />
+                            <SelectValue placeholder="Selectionner" />
                           </SelectTrigger>
                           <SelectContent className="bg-violet-100 border-violet-300">
                             <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
@@ -489,8 +751,6 @@ export default function Missions() {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="locationType">Modalite</Label>
                         <Select
@@ -507,6 +767,17 @@ export default function Missions() {
                           </SelectContent>
                         </Select>
                       </div>
+                      {newMission.locationType !== "distanciel" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="location">Lieu</Label>
+                          <Input
+                            id="location"
+                            placeholder="Adresse"
+                            value={newMission.location}
+                            onChange={(e) => setNewMission({ ...newMission, location: e.target.value })}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -586,36 +857,34 @@ export default function Missions() {
                         Ajoutez chaque jour de formation avec ses horaires (ex: 18 janv 9h-17h, 24 janv 9h-17h).
                       </p>
                     </div>
-                    {newMission.locationType !== "distanciel" && (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="location">Lieu</Label>
-                          <Input
-                            id="location"
-                            placeholder="15 rue de la Formation, Paris"
-                            value={newMission.location}
-                            onChange={(e) => setNewMission({ ...newMission, location: e.target.value })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center space-x-2 pt-2 border-t">
-                      <Checkbox
-                        id="generateReminders"
-                        checked={newMission.generateReminders}
-                        onCheckedChange={(checked) => setNewMission({ ...newMission, generateReminders: checked === true })}
-                      />
-                      <div className="grid gap-1.5 leading-none">
-                        <Label
-                          htmlFor="generateReminders"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                    <div className="space-y-2 pt-2 border-t">
+                      <Label>Rappel avant la formation</Label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant={newMission.reminderDays === null ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setNewMission({ ...newMission, reminderDays: null })}
                         >
-                          Programmer les rappels automatiques
-                        </Label>
-                        <p className="text-xs text-muted-foreground">
-                          Les rappels seront envoyes selon les parametres definis (J-30, J-7, etc.)
-                        </p>
+                          Aucun
+                        </Button>
+                        {[30, 14, 7, 3, 2, 1].map((days) => (
+                          <Button
+                            key={days}
+                            type="button"
+                            variant={newMission.reminderDays === days ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setNewMission({ ...newMission, reminderDays: days })}
+                          >
+                            J-{days}
+                          </Button>
+                        ))}
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {newMission.reminderDays
+                          ? `Un rappel sera envoye ${newMission.reminderDays} jour(s) avant le debut de la formation`
+                          : "Aucun rappel ne sera programme"}
+                      </p>
                     </div>
                   </div>
                   <DialogFooter>

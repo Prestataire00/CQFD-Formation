@@ -162,12 +162,14 @@ function useProcessReminders() {
 
 const reminderTypeLabels: Record<string, string> = {
   mission_start: "Debut de formation",
+  mission_end: "Fin de formation",
   task_deadline: "Deadline de tache",
   admin_summary: "Resume admin",
 };
 
 const reminderTypeColors: Record<string, string> = {
   mission_start: "bg-blue-100 text-blue-700",
+  mission_end: "bg-green-100 text-green-700",
   task_deadline: "bg-orange-100 text-orange-700",
   admin_summary: "bg-purple-100 text-purple-700",
 };
@@ -331,22 +333,43 @@ export default function ReminderSettings() {
                       </SelectTrigger>
                       <SelectContent className="bg-violet-100 border-violet-300">
                         <SelectItem value="mission_start" className="focus:bg-violet-200">Debut de formation</SelectItem>
+                        <SelectItem value="mission_end" className="focus:bg-violet-200">Fin de formation</SelectItem>
                         <SelectItem value="task_deadline" className="focus:bg-violet-200">Deadline de tache</SelectItem>
                         <SelectItem value="admin_summary" className="focus:bg-violet-200">Resume admin</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.reminderType === 'mission_start' && "Rappel envoye X jours avant le debut de la formation"}
+                      {formData.reminderType === 'mission_end' && "Rappel envoye X jours avant la fin de la formation"}
+                      {formData.reminderType === 'task_deadline' && "Rappel envoye X jours avant la deadline d'une tache"}
+                      {formData.reminderType === 'admin_summary' && "Resume periodique pour l'administrateur"}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Jours avant l'evenement</Label>
+                    <Label>Jours avant l'evenement (J-...)</Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {[30, 14, 7, 3, 2, 1].map((days) => (
+                        <Button
+                          key={days}
+                          type="button"
+                          variant={formData.daysBefore === days ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setFormData({ ...formData, daysBefore: days, name: formData.name || `Rappel J-${days}` })}
+                        >
+                          J-{days}
+                        </Button>
+                      ))}
+                    </div>
                     <Input
                       type="number"
                       min={0}
                       value={formData.daysBefore}
                       onChange={(e) => setFormData({ ...formData, daysBefore: parseInt(e.target.value) || 0 })}
+                      placeholder="Ou saisir un nombre personnalise"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Le rappel sera envoye {formData.daysBefore} jour(s) avant la date de l'evenement
+                      Le rappel sera envoye <strong>J-{formData.daysBefore}</strong> ({formData.daysBefore} jour(s) avant la formation)
                     </p>
                   </div>
 

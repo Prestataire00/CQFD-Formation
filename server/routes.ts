@@ -1931,6 +1931,97 @@ export async function registerRoutes(
     }
   });
 
+  // Créer un rappel simple pour une mission avec un J-X spécifique
+  app.post('/api/missions/:id/create-reminder', isAuthenticated, async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const { daysBefore } = req.body;
+
+      if (!daysBefore || daysBefore < 1) {
+        res.status(400).json({ message: "daysBefore doit être un nombre positif" });
+        return;
+      }
+
+      const mission = await storage.getMission(missionId);
+      if (!mission) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+
+      if (!mission.startDate) {
+        res.status(400).json({ message: "La mission n'a pas de date de début" });
+        return;
+      }
+
+      // Calculer la date d'envoi du rappel
+      const scheduledDate = new Date(mission.startDate);
+      scheduledDate.setDate(scheduledDate.getDate() - daysBefore);
+
+      // Si la date est dans le passé, ne pas créer le rappel
+      if (scheduledDate < new Date()) {
+        res.json({ created: 0, message: "La date du rappel est déjà passée" });
+        return;
+      }
+
+      // Récupérer les admins pour les notifier
+      const admins = (await storage.getUsers()).filter(u => u.role === 'admin' && u.status === 'ACTIF');
+      const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+      const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+      let created = 0;
+
+      // Créer les rappels pour admin, formateur et client
+      const recipients: { type: string; email?: string; name?: string }[] = [];
+
+      // Admins
+      for (const admin of admins) {
+        if (admin.email) {
+          recipients.push({
+            type: 'admin',
+            email: admin.email,
+            name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin',
+          });
+        }
+      }
+
+      // Formateur
+      if (trainer?.email) {
+        recipients.push({
+          type: 'trainer',
+          email: trainer.email,
+          name: `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur',
+        });
+      }
+
+      // Client
+      if (client?.contactEmail) {
+        recipients.push({
+          type: 'client',
+          email: client.contactEmail,
+          name: client.contactName || client.name || 'Client',
+        });
+      }
+
+      for (const recipient of recipients) {
+        await storage.createReminder({
+          settingId: null,
+          missionId: mission.id,
+          scheduledDate,
+          status: 'pending',
+          recipientEmail: recipient.email,
+          recipientName: recipient.name,
+          recipientType: recipient.type,
+        });
+        created++;
+      }
+
+      res.json({ created, daysBefore, scheduledDate });
+    } catch (err) {
+      console.error('Error creating reminder for mission:', err);
+      res.status(500).json({ message: "Erreur lors de la création du rappel" });
+    }
+  });
+
   // ==================== DOCUMENT TEMPLATES ====================
   app.get('/api/document-templates', isAuthenticated, requireRole('admin'), async (req, res) => {
     const templates = await storage.getDocumentTemplates();
@@ -2526,6 +2617,50 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[Export] Error downloading export:', error);
       res.status(500).json({ message: 'Erreur lors du téléchargement' });
+    }
+  });
+
+  // Delete specific export
+  app.delete('/api/exports/:filename', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const filename = decodeURIComponent(req.params.filename);
+
+      // Security: only allow .xlsx files and prevent path traversal
+      if (!filename.endsWith('.xlsx') || filename.includes('..') || filename.includes('/')) {
+        return res.status(400).json({ message: 'Nom de fichier invalide' });
+      }
+
+      const exportsDir = path.join(process.cwd(), 'exports');
+      const filepath = path.join(exportsDir, filename);
+
+      if (!fs.existsSync(filepath)) {
+        return res.status(404).json({ message: 'Fichier non trouvé' });
+      }
+
+      fs.unlinkSync(filepath);
+      console.log(`[Export] Fichier supprimé: ${filename}`);
+      res.json({ success: true, message: 'Export supprimé' });
+    } catch (error) {
+      console.error('[Export] Error deleting export:', error);
+      res.status(500).json({ message: 'Erreur lors de la suppression' });
+    }
+  });
+
+  // Delete all exports
+  app.delete('/api/exports', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const exportsDir = path.join(process.cwd(), 'exports');
+      const files = fs.readdirSync(exportsDir).filter(f => f.endsWith('.xlsx'));
+
+      for (const file of files) {
+        fs.unlinkSync(path.join(exportsDir, file));
+      }
+
+      console.log(`[Export] ${files.length} fichiers supprimés`);
+      res.json({ success: true, message: `${files.length} export(s) supprimé(s)` });
+    } catch (error) {
+      console.error('[Export] Error deleting all exports:', error);
+      res.status(500).json({ message: 'Erreur lors de la suppression' });
     }
   });
 
