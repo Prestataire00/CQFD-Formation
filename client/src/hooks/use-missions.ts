@@ -521,6 +521,64 @@ export function useMissionSessions(missionId: number) {
   });
 }
 
+export function useCreateMissionSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, data }: { missionId: number; data: { sessionDate: string; startTime?: string; endTime?: string; location?: string } }) => {
+      const url = buildUrl(api.missions.sessions.create.path, { id: missionId });
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create session");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+    },
+  });
+}
+
+export function useUpdateMissionSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, sessionId, data }: { missionId: number; sessionId: number; data: { sessionDate?: string; startTime?: string; endTime?: string; location?: string } }) => {
+      const url = buildUrl(api.missions.sessions.update.path, { id: missionId, sessionId });
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update session");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+    },
+  });
+}
+
+export function useDeleteMissionSession() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, sessionId }: { missionId: number; sessionId: number }) => {
+      const url = buildUrl(api.missions.sessions.delete.path, { id: missionId, sessionId });
+      const res = await fetch(url, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to delete session");
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+    },
+  });
+}
+
 // Mission Attendance
 export function useMissionAttendance(missionId: number) {
   return useQuery({

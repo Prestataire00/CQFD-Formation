@@ -93,11 +93,6 @@ export default function Login() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
-            <p>Comptes de test :</p>
-            <p className="mt-1">admin@cqfd-formation.fr / admin123</p>
-            <p>formateur@cqfd-formation.fr / formateur123</p>
-          </div>
         </CardContent>
       </Card>
     </div>

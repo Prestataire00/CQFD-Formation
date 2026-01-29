@@ -804,7 +804,13 @@ export async function registerRoutes(
 
   app.post(api.missions.sessions.create.path, isAuthenticated, async (req, res) => {
     try {
-      const input = api.missions.sessions.create.input.parse(req.body);
+      // Convertir les dates string en Date
+      const body = {
+        ...req.body,
+        sessionDate: req.body.sessionDate ? new Date(req.body.sessionDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      const input = api.missions.sessions.create.input.parse(body);
       const session = await storage.createMissionSession({
         ...input,
         missionId: Number(req.params.id),
@@ -817,6 +823,39 @@ export async function registerRoutes(
       }
       throw err;
     }
+  });
+
+  app.put(api.missions.sessions.update.path, isAuthenticated, async (req, res) => {
+    try {
+      // Convertir les dates string en Date
+      const body = {
+        ...req.body,
+        sessionDate: req.body.sessionDate ? new Date(req.body.sessionDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+      const input = api.missions.sessions.update.input.parse(body);
+      const session = await storage.updateMissionSession(Number(req.params.sessionId), input);
+      if (!session) {
+        res.status(404).json({ message: "Session not found" });
+        return;
+      }
+      res.json(session);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.missions.sessions.delete.path, isAuthenticated, async (req, res) => {
+    const deleted = await storage.deleteMissionSession(Number(req.params.sessionId));
+    if (!deleted) {
+      res.status(404).json({ message: "Session not found" });
+      return;
+    }
+    res.json({ success: true });
   });
 
   // Mission Participants
@@ -1729,6 +1768,115 @@ export async function registerRoutes(
       res.json({ created, skipped, missionsProcessed: activeMissions.length });
     } catch (err) {
       console.error('Error generating all reminders:', err);
+      res.status(500).json({ message: "Erreur lors de la génération des rappels" });
+    }
+  });
+
+  // Générer les rappels pour une mission spécifique
+  app.post('/api/missions/:id/generate-reminders', isAuthenticated, async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const mission = await storage.getMission(missionId);
+
+      if (!mission) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+
+      if (!mission.startDate) {
+        res.status(400).json({ message: "La mission n'a pas de date de début" });
+        return;
+      }
+
+      const settings = await storage.getReminderSettings();
+      const activeSettings = settings.filter(s => s.isActive);
+      const admins = (await storage.getUsers()).filter(u => u.role === 'admin' && u.status === 'ACTIF');
+
+      let created = 0;
+      let skipped = 0;
+
+      // Récupérer les infos du formateur et client
+      const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+      const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+      for (const setting of activeSettings) {
+        // Calculer la date d'envoi basée sur le type de rappel
+        let referenceDate: Date;
+        if (setting.reminderType === 'mission_end' && mission.endDate) {
+          referenceDate = new Date(mission.endDate);
+        } else {
+          referenceDate = new Date(mission.startDate);
+        }
+
+        const scheduledDate = new Date(referenceDate);
+        scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
+
+        // Ignorer si la date est dans le passé
+        if (scheduledDate < new Date()) {
+          skipped++;
+          continue;
+        }
+
+        // Créer les rappels pour chaque destinataire
+        const recipients: { type: string; email?: string; name?: string }[] = [];
+
+        if (setting.notifyAdmin) {
+          for (const admin of admins) {
+            if (admin.email) {
+              recipients.push({
+                type: 'admin',
+                email: admin.email,
+                name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin',
+              });
+            }
+          }
+        }
+
+        if (setting.notifyTrainer && trainer?.email) {
+          recipients.push({
+            type: 'trainer',
+            email: trainer.email,
+            name: `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur',
+          });
+        }
+
+        if (setting.notifyClient && client?.contactEmail) {
+          recipients.push({
+            type: 'client',
+            email: client.contactEmail,
+            name: client.contactName || client.name || 'Client',
+          });
+        }
+
+        for (const recipient of recipients) {
+          // Vérifier si ce rappel existe déjà
+          const existingReminders = await storage.getRemindersByMission(mission.id);
+          const alreadyExists = existingReminders.some(r =>
+            r.settingId === setting.id &&
+            r.recipientEmail === recipient.email &&
+            r.status === 'pending'
+          );
+
+          if (!alreadyExists) {
+            await storage.createReminder({
+              settingId: setting.id,
+              missionId: mission.id,
+              scheduledDate,
+              status: 'pending',
+              recipientEmail: recipient.email,
+              recipientName: recipient.name,
+              recipientType: recipient.type,
+            });
+            created++;
+          } else {
+            skipped++;
+          }
+        }
+      }
+
+      res.json({ created, skipped, missionId });
+    } catch (err) {
+      console.error('Error generating reminders for mission:', err);
       res.status(500).json({ message: "Erreur lors de la génération des rappels" });
     }
   });

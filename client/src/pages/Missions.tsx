@@ -113,22 +113,22 @@ export default function Missions() {
     clientIds: string[];
     trainerId: string;
     programId: string;
-    startDate: string;
-    endDate: string;
+    trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
     locationType: LocationType;
     location: string;
     typology: string;
+    generateReminders: boolean;
   }>({
     reference: "",
     title: "",
     clientIds: [],
     trainerId: "",
     programId: "",
-    startDate: "",
-    endDate: "",
+    trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
+    generateReminders: true,
   });
 
   const isAdmin = user?.role === "admin";
@@ -190,42 +190,64 @@ export default function Missions() {
   };
 
   const handleCreateMission = async () => {
-    if (!newMission.title || newMission.clientIds.length === 0 || !newMission.startDate || !newMission.endDate || !newMission.typology) {
-      console.error("Champs requis manquants:", {
-        title: newMission.title,
-        clientIds: newMission.clientIds,
-        startDate: newMission.startDate,
-        endDate: newMission.endDate,
-        typology: newMission.typology
+    // Valider qu'il y a au moins un jour avec une date
+    const validDays = newMission.trainingDays.filter(d => d.date);
+    if (!newMission.title || newMission.clientIds.length === 0 || validDays.length === 0 || !newMission.typology) {
+      toast({
+        title: "Champs requis manquants",
+        description: "Veuillez remplir le titre, le client, au moins un jour de formation et la typologie.",
+        variant: "destructive",
       });
       return;
     }
 
     try {
+      // Calculer les dates globales (min et max) pour la mission
+      const allDates = validDays.map(d => d.date).sort();
+      const globalStartDate = allDates[0];
+      const globalEndDate = allDates[allDates.length - 1];
+
       const missionData = {
         reference: newMission.reference || `MIS-${Date.now()}`,
         title: newMission.title,
-        clientId: parseInt(newMission.clientIds[0]), // Legacy support for schema (primary client)
+        clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
         programId: newMission.programId ? parseInt(newMission.programId) : null,
-        startDate: newMission.startDate,
-        endDate: newMission.endDate,
+        startDate: globalStartDate,
+        endDate: globalEndDate,
         locationType: newMission.locationType,
         location: newMission.location || null,
         typology: newMission.typology,
         status: "draft",
       };
-      
+
       const createdMission = await createMission.mutateAsync(missionData as any);
-      
+
+      // Creer les jours de formation
+      for (const day of validDays) {
+        await apiRequest("POST", `/api/missions/${createdMission.id}/sessions`, {
+          sessionDate: day.date,
+          startTime: day.startTime || null,
+          endTime: day.endTime || null,
+        });
+      }
+
       // If multiple clients for INTER
       if (newMission.typology === "Inter" && newMission.clientIds.length > 1) {
-        // Add additional clients
         for (let i = 1; i < newMission.clientIds.length; i++) {
           await apiRequest("POST", `/api/missions/${createdMission.id}/clients`, {
             clientId: parseInt(newMission.clientIds[i]),
             isPrimary: false
           });
+        }
+      }
+
+      // Générer les rappels automatiques si demandé
+      if (newMission.generateReminders) {
+        try {
+          await apiRequest("POST", `/api/missions/${createdMission.id}/generate-reminders`);
+        } catch (err) {
+          console.error("Erreur lors de la génération des rappels:", err);
         }
       }
 
@@ -236,14 +258,23 @@ export default function Missions() {
         clientIds: [],
         trainerId: "",
         programId: "",
-        startDate: "",
-        endDate: "",
+        trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
         locationType: "presentiel",
         location: "",
         typology: "Intra",
+        generateReminders: true,
+      });
+      toast({
+        title: "Mission creee",
+        description: `La mission a ete creee avec ${validDays.length} jour(s) de formation.${newMission.generateReminders ? " Rappels programmes." : ""}`,
       });
     } catch (error) {
       console.error("Failed to create mission:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de creer la mission.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -457,25 +488,83 @@ export default function Missions() {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="startDate">Date de debut *</Label>
-                        <Input
-                          id="startDate"
-                          type="date"
-                          value={newMission.startDate}
-                          onChange={(e) => setNewMission({ ...newMission, startDate: e.target.value })}
-                        />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Jours de formation *</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setNewMission({
+                            ...newMission,
+                            trainingDays: [...newMission.trainingDays, { date: "", startTime: "09:00", endTime: "17:00" }]
+                          })}
+                        >
+                          <Plus className="w-3 h-3 mr-1" />
+                          Ajouter un jour
+                        </Button>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="endDate">Date de fin *</Label>
-                        <Input
-                          id="endDate"
-                          type="date"
-                          value={newMission.endDate}
-                          onChange={(e) => setNewMission({ ...newMission, endDate: e.target.value })}
-                        />
+                        {newMission.trainingDays.map((day, index) => (
+                          <div key={index} className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+                            <div className="flex-1 grid grid-cols-3 gap-2">
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Date</Label>
+                                <Input
+                                  type="date"
+                                  value={day.date}
+                                  onChange={(e) => {
+                                    const updated = [...newMission.trainingDays];
+                                    updated[index].date = e.target.value;
+                                    setNewMission({ ...newMission, trainingDays: updated });
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Debut</Label>
+                                <Input
+                                  type="time"
+                                  value={day.startTime}
+                                  onChange={(e) => {
+                                    const updated = [...newMission.trainingDays];
+                                    updated[index].startTime = e.target.value;
+                                    setNewMission({ ...newMission, trainingDays: updated });
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">Fin</Label>
+                                <Input
+                                  type="time"
+                                  value={day.endTime}
+                                  onChange={(e) => {
+                                    const updated = [...newMission.trainingDays];
+                                    updated[index].endTime = e.target.value;
+                                    setNewMission({ ...newMission, trainingDays: updated });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            {newMission.trainingDays.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => {
+                                  const updated = newMission.trainingDays.filter((_, i) => i !== index);
+                                  setNewMission({ ...newMission, trainingDays: updated });
+                                }}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        Ajoutez chaque jour de formation avec ses horaires (ex: 18 janv 9h-17h, 24 janv 9h-17h).
+                      </p>
                     </div>
                     {newMission.locationType !== "distanciel" && (
                       <div className="grid grid-cols-2 gap-4">
@@ -490,6 +579,24 @@ export default function Missions() {
                         </div>
                       </div>
                     )}
+                    <div className="flex items-center space-x-2 pt-2 border-t">
+                      <Checkbox
+                        id="generateReminders"
+                        checked={newMission.generateReminders}
+                        onCheckedChange={(checked) => setNewMission({ ...newMission, generateReminders: checked === true })}
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label
+                          htmlFor="generateReminders"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          Programmer les rappels automatiques
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Les rappels seront envoyes selon les parametres definis (J-30, J-7, etc.)
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button variant="outline" onClick={() => setIsCreateOpen(false)}>

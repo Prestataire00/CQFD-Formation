@@ -419,6 +419,24 @@ export const api = {
           400: errorSchemas.validation,
         },
       },
+      update: {
+        method: 'PUT' as const,
+        path: '/api/missions/:id/sessions/:sessionId',
+        input: insertMissionSessionSchema.omit({ missionId: true }).partial(),
+        responses: {
+          200: z.custom<typeof missionSessions.$inferSelect>(),
+          400: errorSchemas.validation,
+          404: errorSchemas.notFound,
+        },
+      },
+      delete: {
+        method: 'DELETE' as const,
+        path: '/api/missions/:id/sessions/:sessionId',
+        responses: {
+          200: z.object({ success: z.boolean() }),
+          404: errorSchemas.notFound,
+        },
+      },
     },
     // Mission Participants
     participants: {

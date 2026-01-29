@@ -147,25 +147,25 @@ export function Sidebar() {
       {/* Logo */}
       <div className="h-20 flex items-center px-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
-          {/* Custom SVG Flower Logo */}
-          <div className="relative w-10 h-10 flex-shrink-0">
+          {/* CQFD Formation Logo - 4 Petal Flower with CQFD in center */}
+          <div className="relative w-12 h-12 flex-shrink-0">
             <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
-              {/* Top Left Leaf - Blue */}
-              <rect x="15" y="15" width="32" height="32" rx="12" fill="#3b82f6" transform="rotate(-5 31 31)" />
-              {/* Top Right Leaf - Green */}
-              <rect x="53" y="15" width="32" height="32" rx="12" fill="#10b981" transform="rotate(5 69 31)" />
-              {/* Bottom Left Leaf - Cyan */}
-              <rect x="15" y="53" width="32" height="32" rx="12" fill="#22d3ee" transform="rotate(5 31 69)" />
-              {/* Bottom Right Leaf - Lime */}
-              <rect x="53" y="53" width="32" height="32" rx="12" fill="#84cc16" transform="rotate(-5 69 69)" />
-              {/* Center Text "CQFD" */}
-              <text x="50" y="52" fontFamily="Arial" fontSize="16" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQFD</text>
+              {/* Top Left Petal - Dark Blue */}
+              <rect x="8" y="8" width="38" height="38" rx="10" fill="#0055a4" transform="rotate(-8 27 27)" />
+              {/* Top Right Petal - Cyan */}
+              <rect x="54" y="8" width="38" height="38" rx="10" fill="#22d3ee" transform="rotate(8 73 27)" />
+              {/* Bottom Left Petal - Green */}
+              <rect x="8" y="54" width="38" height="38" rx="10" fill="#10b981" transform="rotate(8 27 73)" />
+              {/* Bottom Right Petal - Teal */}
+              <rect x="54" y="54" width="38" height="38" rx="10" fill="#14b8a6" transform="rotate(-8 73 73)" />
+              {/* Center Text "CQFD" in white */}
+              <text x="50" y="52" fontFamily="Arial" fontSize="15" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQFD</text>
             </svg>
           </div>
           
           <div className="flex flex-col leading-tight">
-            <span className="text-2xl font-black italic tracking-tighter text-white uppercase">CQFD</span>
-            <span className="text-[12px] font-bold tracking-[0.2em] text-blue-400 uppercase">Formation</span>
+            <span className="text-2xl font-extrabold tracking-tight text-white">CQFD</span>
+            <span className="text-[11px] font-semibold tracking-[0.15em] text-cyan-400 uppercase">Formation</span>
           </div>
         </div>
       </div>

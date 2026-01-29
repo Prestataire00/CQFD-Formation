@@ -84,6 +84,10 @@ import {
   useParticipants,
   useAddParticipantToMission,
   useRemoveParticipantFromMission,
+  useMissionSessions,
+  useCreateMissionSession,
+  useUpdateMissionSession,
+  useDeleteMissionSession,
 } from "@/hooks/use-missions";
 import {
   Dialog,
@@ -458,6 +462,8 @@ export default function MissionDetail() {
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocType, setNewDocType] = useState("");
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+  const [newSession, setNewSession] = useState({ date: "", startTime: "09:00", endTime: "17:00" });
 
   // Data queries
   const { data: mission, isLoading } = useMission(missionId);
@@ -470,6 +476,7 @@ export default function MissionDetail() {
   const { data: missionParticipants } = useMissionParticipants(missionId);
   const { data: allParticipants } = useParticipants();
   const { data: allUsers } = useUsers();
+  const { data: missionSessions } = useMissionSessions(missionId);
 
   // Mutations
   const updateMission = useUpdateMission();
@@ -484,6 +491,9 @@ export default function MissionDetail() {
   const removeTrainer = useRemoveTrainerFromMission();
   const addParticipant = useAddParticipantToMission();
   const removeParticipant = useRemoveParticipantFromMission();
+  const createSession = useCreateMissionSession();
+  const updateSession = useUpdateMissionSession();
+  const deleteSession = useDeleteMissionSession();
 
   // Initialize edit form when mission loads
   useEffect(() => {
@@ -692,6 +702,34 @@ export default function MissionDetail() {
     }
   };
 
+  const handleAddSession = async () => {
+    if (!newSession.date) return;
+    try {
+      await createSession.mutateAsync({
+        missionId,
+        data: {
+          sessionDate: newSession.date,
+          startTime: newSession.startTime || undefined,
+          endTime: newSession.endTime || undefined,
+        },
+      });
+      setNewSession({ date: "", startTime: "09:00", endTime: "17:00" });
+      setIsAddSessionOpen(false);
+      toast({ title: "Jour de formation ajoute" });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: number) => {
+    try {
+      await deleteSession.mutateAsync({ missionId, sessionId });
+      toast({ title: "Periode supprimee" });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex">
@@ -762,65 +800,135 @@ export default function MissionDetail() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Left column */}
-        <Card>
+        <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Dates et horaires
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Jours de formation
+              </CardTitle>
+              {isAdmin && (
+                <Button variant="outline" size="sm" onClick={() => setIsAddSessionOpen(true)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Ajouter un jour
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isEditingInfo ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Date de debut</Label>
-                    <Input
-                      type="date"
-                      value={editForm.startDate}
-                      onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Date de fin</Label>
-                    <Input
-                      type="date"
-                      value={editForm.endDate}
-                      onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Nombre d'heures</Label>
-                  <Input
-                    type="number"
-                    value={editForm.totalHours}
-                    onChange={(e) => setEditForm({ ...editForm, totalHours: e.target.value })}
-                    placeholder="14"
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="w-4 h-4 text-muted-foreground" />
-                  <span>
-                    {mission.startDate
-                      ? format(new Date(mission.startDate), "dd MMMM yyyy", { locale: fr })
-                      : "Non definie"}
-                    {mission.endDate && mission.endDate !== mission.startDate && (
-                      <> - {format(new Date(mission.endDate), "dd MMMM yyyy", { locale: fr })}</>
+            {missionSessions && missionSessions.length > 0 ? (
+              <div className="space-y-2">
+                {missionSessions.map((session: any, index: number) => (
+                  <div
+                    key={session.id}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <span className="font-medium">
+                          {format(new Date(session.sessionDate), "EEEE dd MMMM yyyy", { locale: fr })}
+                        </span>
+                        {(session.startTime || session.endTime) && (
+                          <span className="text-sm text-muted-foreground ml-2">
+                            {session.startTime || "?"} - {session.endTime || "?"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteSession(session.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     )}
-                  </span>
-                </div>
-                {mission.totalHours && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span>{mission.totalHours} heures</span>
                   </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <Calendar className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>Aucun jour de formation defini</p>
+                {isAdmin && (
+                  <Button
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => setIsAddSessionOpen(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Ajouter un jour
+                  </Button>
                 )}
-              </>
+              </div>
             )}
+
+            {/* Résumé */}
+            {missionSessions && missionSessions.length > 0 && (
+              <div className="pt-3 border-t text-sm text-muted-foreground">
+                <span className="font-medium">{missionSessions.length} jour(s) de formation</span>
+              </div>
+            )}
+
+            {mission.totalHours && (
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span>{mission.totalHours} heures au total</span>
+              </div>
+            )}
+
+            {/* Dialog pour ajouter un jour */}
+            <Dialog open={isAddSessionOpen} onOpenChange={setIsAddSessionOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Ajouter un jour de formation</DialogTitle>
+                  <DialogDescription>
+                    Definissez la date et les horaires de ce jour de formation.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div>
+                    <Label>Date *</Label>
+                    <Input
+                      type="date"
+                      value={newSession.date}
+                      onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Heure de debut</Label>
+                      <Input
+                        type="time"
+                        value={newSession.startTime}
+                        onChange={(e) => setNewSession({ ...newSession, startTime: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Heure de fin</Label>
+                      <Input
+                        type="time"
+                        value={newSession.endTime}
+                        onChange={(e) => setNewSession({ ...newSession, endTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddSessionOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button onClick={handleAddSession} disabled={!newSession.date || createSession.isPending}>
+                    {createSession.isPending ? "Ajout..." : "Ajouter"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
 

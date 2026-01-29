@@ -165,7 +165,7 @@ export const stepTasks = pgTable("step_tasks", {
 export const missionSessions = pgTable("mission_sessions", {
   id: serial("id").primaryKey(),
   missionId: integer("mission_id").references(() => missions.id).notNull(),
-  sessionDate: timestamp("session_date").notNull(),
+  sessionDate: timestamp("session_date").notNull(), // Date de la session
   startTime: text("start_time"),
   endTime: text("end_time"),
   location: text("location"),

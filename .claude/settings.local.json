@@ -36,7 +36,10 @@
       "Bash(do sleep 1)",
       "Bash(done)",
       "Bash(NODE_ENV=production node:*)",
-      "Bash(export DATABASE_URL='postgresql://neondb_owner:npg_TbQF3qeYkZ5D@ep-broad-sky-aha33mg9-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require')"
+      "Bash(export DATABASE_URL='postgresql://neondb_owner:npg_TbQF3qeYkZ5D@ep-broad-sky-aha33mg9-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require')",
+      "Bash(gh auth:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
