@@ -946,9 +946,30 @@ export async function registerRoutes(
     }
   });
 
-  // Mission Documents
+  // Mission Documents (avec contrôle d'accès)
   app.get(api.missions.documents.list.path, isAuthenticated, async (req, res) => {
-    const docs = await storage.getDocumentsByMission(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user as User;
+    
+    // Vérifier que l'utilisateur a accès à cette mission
+    const mission = await storage.getMission(missionId);
+    if (!mission) {
+      res.status(404).json({ message: "Mission non trouvée" });
+      return;
+    }
+    
+    // Les formateurs/prestataires ne peuvent voir que les documents de leurs missions
+    if (user.role === 'formateur' || user.role === 'prestataire') {
+      const missionTrainers = await storage.getMissionTrainers(missionId);
+      const isAssigned = mission.trainerId === user.id || 
+                         missionTrainers.some(mt => mt.odooTrainerId === user.id);
+      if (!isAssigned) {
+        res.status(403).json({ message: "Accès non autorisé à cette mission" });
+        return;
+      }
+    }
+    
+    const docs = await storage.getDocumentsByMission(missionId);
     res.json(docs);
   });
 
@@ -1238,6 +1259,30 @@ export async function registerRoutes(
       res.status(400).json({ message: "ID de document invalide" });
       return;
     }
+    
+    const user = req.user as User;
+    
+    // Vérifier que le document existe et récupérer la mission associée
+    const document = await storage.getDocument(docId);
+    if (!document) {
+      res.status(404).json({ message: "Document non trouvé" });
+      return;
+    }
+    
+    // Pour les formateurs/prestataires, vérifier l'accès à la mission
+    if (document.missionId && (user.role === 'formateur' || user.role === 'prestataire')) {
+      const mission = await storage.getMission(document.missionId);
+      if (mission) {
+        const missionTrainers = await storage.getMissionTrainers(document.missionId);
+        const isAssigned = mission.trainerId === user.id || 
+                           missionTrainers.some(mt => mt.odooTrainerId === user.id);
+        if (!isAssigned) {
+          res.status(403).json({ message: "Vous ne pouvez supprimer que les documents de vos missions" });
+          return;
+        }
+      }
+    }
+    
     await storage.deleteDocument(docId);
     res.json({ success: true });
   });
