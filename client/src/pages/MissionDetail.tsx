@@ -1444,7 +1444,8 @@ export default function MissionDetail() {
                             variant="ghost"
                             size="sm"
                             className="text-red-600"
-                            onClick={() => deleteDocument.mutate(doc.id)}
+                            onClick={() => deleteDocument.mutate({ id: doc.id, missionId: mission.id })}
+                            data-testid={`button-delete-document-${doc.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
