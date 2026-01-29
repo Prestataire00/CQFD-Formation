@@ -69,6 +69,13 @@ Preferred communication style: Simple, everyday language.
 4. **Document templates**: Reusable document templates with version control for training materials
 5. **Automatic Excel exports**: Daily Excel extraction at 6:00 AM with missions, participants, sessions, invoices and statistics (files kept for 7 days)
 
+### Branding - CQFD Formation
+- **Primary Color**: Blue #0055a4 (official CQFD blue)
+- **Logo**: 4-petal flower with "CQFD" in white centered, colors: Blue, Cyan, Green, Teal
+- **Sidebar**: Dark slate gray (slate-800) background with white text
+- **Typography**: Outfit (headings) + Inter (body text)
+- **Dark Mode**: Full support with adapted color palette
+
 ## External Dependencies
 
 ### Database
