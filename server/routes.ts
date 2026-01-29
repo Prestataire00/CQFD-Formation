@@ -1233,7 +1233,12 @@ export async function registerRoutes(
   });
 
   app.delete(api.documents.delete.path, isAuthenticated, requirePermission('documents:delete'), async (req, res) => {
-    await storage.deleteDocument(Number(req.params.id));
+    const docId = Number(req.params.id);
+    if (isNaN(docId)) {
+      res.status(400).json({ message: "ID de document invalide" });
+      return;
+    }
+    await storage.deleteDocument(docId);
     res.json({ success: true });
   });
 

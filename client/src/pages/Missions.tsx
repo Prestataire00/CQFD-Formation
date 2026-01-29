@@ -113,6 +113,7 @@ export default function Missions() {
     clientIds: string[];
     trainerId: string;
     programId: string;
+    programTitle: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
     locationType: LocationType;
     location: string;
@@ -124,6 +125,7 @@ export default function Missions() {
     clientIds: [],
     trainerId: "",
     programId: "",
+    programTitle: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
     locationType: "presentiel" as LocationType,
     location: "",
@@ -192,10 +194,10 @@ export default function Missions() {
   const handleCreateMission = async () => {
     // Valider qu'il y a au moins un jour avec une date
     const validDays = newMission.trainingDays.filter(d => d.date);
-    if (!newMission.title || newMission.clientIds.length === 0 || validDays.length === 0 || !newMission.typology) {
+    if (!newMission.title || newMission.clientIds.length === 0 || validDays.length === 0 || !newMission.typology || !newMission.programTitle) {
       toast({
         title: "Champs requis manquants",
-        description: "Veuillez remplir le titre, le client, au moins un jour de formation et la typologie.",
+        description: "Veuillez remplir le titre, le client, la formation, au moins un jour de formation et la typologie.",
         variant: "destructive",
       });
       return;
@@ -213,6 +215,7 @@ export default function Missions() {
         clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
         programId: newMission.programId ? parseInt(newMission.programId) : null,
+        programTitle: newMission.programTitle || null,
         startDate: globalStartDate,
         endDate: globalEndDate,
         locationType: newMission.locationType,
@@ -258,6 +261,7 @@ export default function Missions() {
         clientIds: [],
         trainerId: "",
         programId: "",
+        programTitle: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
         locationType: "presentiel",
         location: "",
@@ -433,15 +437,29 @@ export default function Missions() {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="program">Formation (catalogue) *</Label>
+                    <div className="space-y-2">
+                      <Label htmlFor="programTitle">Formation *</Label>
+                      <Input
+                        id="programTitle"
+                        placeholder="Nom de la formation"
+                        value={newMission.programTitle}
+                        onChange={(e) => setNewMission({ ...newMission, programTitle: e.target.value })}
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">ou choisir dans le catalogue :</span>
                         <Select
                           value={newMission.programId}
-                          onValueChange={(value) => setNewMission({ ...newMission, programId: value })}
+                          onValueChange={(value) => {
+                            const program = programs?.find((p: any) => p.id.toString() === value);
+                            setNewMission({
+                              ...newMission,
+                              programId: value,
+                              programTitle: program?.title || newMission.programTitle
+                            });
+                          }}
                         >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selectionner une formation" />
+                          <SelectTrigger className="w-[200px] h-8">
+                            <SelectValue placeholder="Catalogue..." />
                           </SelectTrigger>
                           <SelectContent className="bg-violet-100 border-violet-300">
                             {programs?.map((program: any) => (
@@ -452,6 +470,8 @@ export default function Missions() {
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="typology">Typologie *</Label>
                         <Select
