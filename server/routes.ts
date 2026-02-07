@@ -2980,6 +2980,7 @@ async function seedTaskDeadlineDefaults() {
       { taskTitle: "Faire le bilan avec le formateur", daysBefore: -7, category: "Apres la formation" },
       { taskTitle: "Envoyer les attestations", daysBefore: -14, category: "Apres la formation" },
       { taskTitle: "Envoyer le compte-rendu au client", daysBefore: -14, category: "Apres la formation" },
+      { taskTitle: "Facturer la mission", daysBefore: -30, category: "Apres la formation" },
     ];
 
     for (const d of defaults) {

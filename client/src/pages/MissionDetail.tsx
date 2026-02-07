@@ -71,6 +71,8 @@ import {
   ChevronsUpDown,
   Copy,
   ExternalLink,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "@/components/ui/rich-text-editor";
 import {
@@ -246,6 +248,7 @@ const quickActions = [
       "Faire le bilan avec le formateur",
       "Envoyer les attestations",
       "Envoyer le compte-rendu au client",
+      "Facturer la mission",
     ]
   },
 ];
@@ -260,9 +263,13 @@ interface TaskItemProps {
   currentUserId: string;
   onUpdate: (taskId: number, data: any) => void;
   onDelete: (taskId: number) => void;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  isFirst?: boolean;
+  isLast?: boolean;
 }
 
-function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete }: TaskItemProps) {
+function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [comment, setComment] = useState(task.comment || "");
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -432,6 +439,25 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
           </div>
 
           <div className="flex items-center gap-1">
+            {/* Move up/down buttons */}
+            <div className="flex flex-col">
+              <button
+                onClick={onMoveUp}
+                disabled={isFirst}
+                className={`p-0.5 rounded hover:bg-white/50 ${isFirst ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Monter"
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={isLast}
+                className={`p-0.5 rounded hover:bg-white/50 ${isLast ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Descendre"
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <button
               onClick={() => setIsEditingComment(!isEditingComment)}
               className="p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-white/50"
@@ -439,15 +465,13 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
             >
               <MessageSquare className="w-4 h-4" />
             </button>
-            {isAdmin && (
-              <button
-                onClick={handleMarkNA}
-                className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
-                title="Marquer sans objet"
-              >
-                <MinusCircle className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={handleMarkNA}
+              className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
+              title="Marquer sans objet"
+            >
+              <MinusCircle className="w-4 h-4" />
+            </button>
             {isAdmin && (
               <button
                 onClick={() => onDelete(task.id)}
@@ -660,6 +684,24 @@ export default function MissionDetail() {
       setIsAddingStep(false);
       setIsAddStepOpen(false);
       toast({ title: "Tache ajoutee" });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleMoveTask = async (taskId: number, direction: 'up' | 'down') => {
+    if (!visibleSteps) return;
+    const sorted = [...visibleSteps].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+    const idx = sorted.findIndex((s: any) => s.id === taskId);
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+
+    const currentTask = sorted[idx];
+    const swapTask = sorted[swapIdx];
+    try {
+      await updateStep.mutateAsync({ missionId, stepId: currentTask.id, data: { order: swapTask.order || 0 } });
+      await updateStep.mutateAsync({ missionId, stepId: swapTask.id, data: { order: currentTask.order || 0 } });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
     }
@@ -1003,6 +1045,23 @@ export default function MissionDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <span>{mission.totalHours} heures au total</span>
+              </div>
+            )}
+
+            {isAdmin && (mission.rateBase || mission.financialTerms) && (
+              <div className="pt-3 border-t space-y-1 text-sm">
+                {mission.rateBase && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Base tarifaire :</span>
+                    <span>{mission.rateBase}</span>
+                  </div>
+                )}
+                {mission.financialTerms && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Modalite financiere :</span>
+                    <span>{mission.financialTerms}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1396,40 +1455,38 @@ export default function MissionDetail() {
               Gestion des taches avec suivi automatique des statuts
             </p>
           </div>
-          {isAdmin && (
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
-                <Zap className="w-4 h-4 mr-2" />
-                Actions rapides
-              </Button>
-              {isAddingStep ? (
-                <div className="flex gap-2">
-                  <Input
-                    value={newStepTitle}
-                    onChange={(e) => setNewStepTitle(e.target.value)}
-                    placeholder="Titre de la tache..."
-                    className="w-64"
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
-                  />
-                  <Button size="sm" onClick={handleAddStep} disabled={createStep.isPending}>
-                    Ajouter
-                  </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setIsAddingStep(false)}>
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              ) : (
-                <Button onClick={() => setIsAddingStep(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ajouter une tache
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
+              <Zap className="w-4 h-4 mr-2" />
+              Actions rapides
+            </Button>
+            {isAddingStep ? (
+              <div className="flex gap-2">
+                <Input
+                  value={newStepTitle}
+                  onChange={(e) => setNewStepTitle(e.target.value)}
+                  placeholder="Titre de la tache..."
+                  className="w-64"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
+                />
+                <Button size="sm" onClick={handleAddStep} disabled={createStep.isPending}>
+                  Ajouter
                 </Button>
-              )}
-            </div>
-          )}
+                <Button size="sm" variant="ghost" onClick={() => setIsAddingStep(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button onClick={() => setIsAddingStep(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Ajouter une tache
+              </Button>
+            )}
+          </div>
         </div>
 
-        {/* Quick Actions Panel - Admin only */}
-        {isAdmin && showQuickActions && (
+        {/* Quick Actions Panel */}
+        {showQuickActions && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -1512,9 +1569,9 @@ export default function MissionDetail() {
             <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-violet-300 via-violet-400 to-violet-300" />
 
             <div className="space-y-4">
-              {[...visibleSteps]
-                .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
-                .map((task: any, index: number) => (
+              {(() => {
+                const sortedTasks = [...visibleSteps].sort((a: any, b: any) => (a.order || 0) - (b.order || 0));
+                return sortedTasks.map((task: any, index: number) => (
                   <div key={task.id} className="relative flex gap-4">
                     {/* Step number with circle */}
                     <div className="relative z-10 flex-shrink-0">
@@ -1548,32 +1605,33 @@ export default function MissionDetail() {
                         currentUserId={user?.id || ""}
                         onUpdate={handleUpdateTask}
                         onDelete={handleDeleteStep}
+                        onMoveUp={() => handleMoveTask(task.id, 'up')}
+                        onMoveDown={() => handleMoveTask(task.id, 'down')}
+                        isFirst={index === 0}
+                        isLast={index === sortedTasks.length - 1}
                       />
                     </div>
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           </div>
         ) : (
           <Card>
             <CardContent className="py-12 text-center">
               <ListTodo className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground mb-4">
-                {isAdmin ? "Aucune tache definie" : "Aucune tache assignee"}
-              </p>
-              {isAdmin && (
-                <div className="flex flex-col items-center gap-2">
-                  <Button variant="outline" onClick={() => setIsAddingStep(true)}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Ajouter une tache manuellement
-                  </Button>
-                  <span className="text-sm text-muted-foreground">ou</span>
-                  <Button variant="outline" onClick={() => setShowQuickActions(true)}>
-                    <Zap className="w-4 h-4 mr-2" />
-                    Utiliser les actions rapides
-                  </Button>
-                </div>
-              )}
+              <p className="text-muted-foreground mb-4">Aucune tache definie</p>
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="outline" onClick={() => setIsAddingStep(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Ajouter une tache manuellement
+                </Button>
+                <span className="text-sm text-muted-foreground">ou</span>
+                <Button variant="outline" onClick={() => setShowQuickActions(true)}>
+                  <Zap className="w-4 h-4 mr-2" />
+                  Utiliser les actions rapides
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -1612,10 +1670,12 @@ export default function MissionDetail() {
                   </div>
                 )}
               </div>
-              <Button variant="outline" onClick={() => setIsAddParticipantOpen(true)}>
-                <UserPlus className="w-4 h-4 mr-2" />
-                Ajouter
-              </Button>
+              {isAdmin && (
+                <Button variant="outline" onClick={() => setIsAddParticipantOpen(true)}>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Ajouter
+                </Button>
+              )}
             </div>
 
             {missionParticipants && missionParticipants.length > 0 ? (
@@ -1635,14 +1695,16 @@ export default function MissionDetail() {
                             <p className="text-xs text-muted-foreground">{mp.participant?.email}</p>
                           </div>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => handleRemoveParticipant(mp.participantId)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleRemoveParticipant(mp.participantId)}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
