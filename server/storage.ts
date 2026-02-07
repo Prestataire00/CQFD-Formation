@@ -112,6 +112,7 @@ export interface IStorage {
   deleteStepTask(id: number): Promise<boolean>;
 
   // Mission Sessions
+  getAllMissionSessions(): Promise<MissionSession[]>;
   getMissionSessions(missionId: number): Promise<MissionSession[]>;
   createMissionSession(session: InsertMissionSession): Promise<MissionSession>;
   updateMissionSession(id: number, data: Partial<MissionSession>): Promise<MissionSession | undefined>;
@@ -701,30 +702,53 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMission(id: number): Promise<boolean> {
-    // We should delete related records first or ensure they have CASCADE
-    // Based on the schema, many tables have references to missions.id
-    // mission_clients, mission_trainers, mission_steps -> step_tasks, mission_sessions, mission_participants, attendance_records, evaluations, invoices, documents, messages, reminders
-    
-    // In a real app, we might use a soft delete or rely on DB cascades if configured.
-    // Since I can't easily check all foreign key constraints for ON DELETE CASCADE right now, 
-    // I'll perform manual deletion of related records to be safe.
+    // Delete all related records before deleting the mission itself
+    // Order matters: delete child tables before parent tables to avoid FK constraint violations.
 
-    await db.delete(missionClients).where(eq(missionClients.missionId, id));
-    await db.delete(missionTrainers).where(eq(missionTrainers.missionId, id));
-    
+    // inAppNotifications references reminders, so delete first
+    await db.delete(inAppNotifications).where(eq(inAppNotifications.missionId, id));
+    // reminders references missionSteps (taskId), so delete before missionSteps
+    await db.delete(reminders).where(eq(reminders.missionId, id));
+
+    // attendanceRecords references missionSessions (sessionId), so delete before missionSessions
+    await db.delete(attendanceRecords).where(eq(attendanceRecords.missionId, id));
+    await db.delete(missionSessions).where(eq(missionSessions.missionId, id));
+
+    // Steps and their tasks
     const steps = await this.getMissionSteps(id);
     for (const step of steps) {
       await db.delete(stepTasks).where(eq(stepTasks.stepId, step.id));
     }
     await db.delete(missionSteps).where(eq(missionSteps.missionId, id));
-    await db.delete(missionSessions).where(eq(missionSessions.missionId, id));
+
+    await db.delete(missionClients).where(eq(missionClients.missionId, id));
+    await db.delete(missionTrainers).where(eq(missionTrainers.missionId, id));
     await db.delete(missionParticipants).where(eq(missionParticipants.missionId, id));
-    await db.delete(attendanceRecords).where(eq(attendanceRecords.missionId, id));
     await db.delete(evaluations).where(eq(evaluations.missionId, id));
     await db.delete(invoices).where(eq(invoices.missionId, id));
     await db.delete(documents).where(eq(documents.missionId, id));
     await db.delete(messages).where(eq(messages.missionId, id));
-    await db.delete(reminders).where(eq(reminders.missionId, id));
+    await db.delete(clientInvoices).where(eq(clientInvoices.missionId, id));
+
+    // Feedback: responses -> tokens -> questions -> questionnaires
+    const questionnaires = await db.select().from(feedbackQuestionnaires)
+      .where(eq(feedbackQuestionnaires.missionId, id));
+    for (const q of questionnaires) {
+      const tokens = await db.select().from(feedbackResponseTokens)
+        .where(eq(feedbackResponseTokens.questionnaireId, q.id));
+      for (const t of tokens) {
+        await db.delete(feedbackResponses).where(eq(feedbackResponses.tokenId, t.id));
+      }
+      await db.delete(feedbackResponseTokens).where(eq(feedbackResponseTokens.questionnaireId, q.id));
+      await db.delete(feedbackQuestions).where(eq(feedbackQuestions.questionnaireId, q.id));
+    }
+    await db.delete(feedbackQuestionnaires).where(eq(feedbackQuestionnaires.missionId, id));
+
+    // Delete child missions (duplications)
+    const children = await db.select().from(missions).where(eq(missions.parentMissionId, id));
+    for (const child of children) {
+      await this.deleteMission(child.id);
+    }
 
     const [deleted] = await db.delete(missions).where(eq(missions.id, id)).returning();
     return !!deleted;
@@ -877,6 +901,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== MISSION SESSIONS ====================
+  async getAllMissionSessions(): Promise<MissionSession[]> {
+    return await db.select().from(missionSessions)
+      .orderBy(missionSessions.sessionDate);
+  }
+
   async getMissionSessions(missionId: number): Promise<MissionSession[]> {
     return await db.select().from(missionSessions)
       .where(eq(missionSessions.missionId, missionId))

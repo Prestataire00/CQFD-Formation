@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
 import { Badge } from "@/components/ui/badge";
-import { useStats, useMissions } from "@/hooks/use-missions";
+import { useStats, useMissions, useAllSessions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
 import {
@@ -21,7 +21,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, MissionStatus, InAppNotification } from "@shared/schema";
+import { useMemo } from "react";
+import type { Mission, MissionStatus, MissionSession, InAppNotification } from "@shared/schema";
 
 function getMissionStatusLabel(status: MissionStatus): { label: string; color: string } {
   const styles: Record<MissionStatus, { label: string; color: string }> = {
@@ -39,6 +40,19 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: stats } = useStats();
   const { data: missions } = useMissions();
+  const { data: allSessions } = useAllSessions();
+
+  // Build a map of missionId -> session dates
+  const sessionsByMission = useMemo(() => {
+    const map: Record<number, MissionSession[]> = {};
+    if (allSessions) {
+      for (const s of allSessions) {
+        if (!map[s.missionId]) map[s.missionId] = [];
+        map[s.missionId].push(s);
+      }
+    }
+    return map;
+  }, [allSessions]);
   const { data: inAppNotifications } = useUnreadInAppNotifications();
   const markInAppAsRead = useMarkInAppNotificationRead();
 
@@ -155,12 +169,30 @@ export default function Dashboard() {
                                 </span>
                               </div>
                               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                                {mission.startDate && (
-                                  <span className="flex items-center gap-1">
-                                    <Calendar className="w-3 h-3" />
-                                    {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                                  </span>
-                                )}
+                                {(() => {
+                                  const sessions = sessionsByMission[mission.id];
+                                  if (sessions && sessions.length > 0) {
+                                    return (
+                                      <span className="flex items-center gap-1 flex-wrap">
+                                        <Calendar className="w-3 h-3" />
+                                        {sessions.map((s: MissionSession, i: number) => (
+                                          <span key={i} className="inline-flex bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded">
+                                            {format(new Date(s.sessionDate), "d MMM yyyy", { locale: fr })}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    );
+                                  }
+                                  if (mission.startDate) {
+                                    return (
+                                      <span className="flex items-center gap-1">
+                                        <Calendar className="w-3 h-3" />
+                                        {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                                 {mission.location && (
                                   <span className="flex items-center gap-1">
                                     <MapPin className="w-3 h-3" />

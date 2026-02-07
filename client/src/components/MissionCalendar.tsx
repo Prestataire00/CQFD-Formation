@@ -29,13 +29,14 @@ import {
   parseISO,
 } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, MissionStatus } from "@shared/schema";
+import type { Mission, MissionSession, MissionStatus } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
 export type CalendarView = "day" | "week" | "month";
 
 interface MissionCalendarProps {
   missions: Mission[];
+  sessions?: MissionSession[];
   view: CalendarView;
   onViewChange: (view: CalendarView) => void;
   selectedDate: Date;
@@ -59,16 +60,23 @@ const statusLabels: Record<MissionStatus, string> = {
   cancelled: "Annulee",
 };
 
-function getMissionsForDate(missions: Mission[], date: Date): Mission[] {
+function getMissionsForDate(missions: Mission[], date: Date, sessionsByMission?: Record<number, MissionSession[]>): Mission[] {
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
   return missions.filter((mission) => {
-    // Use endDate if available, otherwise use startDate
+    // If we have session data, match on individual session dates
+    if (sessionsByMission && sessionsByMission[mission.id]?.length > 0) {
+      return sessionsByMission[mission.id].some((session) => {
+        const sessionDate = new Date(session.sessionDate);
+        const sessionDateOnly = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+        return dateOnly.getTime() === sessionDateOnly.getTime();
+      });
+    }
+
+    // Fallback: use startDate/endDate range
     const missionDate = mission.endDate ? new Date(mission.endDate) : mission.startDate ? new Date(mission.startDate) : null;
     if (!missionDate) return false;
-
-    // Reset time to compare dates only
-    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const missionDateOnly = new Date(missionDate.getFullYear(), missionDate.getMonth(), missionDate.getDate());
-
     return dateOnly.getTime() === missionDateOnly.getTime();
   });
 }
@@ -125,10 +133,12 @@ function MissionItem({ mission, compact = false }: { mission: Mission; compact?:
 // Month View Component
 function MonthView({
   missions,
+  sessionsByMission,
   selectedDate,
   onDateChange,
 }: {
   missions: Mission[];
+  sessionsByMission?: Record<number, MissionSession[]>;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
 }) {
@@ -157,7 +167,7 @@ function MonthView({
       {/* Calendar grid */}
       <div className="flex-1 grid grid-cols-7 auto-rows-fr">
         {days.map((day) => {
-          const dayMissions = getMissionsForDate(missions, day);
+          const dayMissions = getMissionsForDate(missions, day, sessionsByMission);
           const isCurrentMonth = isSameMonth(day, selectedDate);
           const isToday = isSameDay(day, new Date());
 
@@ -199,9 +209,11 @@ function MonthView({
 // Week View Component
 function WeekView({
   missions,
+  sessionsByMission,
   selectedDate,
 }: {
   missions: Mission[];
+  sessionsByMission?: Record<number, MissionSession[]>;
   selectedDate: Date;
 }) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
@@ -241,7 +253,7 @@ function WeekView({
       {/* Day columns with missions */}
       <div className="flex-1 grid grid-cols-7 overflow-y-auto">
         {days.map((day) => {
-          const dayMissions = getMissionsForDate(missions, day);
+          const dayMissions = getMissionsForDate(missions, day, sessionsByMission);
           const isToday = isSameDay(day, new Date());
 
           return (
@@ -271,12 +283,14 @@ function WeekView({
 // Day View Component
 function DayView({
   missions,
+  sessionsByMission,
   selectedDate,
 }: {
   missions: Mission[];
+  sessionsByMission?: Record<number, MissionSession[]>;
   selectedDate: Date;
 }) {
-  const dayMissions = getMissionsForDate(missions, selectedDate);
+  const dayMissions = getMissionsForDate(missions, selectedDate, sessionsByMission);
   const isToday = isSameDay(selectedDate, new Date());
 
   return (
@@ -313,11 +327,23 @@ function DayView({
 
 export function MissionCalendar({
   missions,
+  sessions,
   view,
   onViewChange,
   selectedDate,
   onDateChange,
 }: MissionCalendarProps) {
+  // Build sessionsByMission map
+  const sessionsByMission = useMemo(() => {
+    if (!sessions || sessions.length === 0) return undefined;
+    const map: Record<number, MissionSession[]> = {};
+    for (const s of sessions) {
+      if (!map[s.missionId]) map[s.missionId] = [];
+      map[s.missionId].push(s);
+    }
+    return map;
+  }, [sessions]);
+
   // Navigation handlers
   const navigatePrevious = () => {
     switch (view) {
@@ -407,15 +433,16 @@ export function MissionCalendar({
         {view === "month" && (
           <MonthView
             missions={missions}
+            sessionsByMission={sessionsByMission}
             selectedDate={selectedDate}
             onDateChange={onDateChange}
           />
         )}
         {view === "week" && (
-          <WeekView missions={missions} selectedDate={selectedDate} />
+          <WeekView missions={missions} sessionsByMission={sessionsByMission} selectedDate={selectedDate} />
         )}
         {view === "day" && (
-          <DayView missions={missions} selectedDate={selectedDate} />
+          <DayView missions={missions} sessionsByMission={sessionsByMission} selectedDate={selectedDate} />
         )}
       </div>
     </div>

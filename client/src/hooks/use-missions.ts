@@ -507,6 +507,18 @@ export function useDeleteStepTask() {
   });
 }
 
+// All Mission Sessions (for calendar & cards)
+export function useAllSessions() {
+  return useQuery({
+    queryKey: ['/api/sessions'],
+    queryFn: async () => {
+      const res = await fetch('/api/sessions', { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to fetch all sessions");
+      return res.json();
+    },
+  });
+}
+
 // Mission Sessions
 export function useMissionSessions(missionId: number) {
   return useQuery({
@@ -537,6 +549,9 @@ export function useCreateMissionSession() {
     },
     onSuccess: (_, { missionId }) => {
       queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.get.path, missionId] });
     },
   });
 }
@@ -557,6 +572,9 @@ export function useUpdateMissionSession() {
     },
     onSuccess: (_, { missionId }) => {
       queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.get.path, missionId] });
     },
   });
 }
@@ -575,6 +593,9 @@ export function useDeleteMissionSession() {
     },
     onSuccess: (_, { missionId }) => {
       queryClient.invalidateQueries({ queryKey: [api.missions.sessions.list.path, missionId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.missions.get.path, missionId] });
     },
   });
 }

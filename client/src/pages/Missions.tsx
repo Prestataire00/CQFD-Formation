@@ -57,7 +57,7 @@ import {
   ChevronsUpDown,
   Users,
 } from "lucide-react";
-import { useMissions, useClients, useTrainers, usePrograms, useParticipants, useCreateMission, useUpdateMissionStatus } from "@/hooks/use-missions";
+import { useMissions, useClients, useTrainers, usePrograms, useParticipants, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -111,8 +111,21 @@ export default function Missions() {
   const { data: trainers } = useTrainers();
   const { data: programs } = usePrograms();
   const { data: participants } = useParticipants();
+  const { data: allSessions } = useAllSessions();
   const createMission = useCreateMission();
   const updateMissionStatus = useUpdateMissionStatus();
+
+  // Build a map of missionId -> session dates
+  const sessionsByMission = useMemo(() => {
+    const map: Record<number, Array<{ sessionDate: string; startTime?: string; endTime?: string }>> = {};
+    if (allSessions) {
+      for (const s of allSessions) {
+        if (!map[s.missionId]) map[s.missionId] = [];
+        map[s.missionId].push(s);
+      }
+    }
+    return map;
+  }, [allSessions]);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -297,6 +310,8 @@ export default function Missions() {
           endTime: day.endTime || null,
         });
       }
+      // Invalidate global sessions cache
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
 
       // If multiple clients for INTER
       if (newMission.typology === "Inter" && newMission.clientIds.length > 1) {
@@ -1233,17 +1248,37 @@ export default function Missions() {
                         </div>
                       )}
 
-                      {mission.startDate && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <Calendar className="w-4 h-4" />
-                          <span>
-                            {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                            {mission.endDate && mission.startDate !== mission.endDate && (
-                              <> - {format(new Date(mission.endDate), "d MMM yyyy", { locale: fr })}</>
-                            )}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const sessions = sessionsByMission[mission.id];
+                        if (sessions && sessions.length > 0) {
+                          return (
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <Calendar className="w-4 h-4 mt-0.5 shrink-0" />
+                              <div className="flex flex-wrap gap-1">
+                                {sessions.map((s: any, i: number) => (
+                                  <span key={i} className="inline-flex items-center bg-primary/10 text-primary text-xs px-1.5 py-0.5 rounded">
+                                    {format(new Date(s.sessionDate), "d MMM yyyy", { locale: fr })}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        }
+                        if (mission.startDate) {
+                          return (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="w-4 h-4" />
+                              <span>
+                                {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
+                                {mission.endDate && mission.startDate !== mission.endDate && (
+                                  <> - {format(new Date(mission.endDate), "d MMM yyyy", { locale: fr })}</>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
 
                       {mission.location && (
                         <div className="flex items-center gap-2 text-muted-foreground">

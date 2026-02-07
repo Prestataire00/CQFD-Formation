@@ -3,6 +3,7 @@ import express from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
+import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
@@ -796,6 +797,12 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // All Mission Sessions (for calendar & cards)
+  app.get('/api/sessions', isAuthenticated, async (req, res) => {
+    const sessions = await storage.getAllMissionSessions();
+    res.json(sessions);
+  });
+
   // Mission Sessions
   app.get(api.missions.sessions.list.path, isAuthenticated, async (req, res) => {
     const sessions = await storage.getMissionSessions(Number(req.params.id));
@@ -962,7 +969,7 @@ export async function registerRoutes(
     if (user.role === 'formateur' || user.role === 'prestataire') {
       const missionTrainers = await storage.getMissionTrainers(missionId);
       const isAssigned = mission.trainerId === user.id || 
-                         missionTrainers.some(mt => mt.odooTrainerId === user.id);
+                         missionTrainers.some(mt => mt.trainerId === user.id);
       if (!isAssigned) {
         res.status(403).json({ message: "Accès non autorisé à cette mission" });
         return;
@@ -1275,7 +1282,7 @@ export async function registerRoutes(
       if (mission) {
         const missionTrainers = await storage.getMissionTrainers(document.missionId);
         const isAssigned = mission.trainerId === user.id || 
-                           missionTrainers.some(mt => mt.odooTrainerId === user.id);
+                           missionTrainers.some(mt => mt.trainerId === user.id);
         if (!isAssigned) {
           res.status(403).json({ message: "Vous ne pouvez supprimer que les documents de vos missions" });
           return;
@@ -2210,7 +2217,7 @@ export async function registerRoutes(
           trainerName: 'Jean Dupont',
           location: 'Paris',
           startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        },
+        } as any,
       });
       res.status(201).json(notification);
     } catch (err) {

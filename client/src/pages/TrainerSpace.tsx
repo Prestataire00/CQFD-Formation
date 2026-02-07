@@ -5,7 +5,7 @@ import { Header } from "@/components/Header";
 import { MissionCalendar, type CalendarView } from "@/components/MissionCalendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useMissions, useClients } from "@/hooks/use-missions";
+import { useMissions, useClients, useAllSessions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
 import {
@@ -29,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { format, differenceInDays, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useQuery } from "@tanstack/react-query";
-import type { Mission, MissionStatus, Client, InAppNotification, MissionStep } from "@shared/schema";
+import type { Mission, MissionSession, MissionStatus, Client, InAppNotification, MissionStep } from "@shared/schema";
 
 function StatCard({
   title,
@@ -64,6 +64,19 @@ export default function TrainerSpace() {
   const [, setLocation] = useLocation();
   const { data: allMissions, isLoading: missionsLoading } = useMissions();
   const { data: allClients, isLoading: clientsLoading } = useClients();
+  const { data: allSessions } = useAllSessions();
+
+  // Build a map of missionId -> session dates
+  const sessionsByMission = useMemo(() => {
+    const map: Record<number, MissionSession[]> = {};
+    if (allSessions) {
+      for (const s of allSessions) {
+        if (!map[s.missionId]) map[s.missionId] = [];
+        map[s.missionId].push(s);
+      }
+    }
+    return map;
+  }, [allSessions]);
   const { data: inAppNotifications } = useUnreadInAppNotifications();
   const markInAppAsRead = useMarkInAppNotificationRead();
   const [view, setView] = useState<CalendarView>("month");
@@ -103,6 +116,7 @@ export default function TrainerSpace() {
   // Calculate statistics
   const stats = useMemo(() => {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const inProgress = trainerMissions.filter(
       (m: Mission) => m.status === "in_progress"
     ).length;
@@ -113,36 +127,63 @@ export default function TrainerSpace() {
       (m: Mission) => m.status === "completed"
     ).length;
     const upcoming = trainerMissions.filter((m: Mission) => {
+      if (m.status !== "confirmed" && m.status !== "in_progress") return false;
+      // Check session dates first
+      const sessions = sessionsByMission[m.id];
+      if (sessions && sessions.length > 0) {
+        return sessions.some((s) => {
+          const d = new Date(s.sessionDate);
+          d.setHours(0, 0, 0, 0);
+          return d > now;
+        });
+      }
       if (!m.startDate) return false;
-      return (
-        new Date(m.startDate) > now &&
-        (m.status === "confirmed" || m.status === "in_progress")
-      );
+      return new Date(m.startDate) > now;
     }).length;
 
     return { inProgress, confirmed, completed, upcoming, total: trainerMissions.length };
-  }, [trainerMissions]);
+  }, [trainerMissions, sessionsByMission]);
 
-  // Prochaines missions (14 prochains jours)
+  // Prochaines missions (14 prochains jours) - basé sur les dates de session
   const upcomingMissions = useMemo(() => {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const in14Days = addDays(now, 14);
 
     return trainerMissions
       .filter((m: Mission) => {
+        if (m.status !== "confirmed" && m.status !== "in_progress") return false;
+        // Check session dates first
+        const sessions = sessionsByMission[m.id];
+        if (sessions && sessions.length > 0) {
+          return sessions.some((s) => {
+            const d = new Date(s.sessionDate);
+            d.setHours(0, 0, 0, 0);
+            return d >= now && d <= in14Days;
+          });
+        }
+        // Fallback to startDate
         if (!m.startDate) return false;
         const startDate = new Date(m.startDate);
-        return (
-          startDate >= now &&
-          startDate <= in14Days &&
-          (m.status === "confirmed" || m.status === "in_progress")
-        );
+        return startDate >= now && startDate <= in14Days;
       })
-      .sort((a: Mission, b: Mission) =>
-        new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime()
-      )
+      .sort((a: Mission, b: Mission) => {
+        // Sort by next upcoming session date
+        const getNextDate = (m: Mission) => {
+          const sessions = sessionsByMission[m.id];
+          if (sessions && sessions.length > 0) {
+            const futureSessions = sessions
+              .map((s) => new Date(s.sessionDate))
+              .filter((d) => d >= now)
+              .sort((a, b) => a.getTime() - b.getTime());
+            if (futureSessions.length > 0) return futureSessions[0].getTime();
+          }
+          return m.startDate ? new Date(m.startDate).getTime() : 0;
+        };
+        return getNextDate(a) - getNextDate(b);
+      })
       .slice(0, 5);
-  }, [trainerMissions]);
+  }, [trainerMissions, sessionsByMission]);
 
   // Récupérer les étapes de toutes les missions du formateur
   const { data: allSteps } = useQuery({
@@ -412,7 +453,17 @@ export default function TrainerSpace() {
                       <div className="space-y-3">
                         {upcomingMissions.map((mission: Mission) => {
                           const client = allClients?.find((c: Client) => c.id === mission.clientId);
-                          const daysUntil = differenceInDays(new Date(mission.startDate!), new Date());
+                          const sessions = sessionsByMission[mission.id];
+                          // Get the next upcoming session date
+                          const now = new Date();
+                          now.setHours(0, 0, 0, 0);
+                          const nextSessionDate = sessions && sessions.length > 0
+                            ? sessions
+                                .map((s) => new Date(s.sessionDate))
+                                .filter((d) => { d.setHours(0, 0, 0, 0); return d >= now; })
+                                .sort((a, b) => a.getTime() - b.getTime())[0]
+                            : mission.startDate ? new Date(mission.startDate) : null;
+                          const daysUntil = nextSessionDate ? differenceInDays(nextSessionDate, new Date()) : 0;
 
                           return (
                             <div
@@ -421,18 +472,33 @@ export default function TrainerSpace() {
                               onClick={() => setLocation(`/missions/${mission.id}`)}
                             >
                               <div className="flex-shrink-0 w-12 h-12 bg-blue-500 text-white rounded-lg flex flex-col items-center justify-center">
-                                <span className="text-xs font-medium">
-                                  {format(new Date(mission.startDate!), "MMM", { locale: fr }).toUpperCase()}
-                                </span>
-                                <span className="text-lg font-bold leading-none">
-                                  {format(new Date(mission.startDate!), "d")}
-                                </span>
+                                {nextSessionDate ? (
+                                  <>
+                                    <span className="text-xs font-medium">
+                                      {format(nextSessionDate, "MMM", { locale: fr }).toUpperCase()}
+                                    </span>
+                                    <span className="text-lg font-bold leading-none">
+                                      {format(nextSessionDate, "d")}
+                                    </span>
+                                  </>
+                                ) : (
+                                  <CalendarDays className="w-5 h-5" />
+                                )}
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">{mission.title}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {client?.name || "Client non defini"}
                                 </p>
+                                {sessions && sessions.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {sessions.map((s: MissionSession, i: number) => (
+                                      <span key={i} className="inline-flex bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded">
+                                        {format(new Date(s.sessionDate), "d MMM", { locale: fr })}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
                                 <div className="flex items-center gap-2 mt-1">
                                   {mission.location && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1">
@@ -611,6 +677,7 @@ export default function TrainerSpace() {
                   <div className="h-[calc(100vh-420px)] min-h-[500px]">
                     <MissionCalendar
                       missions={trainerMissions}
+                      sessions={allSessions || []}
                       view={view}
                       onViewChange={setView}
                       selectedDate={selectedDate}

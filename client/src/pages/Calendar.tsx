@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { MissionCalendar, type CalendarView } from "@/components/MissionCalendar";
-import { useMissions } from "@/hooks/use-missions";
+import { useMissions, useAllSessions } from "@/hooks/use-missions";
 import { Loader2, Calendar as CalendarIcon } from "lucide-react";
 
 export default function Calendar() {
   const { data: missions, isLoading } = useMissions();
+  const { data: allSessions } = useAllSessions();
   const [view, setView] = useState<CalendarView>("month");
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -34,6 +35,7 @@ export default function Calendar() {
             <div className="h-[calc(100vh-220px)]">
               <MissionCalendar
                 missions={missions || []}
+                sessions={allSessions || []}
                 view={view}
                 onViewChange={setView}
                 selectedDate={selectedDate}
