@@ -48,7 +48,6 @@ import {
   Filter,
   Trash2,
   ArrowUpDown,
-  BookOpen,
   Tag,
   X,
   LayoutGrid,
@@ -56,8 +55,9 @@ import {
   Check,
   ChevronsUpDown,
   Users,
+  Copy,
 } from "lucide-react";
-import { useMissions, useClients, useTrainers, usePrograms, useParticipants, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
+import { useMissions, useClients, useTrainers, useParticipants, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
@@ -109,7 +109,6 @@ export default function Missions() {
   const { data: missions, isLoading } = useMissions();
   const { data: clients } = useClients();
   const { data: trainers } = useTrainers();
-  const { data: programs } = usePrograms();
   const { data: participants } = useParticipants();
   const { data: allSessions } = useAllSessions();
   const createMission = useCreateMission();
@@ -132,7 +131,6 @@ export default function Missions() {
   const [trainerFilter, setTrainerFilter] = useState<string>("all");
   const [typologyFilter, setTypologyFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
-  const [programFilter, setProgramFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("date_desc");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -147,31 +145,35 @@ export default function Missions() {
   const [clientSearch, setClientSearch] = useState("");
 
   const [newMission, setNewMission] = useState<{
-    reference: string;
     title: string;
     clientIds: string[];
     trainerId: string;
-    programId: string;
-    programTitle: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
     locationType: LocationType;
     location: string;
     typology: string;
     reminderDays: number | null;
     participantIds: number[];
+    expectedParticipants: string;
+    hasDisability: boolean;
+    disabilityDetails: string;
+    rateBase: string;
+    financialTerms: string;
   }>({
-    reference: "",
     title: "",
     clientIds: [],
     trainerId: "",
-    programId: "",
-    programTitle: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
     reminderDays: 7,
     participantIds: [],
+    expectedParticipants: "",
+    hasDisability: false,
+    disabilityDetails: "",
+    rateBase: "",
+    financialTerms: "",
   });
 
   // Filter trainers based on search
@@ -220,8 +222,7 @@ export default function Missions() {
     const matchesTrainer = trainerFilter === "all" || mission.trainerId === trainerFilter;
     const matchesTypology = typologyFilter === "all" || (mission.typology || "") === typologyFilter;
     const matchesClient = clientFilter === "all" || mission.clientId?.toString() === clientFilter;
-    const matchesProgram = programFilter === "all" || mission.programId?.toString() === programFilter;
-    return matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient && matchesProgram;
+    return matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient;
   }) || [];
 
   // Sort missions
@@ -254,7 +255,7 @@ export default function Missions() {
   });
 
   // Check if any filter is active
-  const hasActiveFilters = statusFilter !== "all" || trainerFilter !== "all" || typologyFilter !== "all" || clientFilter !== "all" || programFilter !== "all" || searchTerm !== "";
+  const hasActiveFilters = statusFilter !== "all" || trainerFilter !== "all" || typologyFilter !== "all" || clientFilter !== "all" || searchTerm !== "";
 
   // Reset all filters
   const resetFilters = () => {
@@ -263,40 +264,42 @@ export default function Missions() {
     setTrainerFilter("all");
     setTypologyFilter("all");
     setClientFilter("all");
-    setProgramFilter("all");
     setSortBy("date_desc");
   };
 
   const handleCreateMission = async () => {
     // Valider qu'il y a au moins un jour avec une date
     const validDays = newMission.trainingDays.filter(d => d.date);
-    if (!newMission.title || newMission.clientIds.length === 0 || validDays.length === 0 || !newMission.typology || !newMission.programTitle) {
+    if (!newMission.title || newMission.clientIds.length === 0 || !newMission.typology) {
       toast({
         title: "Champs requis manquants",
-        description: "Veuillez remplir le titre, le client, la formation, au moins un jour de formation et la typologie.",
+        description: "Veuillez remplir le titre, le client et la typologie.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      // Calculer les dates globales (min et max) pour la mission
-      const allDates = validDays.map(d => d.date).sort();
-      const globalStartDate = allDates[0];
-      const globalEndDate = allDates[allDates.length - 1];
+      // Calculer les dates globales (min et max) pour la mission si des jours sont définis
+      const allDates = validDays.length > 0 ? validDays.map(d => d.date).sort() : [];
+      const globalStartDate = allDates.length > 0 ? allDates[0] : null;
+      const globalEndDate = allDates.length > 0 ? allDates[allDates.length - 1] : null;
 
       const missionData = {
-        reference: newMission.reference || `MIS-${Date.now()}`,
+        reference: `MIS-${Date.now()}`,
         title: newMission.title,
         clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
-        programId: newMission.programId ? parseInt(newMission.programId) : null,
-        programTitle: newMission.programTitle || null,
         startDate: globalStartDate,
         endDate: globalEndDate,
         locationType: newMission.locationType,
         location: newMission.location || null,
         typology: newMission.typology,
+        expectedParticipants: newMission.expectedParticipants ? parseInt(newMission.expectedParticipants) : null,
+        hasDisability: newMission.hasDisability,
+        disabilityDetails: newMission.disabilityDetails || null,
+        rateBase: newMission.rateBase || null,
+        financialTerms: newMission.financialTerms || null,
         status: "draft",
       };
 
@@ -347,18 +350,20 @@ export default function Missions() {
 
       setIsCreateOpen(false);
       setNewMission({
-        reference: "",
         title: "",
         clientIds: [],
         trainerId: "",
-        programId: "",
-        programTitle: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
         locationType: "presentiel",
         location: "",
         typology: "Intra",
         reminderDays: 7,
         participantIds: [],
+        expectedParticipants: "",
+        hasDisability: false,
+        disabilityDetails: "",
+        rateBase: "",
+        financialTerms: "",
       });
       const participantCount = newMission.participantIds.length;
       toast({
@@ -433,25 +438,14 @@ export default function Missions() {
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="reference">Reference</Label>
-                        <Input
-                          id="reference"
-                          placeholder="MIS-2024-XXX"
-                          value={newMission.reference}
-                          onChange={(e) => setNewMission({ ...newMission, reference: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Titre *</Label>
-                        <Input
-                          id="title"
-                          placeholder="Formation Management..."
-                          value={newMission.title}
-                          onChange={(e) => setNewMission({ ...newMission, title: e.target.value })}
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="title">Titre *</Label>
+                      <Input
+                        id="title"
+                        placeholder="Formation Management..."
+                        value={newMission.title}
+                        onChange={(e) => setNewMission({ ...newMission, title: e.target.value })}
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -624,37 +618,55 @@ export default function Missions() {
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="programTitle">Formation *</Label>
+                      <Label htmlFor="expectedParticipants">Nombre de participants prevus</Label>
                       <Input
-                        id="programTitle"
-                        placeholder="Nom de la formation"
-                        value={newMission.programTitle}
-                        onChange={(e) => setNewMission({ ...newMission, programTitle: e.target.value })}
+                        id="expectedParticipants"
+                        type="number"
+                        min="0"
+                        placeholder="Ex: 12"
+                        value={newMission.expectedParticipants}
+                        onChange={(e) => setNewMission({ ...newMission, expectedParticipants: e.target.value })}
                       />
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">ou choisir dans le catalogue :</span>
-                        <Select
-                          value={newMission.programId}
-                          onValueChange={(value) => {
-                            const program = programs?.find((p: any) => p.id.toString() === value);
-                            setNewMission({
-                              ...newMission,
-                              programId: value,
-                              programTitle: program?.title || newMission.programTitle
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="w-[200px] h-8">
-                            <SelectValue placeholder="Catalogue..." />
-                          </SelectTrigger>
-                          <SelectContent className="bg-violet-100 border-violet-300">
-                            {programs?.map((program: any) => (
-                              <SelectItem key={program.id} value={program.id.toString()} className="focus:bg-violet-200">
-                                {program.title}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                      <p className="text-xs text-muted-foreground">
+                        Nombre indicatif de participants attendus sur cette mission.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="hasDisability"
+                          checked={newMission.hasDisability}
+                          onCheckedChange={(checked) => setNewMission({ ...newMission, hasDisability: !!checked, disabilityDetails: checked ? newMission.disabilityDetails : "" })}
+                        />
+                        <Label htmlFor="hasDisability" className="cursor-pointer">Situation de handicap</Label>
+                      </div>
+                      {newMission.hasDisability && (
+                        <Textarea
+                          placeholder="Preciser les amenagements necessaires ou les informations utiles..."
+                          value={newMission.disabilityDetails}
+                          onChange={(e) => setNewMission({ ...newMission, disabilityDetails: e.target.value })}
+                          rows={3}
+                        />
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="rateBase">Base tarifaire</Label>
+                        <Input
+                          id="rateBase"
+                          placeholder="Ex: 1 200 EUR / jour"
+                          value={newMission.rateBase}
+                          onChange={(e) => setNewMission({ ...newMission, rateBase: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="financialTerms">Modalite financiere</Label>
+                        <Input
+                          id="financialTerms"
+                          placeholder="Ex: Paiement a 30 jours"
+                          value={newMission.financialTerms}
+                          onChange={(e) => setNewMission({ ...newMission, financialTerms: e.target.value })}
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -796,7 +808,7 @@ export default function Missions() {
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label>Jours de formation *</Label>
+                        <Label>Jours de formation</Label>
                         <Button
                           type="button"
                           variant="outline"
@@ -957,7 +969,7 @@ export default function Missions() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les clients</SelectItem>
-                  {clients?.map((client: any) => (
+                  {clients?.slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((client: any) => (
                     <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                       {client.name}
                     </SelectItem>
@@ -973,7 +985,7 @@ export default function Missions() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les formateurs</SelectItem>
-                  {trainers?.map((trainer: any) => (
+                  {trainers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((trainer: any) => (
                     <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
                       {trainer.firstName} {trainer.lastName}
                     </SelectItem>
@@ -981,21 +993,6 @@ export default function Missions() {
                 </SelectContent>
               </Select>
 
-              {/* Program filter */}
-              <Select value={programFilter} onValueChange={setProgramFilter}>
-                <SelectTrigger className="w-52">
-                  <BookOpen className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Formation" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  <SelectItem value="all" className="focus:bg-violet-200">Toutes les formations</SelectItem>
-                  {programs?.map((program: any) => (
-                    <SelectItem key={program.id} value={program.id.toString()} className="focus:bg-violet-200">
-                      {program.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Sort and view options */}
@@ -1111,9 +1108,17 @@ export default function Missions() {
                           {mission.reference || "-"}
                         </td>
                         <td className="p-3">
-                          <Link href={`/missions/${mission.id}`} className="font-medium hover:text-primary transition-colors">
-                            {mission.title}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/missions/${mission.id}`} className="font-medium hover:text-primary transition-colors">
+                              {mission.title}
+                            </Link>
+                            {mission.isOriginal && (
+                              <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-[10px] px-1.5 py-0">Original</Badge>
+                            )}
+                            {mission.parentMissionId && (
+                              <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300 text-[10px] px-1.5 py-0">Copie</Badge>
+                            )}
+                          </div>
                         </td>
                         <td className="p-3 text-sm">{client?.name || "-"}</td>
                         <td className="p-3 text-sm">
@@ -1196,14 +1201,17 @@ export default function Missions() {
                   <Link href={`/missions/${mission.id}`} className="block cursor-pointer">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        {mission.reference && (
-                          <p className="text-xs text-muted-foreground font-mono">
-                            {mission.reference}
-                          </p>
-                        )}
-                        <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-1">
-                          {mission.title}
-                        </h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-1">
+                            {mission.title}
+                          </h3>
+                          {mission.isOriginal && (
+                            <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-[10px] px-1.5 py-0">Original</Badge>
+                          )}
+                          {mission.parentMissionId && (
+                            <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300 text-[10px] px-1.5 py-0">Copie</Badge>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {getStatusBadge(mission.status as MissionStatus)}
@@ -1245,6 +1253,13 @@ export default function Missions() {
                               return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Formateur";
                             })()}
                           </span>
+                        </div>
+                      )}
+
+                      {mission.expectedParticipants != null && (
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Users className="w-4 h-4" />
+                          <span>{mission.expectedParticipants} participant(s) prevus</span>
                         </div>
                       )}
 

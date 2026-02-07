@@ -17,6 +17,7 @@ import {
   insertTaskSchema,
   insertReminderSettingSchema,
   insertReminderSchema,
+  taskDeadlineDefaults,
   clients,
   trainingPrograms,
   missions,
@@ -932,6 +933,52 @@ export const api = {
         200: z.object({
           created: z.number(),
         }),
+      },
+    },
+  },
+
+  // ==================== TASK DEADLINE DEFAULTS ====================
+  taskDeadlineDefaults: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/task-deadline-defaults',
+      responses: {
+        200: z.array(z.custom<typeof taskDeadlineDefaults.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/task-deadline-defaults',
+      input: z.object({
+        taskTitle: z.string().min(1),
+        daysBefore: z.number(),
+        category: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: {
+        201: z.custom<typeof taskDeadlineDefaults.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/task-deadline-defaults/:id',
+      input: z.object({
+        taskTitle: z.string().optional(),
+        daysBefore: z.number().optional(),
+        category: z.string().optional(),
+        isActive: z.boolean().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof taskDeadlineDefaults.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/task-deadline-defaults/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
       },
     },
   },

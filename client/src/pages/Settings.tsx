@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,13 @@ import {
   FileText,
   Euro,
   Globe,
+  Clock,
+  Plus,
+  Trash2,
+  Edit,
+  BellRing,
+  Check,
+  X,
 } from "lucide-react";
 
 export default function Settings() {
@@ -76,6 +83,50 @@ export default function Settings() {
     missionPrefix: "MISS",
   });
   const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+  // Task deadline defaults state (admin only)
+  const [deadlineDefaults, setDeadlineDefaults] = useState<any[]>([]);
+  const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
+  const [isSavingDeadlines, setIsSavingDeadlines] = useState(false);
+  const [editingDeadlineId, setEditingDeadlineId] = useState<number | null>(null);
+  const [newDeadline, setNewDeadline] = useState({ taskTitle: "", daysBefore: 0, category: "" });
+  const [isAddingDeadline, setIsAddingDeadline] = useState(false);
+
+  // Reminder settings state (admin only)
+  const [reminderSettings, setReminderSettings] = useState<any[]>([]);
+  const [isLoadingReminders, setIsLoadingReminders] = useState(false);
+  const [editingReminderId, setEditingReminderId] = useState<number | null>(null);
+  const [editingReminderData, setEditingReminderData] = useState<any>(null);
+  const [isAddingReminder, setIsAddingReminder] = useState(false);
+  const [newReminder, setNewReminder] = useState({
+    name: "",
+    reminderType: "mission_start",
+    daysBefore: 7,
+    isActive: true,
+    emailSubject: "",
+    notifyAdmin: false,
+    notifyTrainer: true,
+    notifyClient: false,
+  });
+
+  // Load deadline defaults and reminder settings
+  useEffect(() => {
+    if (isAdmin) {
+      setIsLoadingDeadlines(true);
+      fetch("/api/task-deadline-defaults", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => setDeadlineDefaults(data))
+        .catch(() => {})
+        .finally(() => setIsLoadingDeadlines(false));
+
+      setIsLoadingReminders(true);
+      fetch("/api/reminder-settings", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => setReminderSettings(data))
+        .catch(() => {})
+        .finally(() => setIsLoadingReminders(false));
+    }
+  }, [isAdmin]);
 
   const handleSaveProfile = async () => {
     setIsSavingProfile(true);
@@ -208,6 +259,135 @@ export default function Settings() {
     }
   };
 
+  const handleUpdateDeadline = async (id: number, daysBefore: number) => {
+    try {
+      const response = await fetch(`/api/task-deadline-defaults/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ daysBefore }),
+      });
+      if (!response.ok) throw new Error();
+      const updated = await response.json();
+      setDeadlineDefaults((prev) =>
+        prev.map((d) => (d.id === id ? updated : d))
+      );
+      setEditingDeadlineId(null);
+      toast({ title: "Deadline mise a jour" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddDeadline = async () => {
+    if (!newDeadline.taskTitle.trim()) return;
+    setIsSavingDeadlines(true);
+    try {
+      const response = await fetch("/api/task-deadline-defaults", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newDeadline),
+      });
+      if (!response.ok) throw new Error();
+      const created = await response.json();
+      setDeadlineDefaults((prev) => [...prev, created]);
+      setNewDeadline({ taskTitle: "", daysBefore: 0, category: "" });
+      setIsAddingDeadline(false);
+      toast({ title: "Deadline par defaut ajoutee" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setIsSavingDeadlines(false);
+    }
+  };
+
+  const handleDeleteDeadline = async (id: number) => {
+    try {
+      await fetch(`/api/task-deadline-defaults/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      setDeadlineDefaults((prev) => prev.filter((d) => d.id !== id));
+      toast({ title: "Deadline supprimee" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const formatDeadlineLabel = (days: number) => {
+    if (days > 0) return `J-${days}`;
+    if (days === 0) return "Jour J";
+    return `J+${Math.abs(days)}`;
+  };
+
+  // Reminder settings handlers
+  const handleCreateReminder = async () => {
+    if (!newReminder.name.trim()) return;
+    try {
+      const response = await fetch("/api/reminder-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newReminder),
+      });
+      if (!response.ok) throw new Error();
+      const created = await response.json();
+      setReminderSettings((prev) => [...prev, created]);
+      setNewReminder({
+        name: "", reminderType: "mission_start", daysBefore: 7,
+        isActive: true, emailSubject: "", notifyAdmin: false, notifyTrainer: true, notifyClient: false,
+      });
+      setIsAddingReminder(false);
+      toast({ title: "Rappel cree" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateReminder = async (id: number, data: any) => {
+    try {
+      const response = await fetch(`/api/reminder-settings/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) throw new Error();
+      const updated = await response.json();
+      setReminderSettings((prev) => prev.map((r) => (r.id === id ? updated : r)));
+      setEditingReminderId(null);
+      setEditingReminderData(null);
+      toast({ title: "Rappel mis a jour" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteReminder = async (id: number) => {
+    try {
+      await fetch(`/api/reminder-settings/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      setReminderSettings((prev) => prev.filter((r) => r.id !== id));
+      toast({ title: "Rappel supprime" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleToggleReminderActive = async (id: number, isActive: boolean) => {
+    await handleUpdateReminder(id, { isActive });
+  };
+
+  const reminderTypeLabels: Record<string, string> = {
+    mission_start: "Debut formation",
+    mission_end: "Fin formation",
+    task_deadline: "Deadline tache",
+    admin_summary: "Resume admin",
+  };
+
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
@@ -216,7 +396,7 @@ export default function Settings() {
 
         <div className="flex-1 p-6">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid w-full max-w-2xl grid-cols-4">
+            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-6' : 'grid-cols-3'}`}>
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profil</span>
@@ -233,6 +413,18 @@ export default function Settings() {
                 <TabsTrigger value="company" className="flex items-center gap-2">
                   <Building2 className="w-4 h-4" />
                   <span className="hidden sm:inline">Entreprise</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <TabsTrigger value="deadlines" className="flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  <span className="hidden sm:inline">Deadlines</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <TabsTrigger value="reminders" className="flex items-center gap-2">
+                  <BellRing className="w-4 h-4" />
+                  <span className="hidden sm:inline">Rappels</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -747,6 +939,209 @@ export default function Settings() {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+            )}
+
+            {/* Deadlines Tab (Admin only) */}
+            {isAdmin && (
+              <TabsContent value="deadlines">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Deadlines par defaut</CardTitle>
+                        <CardDescription>
+                          Configurez les deadlines automatiques des taches par rapport au 1er jour de formation.
+                          J-X = X jours avant, Jour J = le jour meme, J+X = X jours apres.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsAddingDeadline(true)}
+                        disabled={isAddingDeadline}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingDeadlines ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {isAddingDeadline && (
+                          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label>Nom de la tache</Label>
+                                <Input
+                                  value={newDeadline.taskTitle}
+                                  onChange={(e) => setNewDeadline({ ...newDeadline, taskTitle: e.target.value })}
+                                  placeholder="Ex: Envoyer la convocation"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Jours (positif = avant, negatif = apres)</Label>
+                                <Input
+                                  type="number"
+                                  value={newDeadline.daysBefore}
+                                  onChange={(e) => setNewDeadline({ ...newDeadline, daysBefore: parseInt(e.target.value) || 0 })}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Categorie</Label>
+                                <Input
+                                  value={newDeadline.category}
+                                  onChange={(e) => setNewDeadline({ ...newDeadline, category: e.target.value })}
+                                  placeholder="Ex: Avant la formation"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => setIsAddingDeadline(false)}>
+                                Annuler
+                              </Button>
+                              <Button size="sm" onClick={handleAddDeadline} disabled={isSavingDeadlines}>
+                                {isSavingDeadlines && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Ajouter
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {["Avant la formation", "Pendant la formation", "Apres la formation"].map((cat) => {
+                          const items = deadlineDefaults.filter((d) => d.category === cat);
+                          if (items.length === 0) return null;
+                          return (
+                            <div key={cat}>
+                              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                                {cat}
+                              </h3>
+                              <div className="space-y-2">
+                                {items.map((d: any) => (
+                                  <div
+                                    key={d.id}
+                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium flex-1">{d.taskTitle}</span>
+                                      {editingDeadlineId === d.id ? (
+                                        <div className="flex items-center gap-2">
+                                          <Input
+                                            type="number"
+                                            defaultValue={d.daysBefore}
+                                            className="w-24 h-8"
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                handleUpdateDeadline(d.id, parseInt((e.target as HTMLInputElement).value) || 0);
+                                              }
+                                              if (e.key === 'Escape') setEditingDeadlineId(null);
+                                            }}
+                                            autoFocus
+                                          />
+                                          <span className="text-xs text-muted-foreground">jours</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setEditingDeadlineId(null)}
+                                          >
+                                            Annuler
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setEditingDeadlineId(d.id)}
+                                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
+                                        >
+                                          {formatDeadlineLabel(d.daysBefore)}
+                                          <Edit className="w-3 h-3 ml-1" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive ml-2"
+                                      onClick={() => handleDeleteDeadline(d.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Show uncategorized items */}
+                        {deadlineDefaults.filter((d) => !d.category || !["Avant la formation", "Pendant la formation", "Apres la formation"].includes(d.category)).length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                              Autres
+                            </h3>
+                            <div className="space-y-2">
+                              {deadlineDefaults
+                                .filter((d) => !d.category || !["Avant la formation", "Pendant la formation", "Apres la formation"].includes(d.category))
+                                .map((d: any) => (
+                                  <div
+                                    key={d.id}
+                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-3 flex-1">
+                                      <span className="text-sm font-medium flex-1">{d.taskTitle}</span>
+                                      {editingDeadlineId === d.id ? (
+                                        <div className="flex items-center gap-2">
+                                          <Input
+                                            type="number"
+                                            defaultValue={d.daysBefore}
+                                            className="w-24 h-8"
+                                            onKeyDown={(e) => {
+                                              if (e.key === 'Enter') {
+                                                handleUpdateDeadline(d.id, parseInt((e.target as HTMLInputElement).value) || 0);
+                                              }
+                                              if (e.key === 'Escape') setEditingDeadlineId(null);
+                                            }}
+                                            autoFocus
+                                          />
+                                          <span className="text-xs text-muted-foreground">jours</span>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setEditingDeadlineId(null)}
+                                          >
+                                            Annuler
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={() => setEditingDeadlineId(d.id)}
+                                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
+                                        >
+                                          {formatDeadlineLabel(d.daysBefore)}
+                                          <Edit className="w-3 h-3 ml-1" />
+                                        </button>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive ml-2"
+                                      onClick={() => handleDeleteDeadline(d.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             )}
           </Tabs>

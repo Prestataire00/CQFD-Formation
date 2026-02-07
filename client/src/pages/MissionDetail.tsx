@@ -69,6 +69,8 @@ import {
   Zap,
   Search,
   ChevronsUpDown,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "@/components/ui/rich-text-editor";
 import {
@@ -104,6 +106,9 @@ import {
   useCreateMissionSession,
   useUpdateMissionSession,
   useDeleteMissionSession,
+  useDuplicateMissionMulti,
+  useChildMissions,
+  useParentMission,
 } from "@/hooks/use-missions";
 import {
   Dialog,
@@ -252,12 +257,13 @@ interface TaskItemProps {
   missionId: number;
   isAdmin: boolean;
   users: any[];
+  assignableUsers: any[];
   currentUserId: string;
   onUpdate: (taskId: number, data: any) => void;
   onDelete: (taskId: number) => void;
 }
 
-function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, onDelete }: TaskItemProps) {
+function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete }: TaskItemProps) {
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [comment, setComment] = useState(task.comment || "");
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -331,7 +337,7 @@ function TaskItem({ task, missionId, isAdmin, users, currentUserId, onUpdate, on
                     </SelectTrigger>
                     <SelectContent className="bg-violet-100 border-violet-300">
                       <SelectItem value="unassigned" className="focus:bg-violet-200">Non assigne</SelectItem>
-                      {users?.map((u: any) => (
+                      {assignableUsers?.map((u: any) => (
                         <SelectItem key={u.id} value={u.id} className="focus:bg-violet-200">
                           {u.firstName} {u.lastName}
                         </SelectItem>
@@ -498,6 +504,30 @@ export default function MissionDetail() {
   const { data: allUsers } = useUsers();
   const { data: missionSessions } = useMissionSessions(missionId);
 
+  // Task deadline defaults
+  const [deadlineDefaults, setDeadlineDefaults] = useState<Record<string, number>>({});
+  useEffect(() => {
+    fetch("/api/task-deadline-defaults", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data: any[]) => {
+        const map: Record<string, number> = {};
+        data.forEach((d) => { if (d.isActive) map[d.taskTitle] = d.daysBefore; });
+        setDeadlineDefaults(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Duplication queries
+  const { data: childMissions } = useChildMissions(missionId);
+  const { data: parentMission } = useParentMission(missionId, !!mission?.parentMissionId);
+  const duplicateMissionMulti = useDuplicateMissionMulti();
+
+  // Duplication dialog state
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
+  const [selectedTrainerIds, setSelectedTrainerIds] = useState<string[]>([]);
+  const [duplicateTrainerSearch, setDuplicateTrainerSearch] = useState("");
+  const [duplicateTrainerOpen, setDuplicateTrainerOpen] = useState(false);
+
   // Mutations
   const updateMission = useUpdateMission();
   const updateStatus = useUpdateMissionStatus();
@@ -584,16 +614,36 @@ export default function MissionDetail() {
     }
   };
 
+  // Compute due date based on first session date and deadline defaults
+  const computeDueDate = (taskTitle: string): string | null => {
+    const daysBefore = deadlineDefaults[taskTitle];
+    if (daysBefore === undefined || !missionSessions || missionSessions.length === 0) return null;
+
+    // Sort sessions to get the first one
+    const sortedSessions = [...missionSessions].sort(
+      (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
+    );
+    const firstSessionDate = new Date(sortedSessions[0].sessionDate);
+
+    // daysBefore > 0 means before session, < 0 means after session, 0 means same day
+    const dueDate = new Date(firstSessionDate);
+    dueDate.setDate(dueDate.getDate() - daysBefore);
+    return dueDate.toISOString();
+  };
+
   const handleAddStep = async () => {
     if (!newStepTitle.trim()) return;
     try {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const dueDate = computeDueDate(newStepTitle.trim());
       await createStep.mutateAsync({
         missionId,
         data: {
           title: newStepTitle.trim(),
           status: "todo",
           order: maxOrder + 1,
+          assigneeId: mission?.trainerId || null,
+          dueDate: dueDate || undefined,
         },
       });
       setNewStepTitle("");
@@ -629,12 +679,15 @@ export default function MissionDetail() {
   const handleAddQuickAction = async (actionTitle: string) => {
     try {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const dueDate = computeDueDate(actionTitle);
       await createStep.mutateAsync({
         missionId,
         data: {
           title: actionTitle,
           status: "todo",
           order: maxOrder + 1,
+          assigneeId: mission?.trainerId || null,
+          dueDate: dueDate || undefined,
         },
       });
       toast({ title: "Tache ajoutee" });
@@ -651,12 +704,15 @@ export default function MissionDetail() {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
       for (const action of categoryData.actions) {
         maxOrder++;
+        const dueDate = computeDueDate(action);
         await createStep.mutateAsync({
           missionId,
           data: {
             title: action,
             status: "todo",
             order: maxOrder,
+            assigneeId: mission?.trainerId || null,
+            dueDate: dueDate || undefined,
           },
         });
       }
@@ -747,6 +803,44 @@ export default function MissionDetail() {
       toast({ title: "Periode supprimee" });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  // Trainers already assigned via child missions
+  const assignedTrainerIds = new Set<string>();
+  if (mission?.trainerId) assignedTrainerIds.add(mission.trainerId);
+  if (childMissions) {
+    for (const child of childMissions) {
+      if (child.trainerId) assignedTrainerIds.add(child.trainerId);
+    }
+  }
+
+  const availableTrainersForDuplication = trainers?.filter((t: any) => {
+    if (assignedTrainerIds.has(t.id)) return false;
+    if (!duplicateTrainerSearch) return true;
+    const search = duplicateTrainerSearch.toLowerCase();
+    return `${t.firstName} ${t.lastName}`.toLowerCase().includes(search) || t.email?.toLowerCase().includes(search);
+  }) || [];
+
+  const handleDuplicateMission = async () => {
+    if (selectedTrainerIds.length === 0) return;
+    try {
+      const result = await duplicateMissionMulti.mutateAsync({
+        missionId,
+        trainerIds: selectedTrainerIds,
+      });
+      setIsDuplicateOpen(false);
+      setSelectedTrainerIds([]);
+      toast({
+        title: "Duplication reussie",
+        description: `${result.created?.length || 0} copie(s) creee(s)${result.errors?.length > 0 ? `, ${result.errors.length} erreur(s)` : ""}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de dupliquer la mission",
+        variant: "destructive",
+      });
     }
   };
 
@@ -899,6 +993,23 @@ export default function MissionDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-muted-foreground" />
                 <span>{mission.totalHours} heures au total</span>
+              </div>
+            )}
+
+            {(mission.rateBase || mission.financialTerms) && (
+              <div className="pt-3 border-t space-y-1 text-sm">
+                {mission.rateBase && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Base tarifaire :</span>
+                    <span>{mission.rateBase}</span>
+                  </div>
+                )}
+                {mission.financialTerms && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Modalite financiere :</span>
+                    <span>{mission.financialTerms}</span>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1262,9 +1373,22 @@ export default function MissionDetail() {
 
   // Step 3: Tasks
   const renderTasksStep = () => {
-    // Get users from mission trainers or all users
+    // Get users from mission trainers or all users (for display of names)
     const missionTrainerUsers = missionTrainers?.map((mt: any) => mt.trainer).filter(Boolean) || [];
     const availableUsers = missionTrainerUsers.length > 0 ? missionTrainerUsers : allUsers || [];
+
+    // Assignable users: only Admin(s) + the mission's trainer
+    const assignableUsers: any[] = [];
+    const seenIds = new Set<string>();
+    // Add admins
+    allUsers?.filter((u: any) => u.role === 'admin').forEach((u: any) => {
+      if (!seenIds.has(u.id)) { assignableUsers.push(u); seenIds.add(u.id); }
+    });
+    // Add mission's main trainer
+    if (mission?.trainerId) {
+      const t = allUsers?.find((u: any) => u.id === mission.trainerId);
+      if (t && !seenIds.has(t.id)) { assignableUsers.push(t); seenIds.add(t.id); }
+    }
 
     return (
       <div className="space-y-6">
@@ -1425,6 +1549,7 @@ export default function MissionDetail() {
                         missionId={missionId}
                         isAdmin={isAdmin}
                         users={availableUsers}
+                        assignableUsers={assignableUsers}
                         currentUserId={user?.id || ""}
                         onUpdate={handleUpdateTask}
                         onDelete={handleDeleteStep}
@@ -1469,7 +1594,25 @@ export default function MissionDetail() {
           {/* Participants */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Participants</h2>
+              <div>
+                <h2 className="text-xl font-semibold">Participants</h2>
+                {mission.expectedParticipants != null && (
+                  <p className="text-sm text-muted-foreground">
+                    {missionParticipants?.length || 0} / {mission.expectedParticipants} prevus
+                  </p>
+                )}
+                {mission.hasDisability && (
+                  <div className="mt-1 flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium text-amber-700">Situation de handicap</span>
+                      {mission.disabilityDetails && (
+                        <p className="text-amber-600 text-xs mt-0.5">{mission.disabilityDetails}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <Button variant="outline" onClick={() => setIsAddParticipantOpen(true)}>
                 <UserPlus className="w-4 h-4 mr-2" />
                 Ajouter
@@ -1825,12 +1968,64 @@ export default function MissionDetail() {
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-bold">{mission.title}</h1>
                   {getStatusBadge(mission.status as MissionStatus)}
+                  {mission.isOriginal && childMissions && childMissions.length > 0 && (
+                    <Badge className="bg-purple-100 text-purple-700 border border-purple-300">Original</Badge>
+                  )}
+                  {mission.parentMissionId && (
+                    <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300">Copie</Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {mission.reference} - {client?.name || "Client non defini"}
                 </p>
               </div>
+              {isAdmin && !mission.parentMissionId && (
+                <Button variant="outline" size="sm" onClick={() => setIsDuplicateOpen(true)}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Dupliquer pour un formateur
+                </Button>
+              )}
             </div>
+
+            {/* Banner if this is a copy */}
+            {mission.parentMissionId && parentMission && (
+              <div className="mt-2 flex items-center gap-2 text-sm bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
+                <Copy className="w-4 h-4 text-indigo-500" />
+                <span className="text-indigo-700">
+                  Copie de{" "}
+                  <Link href={`/missions/${parentMission.id}`} className="font-medium underline hover:text-indigo-900">
+                    {parentMission.title} ({parentMission.reference})
+                  </Link>
+                </span>
+                <Link href={`/missions/${parentMission.id}`}>
+                  <ExternalLink className="w-3 h-3 text-indigo-500" />
+                </Link>
+              </div>
+            )}
+
+            {/* Child missions list for originals */}
+            {isAdmin && mission.isOriginal && childMissions && childMissions.length > 0 && (
+              <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
+                <div className="text-sm font-medium text-purple-700 mb-1 flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Copies formateurs ({childMissions.length})
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {childMissions.map((child: any) => {
+                    const childTrainer = trainers?.find((t: any) => t.id === child.trainerId);
+                    return (
+                      <Link key={child.id} href={`/missions/${child.id}`}>
+                        <Badge variant="outline" className="cursor-pointer hover:bg-purple-100 border-purple-300 text-purple-700">
+                          {childTrainer ? `${childTrainer.firstName} ${childTrainer.lastName}` : child.reference}
+                          {" - "}
+                          {getStatusBadge(child.status as MissionStatus)}
+                        </Badge>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1838,6 +2033,103 @@ export default function MissionDetail() {
         <div className="flex-1 p-6 pb-32">
           {renderStepContent()}
         </div>
+
+        {/* Duplication dialog */}
+        <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Dupliquer pour des formateurs</DialogTitle>
+              <DialogDescription>
+                Selectionnez un ou plusieurs formateurs. Chaque formateur recevra une copie independante de cette mission avec ses sessions et participants.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Popover open={duplicateTrainerOpen} onOpenChange={setDuplicateTrainerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between font-normal"
+                  >
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <UserPlus className="w-4 h-4" />
+                      Rechercher un formateur...
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Rechercher un formateur..."
+                      value={duplicateTrainerSearch}
+                      onValueChange={setDuplicateTrainerSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Aucun formateur disponible</CommandEmpty>
+                      <CommandGroup>
+                        {availableTrainersForDuplication
+                          .filter((t: any) => !selectedTrainerIds.includes(t.id))
+                          .map((t: any) => (
+                            <CommandItem
+                              key={t.id}
+                              value={t.id}
+                              onSelect={() => {
+                                setSelectedTrainerIds([...selectedTrainerIds, t.id]);
+                                setDuplicateTrainerSearch("");
+                              }}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              <div className="flex flex-col">
+                                <span>{t.firstName} {t.lastName}</span>
+                                {t.email && <span className="text-xs text-muted-foreground">{t.email}</span>}
+                              </div>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {selectedTrainerIds.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {selectedTrainerIds.map((id) => {
+                    const t = trainers?.find((tr: any) => tr.id === id);
+                    return (
+                      <Badge key={id} variant="secondary" className="flex items-center gap-1 py-1">
+                        <span>{t ? `${t.firstName} ${t.lastName}` : id}</span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTrainerIds(selectedTrainerIds.filter(tid => tid !== id))}
+                          className="ml-1 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {selectedTrainerIds.length} formateur(s) selectionne(s)
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsDuplicateOpen(false); setSelectedTrainerIds([]); }}>
+                Annuler
+              </Button>
+              <Button
+                onClick={handleDuplicateMission}
+                disabled={selectedTrainerIds.length === 0 || duplicateMissionMulti.isPending}
+              >
+                {duplicateMissionMulti.isPending
+                  ? "Duplication..."
+                  : `Dupliquer (${selectedTrainerIds.length})`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Bottom stepper navigation */}
         <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-card border-t shadow-lg z-20">

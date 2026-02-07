@@ -3,7 +3,6 @@ import {
   useClients, 
   useMissions, 
   useInvoices, 
-  useUsers 
 } from "@/hooks/use-missions";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -12,9 +11,9 @@ import { Header } from "@/components/Header";
 import { Sidebar } from "@/components/Sidebar";
 import { 
   Plus, Search, Building2, Mail, Phone, MapPin, 
-  ExternalLink, Briefcase, Receipt, X, Check, Loader2,
-  Users, Euro, UserPlus, Handshake, XCircle, ClipboardCheck,
-  Star, Calendar, UserCircle, Edit3, Fingerprint, UserCheck
+  ExternalLink, Briefcase, X, Check, Loader2, Trash2,
+  Users, Euro, ClipboardCheck,
+  Star, Calendar, UserCircle, Edit3, Fingerprint
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,15 +29,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Client, Mission, Invoice, User, ClientContractStatus } from "@shared/schema";
+import type { Client, Mission, Invoice, User } from "@shared/schema";
 
 // Helper functions
 function getTypeBadge(type: string) {
   const styles: Record<string, { label: string; color: string }> = {
-    entreprise: { label: "Entreprise", color: "bg-blue-100 text-blue-700" },
-    opco: { label: "OPCO", color: "bg-purple-100 text-purple-700" },
-    particulier: { label: "Particulier", color: "bg-green-100 text-green-700" },
-    institution: { label: "Institution", color: "bg-orange-100 text-orange-700" },
+    "privé": { label: "Privé", color: "bg-blue-100 text-blue-700" },
+    "public": { label: "Public", color: "bg-purple-100 text-purple-700" },
+    "particulier": { label: "Particulier", color: "bg-green-100 text-green-700" },
   };
   const { label, color } = styles[type] || { label: type, color: "bg-gray-100 text-gray-700" };
   return <span className={`inline-block text-xs px-2 py-1 rounded-full font-medium ${color}`}>{label}</span>;
@@ -99,7 +97,6 @@ function ClientForm({
   onCancel,
   isSubmitting,
   submitLabel,
-  trainers,
 }: {
   client: any;
   onChange: (data: any) => void;
@@ -107,101 +104,53 @@ function ClientForm({
   onCancel: () => void;
   isSubmitting: boolean;
   submitLabel: string;
-  trainers: User[];
 }) {
   return (
-    <div className="space-y-4 pt-4">
+    <div className="flex flex-col max-h-[70vh]">
+      <div className="flex-1 overflow-y-auto space-y-4 pt-4 pr-2">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Nom de l'entreprise *</Label>
-          <Input 
-            value={client.name} 
-            onChange={(e) => onChange({ ...client, name: e.target.value })} 
+          <Input
+            value={client.name}
+            onChange={(e) => onChange({ ...client, name: e.target.value })}
             placeholder="Nom du client"
             required
           />
         </div>
         <div className="space-y-2">
-          <Label>Type *</Label>
-          <Select 
-            value={client.type} 
+          <Label>Type</Label>
+          <Select
+            value={client.type}
             onValueChange={(v) => onChange({ ...client, type: v })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Sélectionner un type" />
             </SelectTrigger>
             <SelectContent className="bg-violet-100 border-violet-300">
-              <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
-              <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+              <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
+              <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
               <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
-              <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Statut du contrat</Label>
-          <Select 
-            value={client.contractStatus} 
-            onValueChange={(v) => onChange({ ...client, contractStatus: v })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-violet-100 border-violet-300">
-              <SelectItem value="prospect" className="focus:bg-violet-200">Prospect</SelectItem>
-              <SelectItem value="negotiation" className="focus:bg-violet-200">En négociation</SelectItem>
-              <SelectItem value="lost" className="focus:bg-violet-200">Perdu</SelectItem>
-              <SelectItem value="client" className="focus:bg-violet-200">Client</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label>Montant du contrat (€)</Label>
-          <Input 
-            type="number" 
-            value={client.contractAmount} 
-            onChange={(e) => onChange({ ...client, contractAmount: parseFloat(e.target.value) || 0 })} 
-            placeholder="0.00"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Formateur assigné</Label>
-        <Select 
-          value={client.assignedTrainerId || "none"} 
-          onValueChange={(v) => onChange({ ...client, assignedTrainerId: v === "none" ? "" : v })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Choisir un formateur" />
-          </SelectTrigger>
-          <SelectContent className="bg-violet-100 border-violet-300">
-            <SelectItem value="none" className="focus:bg-violet-200">Aucun</SelectItem>
-            {trainers.map((t) => (
-              <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">{t.firstName} {t.lastName}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Contact (Nom)</Label>
-          <Input 
-            value={client.contactName} 
-            onChange={(e) => onChange({ ...client, contactName: e.target.value })} 
+          <Input
+            value={client.contactName}
+            onChange={(e) => onChange({ ...client, contactName: e.target.value })}
             placeholder="Jean Dupont"
           />
         </div>
         <div className="space-y-2">
           <Label>Contact (Email)</Label>
-          <Input 
-            type="email" 
-            value={client.contactEmail} 
-            onChange={(e) => onChange({ ...client, contactEmail: e.target.value })} 
+          <Input
+            type="email"
+            value={client.contactEmail}
+            onChange={(e) => onChange({ ...client, contactEmail: e.target.value })}
             placeholder="jean@entreprise.com"
           />
         </div>
@@ -210,17 +159,17 @@ function ClientForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Contact (Téléphone)</Label>
-          <Input 
-            value={client.contactPhone} 
-            onChange={(e) => onChange({ ...client, contactPhone: e.target.value })} 
+          <Input
+            value={client.contactPhone}
+            onChange={(e) => onChange({ ...client, contactPhone: e.target.value })}
             placeholder="01 23 45 67 89"
           />
         </div>
         <div className="space-y-2">
           <Label>SIRET</Label>
-          <Input 
-            value={client.siret} 
-            onChange={(e) => onChange({ ...client, siret: e.target.value })} 
+          <Input
+            value={client.siret}
+            onChange={(e) => onChange({ ...client, siret: e.target.value })}
             placeholder="14 chiffres"
           />
         </div>
@@ -228,9 +177,9 @@ function ClientForm({
 
       <div className="space-y-2">
         <Label>Adresse</Label>
-        <Input 
-          value={client.address} 
-          onChange={(e) => onChange({ ...client, address: e.target.value })} 
+        <Input
+          value={client.address}
+          onChange={(e) => onChange({ ...client, address: e.target.value })}
           placeholder="12 rue des Fleurs"
         />
       </div>
@@ -238,32 +187,107 @@ function ClientForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Code Postal</Label>
-          <Input 
-            value={client.postalCode} 
-            onChange={(e) => onChange({ ...client, postalCode: e.target.value })} 
+          <Input
+            value={client.postalCode}
+            onChange={(e) => onChange({ ...client, postalCode: e.target.value })}
             placeholder="75001"
           />
         </div>
         <div className="space-y-2">
           <Label>Ville</Label>
-          <Input 
-            value={client.city} 
-            onChange={(e) => onChange({ ...client, city: e.target.value })} 
+          <Input
+            value={client.city}
+            onChange={(e) => onChange({ ...client, city: e.target.value })}
             placeholder="Paris"
           />
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label>Demande spécifique</Label>
-        <Input 
-          value={client.demand} 
-          onChange={(e) => onChange({ ...client, demand: e.target.value })} 
-          placeholder="Détails de la demande..."
+        <Label>Adresse de facturation</Label>
+        <Input
+          value={client.billingAddress}
+          onChange={(e) => onChange({ ...client, billingAddress: e.target.value })}
+          placeholder="Adresse de facturation (si différente)"
         />
       </div>
 
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Code Postal (facturation)</Label>
+          <Input
+            value={client.billingPostalCode}
+            onChange={(e) => onChange({ ...client, billingPostalCode: e.target.value })}
+            placeholder="75001"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Ville (facturation)</Label>
+          <Input
+            value={client.billingCity}
+            onChange={(e) => onChange({ ...client, billingCity: e.target.value })}
+            placeholder="Paris"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Adresse de formation</Label>
+        <Input
+          value={client.trainingAddress}
+          onChange={(e) => onChange({ ...client, trainingAddress: e.target.value })}
+          placeholder="Adresse du lieu de formation (si différente)"
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Code Postal (formation)</Label>
+          <Input
+            value={client.trainingPostalCode}
+            onChange={(e) => onChange({ ...client, trainingPostalCode: e.target.value })}
+            placeholder="75001"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Ville (formation)</Label>
+          <Input
+            value={client.trainingCity}
+            onChange={(e) => onChange({ ...client, trainingCity: e.target.value })}
+            placeholder="Paris"
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Origine</Label>
+        <Input
+          value={client.origine}
+          onChange={(e) => onChange({ ...client, origine: e.target.value })}
+          placeholder="Ex: Bouche à oreille, Salon professionnel..."
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Réseaux sociaux</Label>
+        <Input
+          value={client.socialMedia}
+          onChange={(e) => onChange({ ...client, socialMedia: e.target.value })}
+          placeholder="Ex: LinkedIn, Instagram, site web..."
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Demande spécifique</Label>
+        <Input
+          value={client.demand}
+          onChange={(e) => onChange({ ...client, demand: e.target.value })}
+          placeholder="Détails de la demande..."
+        />
+      </div>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4 border-t mt-4">
         <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
           Annuler
         </Button>
@@ -282,25 +306,21 @@ function ClientDetailDialog({
   stats,
   isOpen,
   onClose,
-  trainers,
   onSave,
+  onDelete,
 }: {
   client: Client;
   stats: ClientStats;
   isOpen: boolean;
   onClose: () => void;
-  trainers: User[];
   onSave: (data: any) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
 }) {
-  const { data: users } = useUsers();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editedClient, setEditedClient] = useState({
     name: client.name,
     type: client.type,
-    contractStatus: client.contractStatus || "prospect",
-    contractAmount: (client.contractAmount || 0) / 100,
-    assignedTrainerId: client.assignedTrainerId || "",
     siret: client.siret || "",
     address: client.address || "",
     city: client.city || "",
@@ -308,6 +328,14 @@ function ClientDetailDialog({
     contactName: client.contactName || "",
     contactEmail: client.contactEmail || "",
     contactPhone: client.contactPhone || "",
+    billingAddress: (client as any).billingAddress || "",
+    billingPostalCode: (client as any).billingPostalCode || "",
+    billingCity: (client as any).billingCity || "",
+    trainingAddress: (client as any).trainingAddress || "",
+    trainingPostalCode: (client as any).trainingPostalCode || "",
+    trainingCity: (client as any).trainingCity || "",
+    origine: (client as any).origine || "",
+    socialMedia: (client as any).socialMedia || "",
     demand: client.demand || "",
   });
 
@@ -315,9 +343,6 @@ function ClientDetailDialog({
     setEditedClient({
       name: client.name,
       type: client.type,
-      contractStatus: client.contractStatus || "prospect",
-      contractAmount: (client.contractAmount || 0) / 100,
-      assignedTrainerId: client.assignedTrainerId || "",
       siret: client.siret || "",
       address: client.address || "",
       city: client.city || "",
@@ -325,6 +350,14 @@ function ClientDetailDialog({
       contactName: client.contactName || "",
       contactEmail: client.contactEmail || "",
       contactPhone: client.contactPhone || "",
+      billingAddress: (client as any).billingAddress || "",
+      billingPostalCode: (client as any).billingPostalCode || "",
+      billingCity: (client as any).billingCity || "",
+      trainingAddress: (client as any).trainingAddress || "",
+      trainingPostalCode: (client as any).trainingPostalCode || "",
+      trainingCity: (client as any).trainingCity || "",
+      origine: (client as any).origine || "",
+      socialMedia: (client as any).socialMedia || "",
       demand: client.demand || "",
     });
     setIsEditing(false);
@@ -333,23 +366,13 @@ function ClientDetailDialog({
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      await onSave({
-        ...editedClient,
-        contractAmount: Math.round(editedClient.contractAmount * 100),
-        assignedTrainerId: editedClient.assignedTrainerId || null,
-      });
+      await onSave(editedClient);
       setIsEditing(false);
     } catch (error) {
       console.error("Save error:", error);
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const getTrainerName = (trainerId: string | null | undefined) => {
-    if (!trainerId || !users) return "Non assigné";
-    const trainer = users.find((u: User) => u.id === trainerId);
-    return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigné";
   };
 
   return (
@@ -392,13 +415,12 @@ function ClientDetailDialog({
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">TYPE</Label>
-                    <Select value={editedClient.type} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    <Select value={editedClient.type || ""} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
                       <SelectContent className="bg-violet-100 border-violet-300">
-                        <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
-                        <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+                        <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
+                        <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
                         <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
-                        <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -407,37 +429,25 @@ function ClientDetailDialog({
                 <>
                   <div className="space-y-1">
                     <span className="text-xs text-muted-foreground uppercase font-semibold">Type</span>
-                    <div>{getTypeBadge(client.type)}</div>
+                    <div>{getTypeBadge(client.type || "")}</div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Statut</span>
-                    <Badge variant="outline" className={
-                      client.contractStatus === "client" ? "bg-green-100 text-green-700" :
-                      client.contractStatus === "negotiation" ? "bg-amber-100 text-amber-700" :
-                      client.contractStatus === "lost" ? "bg-red-100 text-red-700" :
-                      "bg-blue-100 text-blue-700"
-                    }>
-                      {client.contractStatus === "client" ? "Client" :
-                       client.contractStatus === "negotiation" ? "En négociation" :
-                       client.contractStatus === "lost" ? "Perdu" : "Prospect"}
-                    </Badge>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">SIRET</span>
+                    <div className="flex items-center gap-2">
+                      <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                      <span>{client.siret || "-"}</span>
+                    </div>
                   </div>
                 </>
               )}
-              
+
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">SIRET</span>
-                <div className="flex items-center gap-2">
-                  <Fingerprint className="w-4 h-4 text-muted-foreground" />
-                  <span>{client.siret || "-"}</span>
-                </div>
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Origine</span>
+                <div>{client.origine || "-"}</div>
               </div>
               <div className="space-y-1">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">Formateur assigné</span>
-                <div className="flex items-center gap-2">
-                  <UserCheck className="w-4 h-4 text-muted-foreground" />
-                  <span>{getTrainerName(client.assignedTrainerId)}</span>
-                </div>
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Réseaux sociaux</span>
+                <div>{client.socialMedia || "-"}</div>
               </div>
             </div>
 
@@ -457,11 +467,34 @@ function ClientDetailDialog({
                 <div className="flex items-start gap-3 border-t pt-3">
                   <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
                   <div>
+                    <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse du client</div>
                     {client.address || "-"}
                     <br />
                     {client.postalCode} {client.city}
                   </div>
                 </div>
+                {((client as any).billingAddress || (client as any).billingCity) && (
+                  <div className="flex items-start gap-3 border-t pt-3">
+                    <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse de facturation</div>
+                      {(client as any).billingAddress || "-"}
+                      <br />
+                      {(client as any).billingPostalCode} {(client as any).billingCity}
+                    </div>
+                  </div>
+                )}
+                {((client as any).trainingAddress || (client as any).trainingCity) && (
+                  <div className="flex items-start gap-3 border-t pt-3">
+                    <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse de formation</div>
+                      {(client as any).trainingAddress || "-"}
+                      <br />
+                      {(client as any).trainingPostalCode} {(client as any).trainingCity}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -477,16 +510,6 @@ function ClientDetailDialog({
                 <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-center">
                   <div className="text-2xl font-bold text-orange-700">{stats.upcomingMissions}</div>
                   <div className="text-xs text-orange-600">Missions à venir</div>
-                </div>
-                <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-green-700">{formatCurrency(stats.totalRevenue)}</div>
-                  <div className="text-xs text-green-600">CA cumulé</div>
-                </div>
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-                  <div className="text-2xl font-bold text-yellow-700">
-                    {stats.avgSatisfaction !== null ? `${stats.avgSatisfaction.toFixed(1)}/5` : "-"}
-                  </div>
-                  <div className="text-xs text-yellow-600">Satisfaction</div>
                 </div>
               </div>
             </div>
@@ -512,27 +535,21 @@ function ClientDetailDialog({
               </div>
             </div>
 
-            <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
-                <Receipt className="w-5 h-5" /> Factures ({stats.invoices.length})
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                {stats.invoices.map((invoice) => (
-                  <div key={invoice.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm">
-                    <div className="min-w-0 flex-1 mr-2">
-                      <div className="font-medium truncate">{invoice.invoiceNumber}</div>
-                      <div className="text-[10px] font-semibold">{formatCurrency(invoice.amount)}</div>
-                    </div>
-                    <Badge variant="outline" className={`text-[10px] ${invoice.status === "paid" ? "bg-green-100 text-green-700" : ""}`}>
-                      {invoice.status === "paid" ? "Payée" : "En cours"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
-        <DialogFooter className="mt-6">
+        <DialogFooter className="mt-6 flex justify-between">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => {
+              if (window.confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) {
+                onDelete(client.id);
+              }
+            }}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Supprimer
+          </Button>
           <Button variant="outline" onClick={onClose}>Fermer</Button>
         </DialogFooter>
       </DialogContent>
@@ -544,23 +561,17 @@ export default function Clients() {
   const { data: clients, isLoading: clientsLoading } = useClients();
   const { data: missions } = useMissions();
   const { data: invoices } = useInvoices();
-  const { data: users } = useUsers();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [contractFilter, setContractFilter] = useState("all");
-  const [trainerFilter, setTrainerFilter] = useState("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
   const [newClient, setNewClient] = useState({
     name: "",
-    type: "entreprise" as any,
-    contractStatus: "prospect" as ClientContractStatus,
-    contractAmount: 0,
-    assignedTrainerId: "",
+    type: "" as any,
     siret: "",
     address: "",
     city: "",
@@ -568,13 +579,16 @@ export default function Clients() {
     contactName: "",
     contactEmail: "",
     contactPhone: "",
+    billingAddress: "",
+    billingPostalCode: "",
+    billingCity: "",
+    trainingAddress: "",
+    trainingPostalCode: "",
+    trainingCity: "",
+    origine: "",
+    socialMedia: "",
     demand: "",
   });
-
-  const trainers = useMemo(() => {
-    if (!users) return [];
-    return users.filter((u: User) => u.role === "formateur" || u.role === "prestataire");
-  }, [users]);
 
   const clientStatsMap = useMemo(() => {
     const statsMap = new Map<number, ClientStats>();
@@ -604,12 +618,12 @@ export default function Clients() {
   }, [clients, missions, invoices]);
 
   const kpis = useMemo(() => {
-    if (!clients) return { prospects: 0, negotiation: 0, lost: 0, activeClients: 0, totalRevenue: 0 };
+    if (!clients) return { totalClients: 0, prive: 0, publique: 0, particulier: 0, totalRevenue: 0 };
     return {
-      prospects: clients.filter(c => (c.contractStatus || "prospect") === "prospect").length,
-      negotiation: clients.filter(c => c.contractStatus === "negotiation").length,
-      lost: clients.filter(c => c.contractStatus === "lost").length,
-      activeClients: clients.filter(c => c.contractStatus === "client").length,
+      totalClients: clients.length,
+      prive: clients.filter(c => c.type === "privé").length,
+      publique: clients.filter(c => c.type === "public").length,
+      particulier: clients.filter(c => c.type === "particulier").length,
       totalRevenue: Array.from(clientStatsMap.values()).reduce((sum, s) => sum + s.totalRevenue, 0),
     };
   }, [clients, clientStatsMap]);
@@ -617,25 +631,19 @@ export default function Clients() {
   const filteredClients = useMemo(() => {
     if (!clients) return [];
     return clients.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           c.contactEmail?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesType = typeFilter === "all" || c.type === typeFilter;
-      const matchesContract = contractFilter === "all" || (c.contractStatus || "prospect") === contractFilter;
-      const matchesTrainer = trainerFilter === "all" || c.assignedTrainerId === trainerFilter;
-      return matchesSearch && matchesType && matchesContract && matchesTrainer;
+      return matchesSearch && matchesType;
     });
-  }, [clients, searchTerm, typeFilter, contractFilter, trainerFilter]);
+  }, [clients, searchTerm, typeFilter]);
 
   const handleCreateClient = async () => {
     try {
       const res = await fetch("/api/clients", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newClient,
-          contractAmount: Math.round(newClient.contractAmount * 100),
-          assignedTrainerId: newClient.assignedTrainerId || null,
-        }),
+        body: JSON.stringify(newClient),
       });
       if (!res.ok) throw new Error();
       setIsCreateOpen(false);
@@ -663,13 +671,22 @@ export default function Clients() {
     }
   };
 
+  const handleDeleteClient = async (id: number) => {
+    try {
+      const response = await fetch(`/api/clients/${id}`, { method: "DELETE" });
+      if (!response.ok) throw new Error();
+      setSelectedClient(null);
+      await queryClient.invalidateQueries({ queryKey: [api.clients.list.path] });
+      toast({ title: "Client supprimé", description: "Le client a été supprimé avec succès." });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer le client.", variant: "destructive" });
+    }
+  };
+
   const resetForm = () => {
     setNewClient({
       name: "",
-      type: "entreprise",
-      contractStatus: "prospect",
-      contractAmount: 0,
-      assignedTrainerId: "",
+      type: "",
       siret: "",
       address: "",
       city: "",
@@ -677,6 +694,14 @@ export default function Clients() {
       contactName: "",
       contactEmail: "",
       contactPhone: "",
+      billingAddress: "",
+      billingPostalCode: "",
+      billingCity: "",
+      trainingAddress: "",
+      trainingPostalCode: "",
+      trainingCity: "",
+      origine: "",
+      socialMedia: "",
       demand: "",
     });
   };
@@ -688,11 +713,11 @@ export default function Clients() {
         <Header title="Clients" />
         <div className="flex-1 p-6 space-y-6">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <StatCard title="Prospects" value={kpis.prospects} icon={UserPlus} color="bg-blue-100 text-blue-600" />
-            <StatCard title="Négociation" value={kpis.negotiation} icon={Handshake} color="bg-amber-100 text-amber-600" />
-            <StatCard title="Perdus" value={kpis.lost} icon={XCircle} color="bg-red-100 text-red-600" />
-            <StatCard title="Clients" value={kpis.activeClients} icon={Users} color="bg-green-100 text-green-600" />
-            <StatCard title="CA Total" value={formatCurrency(kpis.totalRevenue)} icon={Euro} color="bg-purple-100 text-purple-600" />
+            <StatCard title="Total clients" value={kpis.totalClients} icon={Users} color="bg-blue-100 text-blue-600" />
+            <StatCard title="Privé" value={kpis.prive} icon={Building2} color="bg-indigo-100 text-indigo-600" />
+            <StatCard title="Public" value={kpis.publique} icon={Building2} color="bg-purple-100 text-purple-600" />
+            <StatCard title="Particulier" value={kpis.particulier} icon={UserCircle} color="bg-green-100 text-green-600" />
+            <StatCard title="CA Total" value={formatCurrency(kpis.totalRevenue)} icon={Euro} color="bg-amber-100 text-amber-600" />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -705,27 +730,16 @@ export default function Clients() {
                 <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les types</SelectItem>
-                  <SelectItem value="entreprise" className="focus:bg-violet-200">Entreprise</SelectItem>
-                  <SelectItem value="opco" className="focus:bg-violet-200">OPCO</SelectItem>
+                  <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
+                  <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
                   <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
-                  <SelectItem value="institution" className="focus:bg-violet-200">Institution</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={contractFilter} onValueChange={setContractFilter}>
-                <SelectTrigger className="w-44"><SelectValue placeholder="Contrat" /></SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
-                  <SelectItem value="prospect" className="focus:bg-violet-200">Prospect</SelectItem>
-                  <SelectItem value="negotiation" className="focus:bg-violet-200">Négociation</SelectItem>
-                  <SelectItem value="lost" className="focus:bg-violet-200">Perdu</SelectItem>
-                  <SelectItem value="client" className="focus:bg-violet-200">Client</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Nouveau client</Button></DialogTrigger>
               <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Ajouter un client</DialogTitle></DialogHeader>
-                <ClientForm client={newClient} onChange={setNewClient} onSubmit={handleCreateClient} onCancel={() => setIsCreateOpen(false)} isSubmitting={false} submitLabel="Ajouter" trainers={trainers} />
+                <ClientForm client={newClient} onChange={setNewClient} onSubmit={handleCreateClient} onCancel={() => setIsCreateOpen(false)} isSubmitting={false} submitLabel="Ajouter" />
               </DialogContent>
             </Dialog>
           </div>
@@ -757,8 +771,8 @@ export default function Clients() {
             stats={clientStatsMap.get(selectedClient.id)!}
             isOpen={true}
             onClose={() => setSelectedClient(null)}
-            trainers={trainers}
             onSave={handleUpdateClient}
+            onDelete={handleDeleteClient}
           />
         )}
       </main>

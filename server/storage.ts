@@ -5,7 +5,7 @@ import {
   messages, projects, tasks, reminderSettings, reminders, passwordResetTokens,
   xpTransactions, badges, userBadges, inAppNotifications,
   feedbackQuestionnaires, feedbackQuestions, feedbackResponseTokens, feedbackResponses,
-  companySettings, clientContracts, clientInvoices, personalNotes,
+  companySettings, clientContracts, clientInvoices, taskDeadlineDefaults, personalNotes,
   type User, type PasswordResetToken, type Client, type TrainingProgram, type Mission, type MissionClient, type MissionTrainer, type MissionStep,
   type StepTask, type MissionSession, type Participant, type MissionParticipant,
   type AttendanceRecord, type Evaluation, type AuditLog, type Invoice,
@@ -14,7 +14,7 @@ import {
   type ReminderSetting, type Reminder, type InAppNotification,
   type XPTransaction, type Badge, type UserBadge,
   type FeedbackQuestionnaire, type FeedbackQuestion, type FeedbackResponseToken, type FeedbackResponse,
-  type CompanySettings, type ClientContract, type ClientInvoice, type PersonalNote,
+  type CompanySettings, type ClientContract, type ClientInvoice, type TaskDeadlineDefault, type PersonalNote,
   type InsertClient, type InsertTrainingProgram, type InsertMission,
   type InsertMissionClient, type InsertMissionTrainer, type InsertMissionStep, type InsertStepTask, type InsertMissionSession, type InsertParticipant,
   type InsertMissionParticipant, type InsertAttendanceRecord,
@@ -24,7 +24,7 @@ import {
   type InsertReminderSetting, type InsertReminder, type InsertInAppNotification,
   type InsertXPTransaction, type InsertBadge, type InsertUserBadge,
   type InsertFeedbackQuestionnaire, type InsertFeedbackQuestion, type InsertFeedbackResponseToken, type InsertFeedbackResponse,
-  type InsertCompanySettings, type InsertClientContract, type InsertClientInvoice, type InsertPersonalNote,
+  type InsertCompanySettings, type InsertClientContract, type InsertClientInvoice, type InsertTaskDeadlineDefault, type InsertPersonalNote,
   type MissionStatus, type InvoiceStatus, type StepStatus
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
@@ -45,7 +45,7 @@ export interface IStorage {
   updateUser(id: string, data: Partial<User>): Promise<User | undefined>;
 
   // Password Reset Tokens
-  createPasswordResetToken(userId: string): Promise<PasswordResetToken>;
+  createPasswordResetToken(userId: string, ttlMs?: number): Promise<PasswordResetToken>;
   getPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markTokenAsUsed(token: string): Promise<void>;
   deleteExpiredTokens(): Promise<void>;
@@ -267,6 +267,13 @@ export interface IStorage {
   createFeedbackResponse(response: InsertFeedbackResponse): Promise<FeedbackResponse>;
 
   // Personal Notes
+  // Task Deadline Defaults
+  getTaskDeadlineDefaults(): Promise<TaskDeadlineDefault[]>;
+  getTaskDeadlineDefaultByTitle(taskTitle: string): Promise<TaskDeadlineDefault | undefined>;
+  createTaskDeadlineDefault(data: InsertTaskDeadlineDefault): Promise<TaskDeadlineDefault>;
+  updateTaskDeadlineDefault(id: number, data: Partial<TaskDeadlineDefault>): Promise<TaskDeadlineDefault | undefined>;
+  deleteTaskDeadlineDefault(id: number): Promise<boolean>;
+
   getPersonalNotes(userId: string): Promise<PersonalNote[]>;
   getPersonalNote(id: number): Promise<PersonalNote | undefined>;
   createPersonalNote(note: InsertPersonalNote): Promise<PersonalNote>;
@@ -333,6 +340,7 @@ export class DatabaseStorage implements IStorage {
     const passwordHash = await bcrypt.hash(password, 10);
     const [newUser] = await db.insert(users).values({
       ...userData,
+      status: userData.status || 'ACTIF',
       passwordHash,
     } as any).returning();
     return newUser;
@@ -372,10 +380,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ==================== PASSWORD RESET TOKENS ====================
-  async createPasswordResetToken(userId: string): Promise<PasswordResetToken> {
+  async createPasswordResetToken(userId: string, ttlMs: number = 60 * 60 * 1000): Promise<PasswordResetToken> {
     const crypto = await import('crypto');
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+    const expiresAt = new Date(Date.now() + ttlMs);
 
     // Delete any existing tokens for this user
     await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, userId));
@@ -548,34 +556,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async duplicateMissionForTrainer(originalMissionId: number, newTrainerId: string): Promise<Mission | undefined> {
-    // Get the original mission
-    const originalMission = await this.getMission(originalMissionId);
-    if (!originalMission) return undefined;
-
-    // Create a copy of the mission for the new trainer
-    const { id, createdAt, updatedAt, ...missionData } = originalMission;
-    const [duplicatedMission] = await db.insert(missions).values({
-      ...missionData,
-      trainerId: newTrainerId,
-      title: `${missionData.title} (Copie)`,
-    }).returning();
-
-    // Attach template documents for the new trainer
-    if (newTrainerId) {
-      await this.attachTemplateDocumentsToMission(duplicatedMission.id, newTrainerId);
+    const result = await this.duplicateMissionForMultipleTrainers(originalMissionId, [newTrainerId]);
+    if (result.created.length > 0) {
+      return result.created[0];
     }
-
-    // Copy steps (tâches)
-    const originalSteps = await this.getMissionSteps(originalMissionId);
-    for (const step of originalSteps) {
-      const { id, missionId, createdAt, updatedAt, ...stepData } = step;
-      await this.createMissionStep({
-        ...stepData,
-        missionId: duplicatedMission.id,
-      });
+    if (result.errors.length > 0) {
+      throw new Error(result.errors[0].error);
     }
-
-    return duplicatedMission;
+    return undefined;
   }
 
   // ==================== MULTI-TRAINER DUPLICATION ====================
@@ -642,6 +630,25 @@ export class DatabaseStorage implements IStorage {
             // Reset completion status for new trainer
             isCompleted: false,
             status: 'todo',
+          });
+        }
+
+        // Copy all sessions
+        const originalSessions = await this.getMissionSessions(originalMissionId);
+        for (const session of originalSessions) {
+          const { id: sessionId, missionId: sessionMissionId, ...sessionData } = session;
+          await this.createMissionSession({
+            ...sessionData,
+            missionId: newMission.id,
+          });
+        }
+
+        // Copy all participants
+        const originalParticipants = await this.getMissionParticipants(originalMissionId);
+        for (const mp of originalParticipants) {
+          await this.addParticipantToMission({
+            missionId: newMission.id,
+            participantId: mp.participantId,
           });
         }
 
@@ -1821,6 +1828,35 @@ export class DatabaseStorage implements IStorage {
 
     const nextNumber = (invoicesList.length + 1).toString().padStart(4, '0');
     return `${prefix}-${year}-${nextNumber}`;
+  }
+
+  // ==================== PERSONAL NOTES ====================
+  // ==================== TASK DEADLINE DEFAULTS ====================
+  async getTaskDeadlineDefaults(): Promise<TaskDeadlineDefault[]> {
+    return await db.select().from(taskDeadlineDefaults).orderBy(taskDeadlineDefaults.category, taskDeadlineDefaults.taskTitle);
+  }
+
+  async getTaskDeadlineDefaultByTitle(taskTitle: string): Promise<TaskDeadlineDefault | undefined> {
+    const [result] = await db.select().from(taskDeadlineDefaults).where(eq(taskDeadlineDefaults.taskTitle, taskTitle));
+    return result;
+  }
+
+  async createTaskDeadlineDefault(data: InsertTaskDeadlineDefault): Promise<TaskDeadlineDefault> {
+    const [created] = await db.insert(taskDeadlineDefaults).values(data).returning();
+    return created;
+  }
+
+  async updateTaskDeadlineDefault(id: number, data: Partial<TaskDeadlineDefault>): Promise<TaskDeadlineDefault | undefined> {
+    const [updated] = await db.update(taskDeadlineDefaults)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(taskDeadlineDefaults.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTaskDeadlineDefault(id: number): Promise<boolean> {
+    await db.delete(taskDeadlineDefaults).where(eq(taskDeadlineDefaults.id, id));
+    return true;
   }
 
   // ==================== PERSONAL NOTES ====================

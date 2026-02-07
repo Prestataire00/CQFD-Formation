@@ -380,7 +380,7 @@ export function useMissionSteps(missionId: number) {
 export function useCreateMissionStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null } }) => {
+    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null; assigneeId?: string | null } }) => {
       const url = buildUrl(api.missions.steps.create.path, { id: missionId });
       const res = await fetch(url, {
         method: 'POST',

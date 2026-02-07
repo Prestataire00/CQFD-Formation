@@ -21,7 +21,7 @@ export const users = pgTable("users", {
   passwordHash: varchar("password_hash"),
   profileImageUrl: varchar("profile_image_url"),
   role: text("role").default("subcontractor").notNull(), // admin, formateur, prestataire
-  status: text("status").default("active").notNull(), // active, inactive, deleted
+  status: text("status").default("ACTIF").notNull(), // ACTIF, INACTIF, SUPPRIME
   phone: varchar("phone"),
   address: text("address"),
   siret: varchar("siret"), // For prestataires (subcontractors)
@@ -57,7 +57,7 @@ export type ClientContractStatus = 'prospect' | 'negotiation' | 'lost' | 'client
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
-  type: text("type").default("entreprise").notNull(), // entreprise, opco, particulier, institution
+  type: text("type").default(""), // privé, public, particulier
   contractStatus: text("contract_status").default("prospect").notNull(), // prospect, negotiation, lost, client
   contractAmount: integer("contract_amount").default(0), // Montant du contrat en centimes
   assignedTrainerId: text("assigned_trainer_id"), // Formateur assigné à ce client
@@ -70,6 +70,14 @@ export const clients = pgTable("clients", {
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
+  billingAddress: text("billing_address"),
+  billingPostalCode: text("billing_postal_code"),
+  billingCity: text("billing_city"),
+  trainingAddress: text("training_address"),
+  trainingPostalCode: text("training_postal_code"),
+  trainingCity: text("training_city"),
+  origine: text("origine"),
+  socialMedia: text("social_media"),
   demand: text("demand"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -110,6 +118,11 @@ export const missions = pgTable("missions", {
   clientId: integer("client_id").references(() => clients.id),
   programId: integer("program_id").references(() => trainingPrograms.id),
   programTitle: text("program_title"), // Titre du programme en texte libre
+  expectedParticipants: integer("expected_participants"), // Nombre de participants prévus
+  hasDisability: boolean("has_disability").default(false), // Situation de handicap signalée
+  disabilityDetails: text("disability_details"), // Détails sur la situation de handicap
+  rateBase: text("rate_base"), // Base tarifaire (saisie libre)
+  financialTerms: text("financial_terms"), // Modalité financière (saisie libre)
   // Multi-trainer duplication fields
   parentMissionId: integer("parent_mission_id"), // Reference to original mission if this is a copy
   isOriginal: boolean("is_original").default(true).notNull(), // true = original, false = copy
@@ -539,6 +552,18 @@ export const feedbackResponses = pgTable("feedback_responses", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// --- TASK DEADLINE DEFAULTS ---
+// Defines default deadlines (relative to 1st training session) for each task type
+export const taskDeadlineDefaults = pgTable("task_deadline_defaults", {
+  id: serial("id").primaryKey(),
+  taskTitle: text("task_title").notNull().unique(), // Title matching quick action or manual task
+  daysBefore: integer("days_before").notNull(), // Positive = before 1st session, negative = after
+  category: text("category"), // "Avant la formation", "Pendant la formation", "Apres la formation"
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // --- PERSONAL NOTES ---
 export const personalNotes = pgTable("personal_notes", {
   id: serial("id").primaryKey(),
@@ -587,6 +612,7 @@ export const insertFeedbackResponseSchema = createInsertSchema(feedbackResponses
 export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({ id: true, updatedAt: true });
 export const insertClientContractSchema = createInsertSchema(clientContracts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTaskDeadlineDefaultSchema = createInsertSchema(taskDeadlineDefaults).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPersonalNoteSchema = createInsertSchema(personalNotes).omit({ id: true, createdAt: true, updatedAt: true });
 
 // --- TYPES ---
@@ -662,5 +688,7 @@ export type ClientInvoice = typeof clientInvoices.$inferSelect;
 export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
 export type InsertClientContract = z.infer<typeof insertClientContractSchema>;
 export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;
+export type TaskDeadlineDefault = typeof taskDeadlineDefaults.$inferSelect;
+export type InsertTaskDeadlineDefault = z.infer<typeof insertTaskDeadlineDefaultSchema>;
 export type PersonalNote = typeof personalNotes.$inferSelect;
 export type InsertPersonalNote = z.infer<typeof insertPersonalNoteSchema>;

@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty } from "./email";
+import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
@@ -104,6 +104,26 @@ export async function registerRoutes(
       const input = api.users.create.input.parse(req.body);
       const { password, ...userData } = input;
       const user = await storage.createUser(userData, password);
+
+      // Send welcome email with account setup link (72h TTL)
+      if (user.email) {
+        try {
+          const TTL_72H = 72 * 60 * 60 * 1000;
+          const resetToken = await storage.createPasswordResetToken(user.id, TTL_72H);
+          const baseUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+          await sendWelcomeEmail(
+            user.email,
+            user.firstName || '',
+            user.lastName || '',
+            resetToken.token,
+            baseUrl
+          );
+          console.log(`[Welcome Email] Email de bienvenue envoyé à ${user.email}`);
+        } catch (emailErr) {
+          console.error(`[Welcome Email] Erreur lors de l'envoi de l'email de bienvenue à ${user.email}:`, emailErr);
+        }
+      }
+
       // Remove passwordHash from response
       const { passwordHash, ...userWithoutPassword } = user as any;
       res.status(201).json(userWithoutPassword);
@@ -218,6 +238,16 @@ export async function registerRoutes(
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
+      throw err;
+    }
+  });
+
+  app.delete('/api/clients/:id', isAuthenticated, requirePermission('clients:create'), async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      await storage.updateClient(id, { isActive: false } as any);
+      res.json({ success: true });
+    } catch (err) {
       throw err;
     }
   });
@@ -977,6 +1007,15 @@ export async function registerRoutes(
     }
     
     const docs = await storage.getDocumentsByMission(missionId);
+
+    // Filtrer les documents pour les formateurs/prestataires :
+    // ils ne voient que leurs propres documents et les documents système (sans userId)
+    if (user.role === 'formateur' || user.role === 'prestataire') {
+      const filteredDocs = docs.filter(doc => doc.userId === user.id || !doc.userId);
+      res.json(filteredDocs);
+      return;
+    }
+
     res.json(docs);
   });
 
@@ -2304,6 +2343,49 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== TASK DEADLINE DEFAULTS ====================
+  app.get(api.taskDeadlineDefaults.list.path, isAuthenticated, async (req, res) => {
+    const defaults = await storage.getTaskDeadlineDefaults();
+    res.json(defaults);
+  });
+
+  app.post(api.taskDeadlineDefaults.create.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const input = api.taskDeadlineDefaults.create.input.parse(req.body);
+      const created = await storage.createTaskDeadlineDefault(input);
+      res.status(201).json(created);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.taskDeadlineDefaults.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const input = api.taskDeadlineDefaults.update.input.parse(req.body);
+      const updated = await storage.updateTaskDeadlineDefault(Number(req.params.id), input);
+      if (!updated) {
+        res.status(404).json({ message: "Parametre non trouve" });
+        return;
+      }
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.taskDeadlineDefaults.delete.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.deleteTaskDeadlineDefault(Number(req.params.id));
+    res.json({ success: true });
+  });
+
   // ==================== GAMIFICATION ====================
   // Get gamification profile for current user
   app.get('/api/gamification/profile', isAuthenticated, async (req, res) => {
@@ -2675,6 +2757,7 @@ export async function registerRoutes(
   await seedDatabase().catch(err => console.error('Error seeding database:', err));
   await seedBadges().catch(err => console.error('Error seeding badges:', err));
   await seedDefaultTemplates().catch(err => console.error('Error seeding default templates:', err));
+  await seedTaskDeadlineDefaults().catch(err => console.error('Error seeding task deadline defaults:', err));
 
   return httpServer;
 }
@@ -2867,5 +2950,44 @@ async function seedBadges() {
     console.log(`Seeded ${DEFAULT_BADGES.length} badges`);
   } catch (err) {
     console.error('Error seeding badges:', err);
+  }
+}
+
+// Seed default task deadline defaults
+async function seedTaskDeadlineDefaults() {
+  try {
+    const existing = await storage.getTaskDeadlineDefaults();
+    if (existing.length > 0) {
+      return; // Already seeded
+    }
+
+    console.log('Seeding default task deadline defaults...');
+
+    const defaults = [
+      // Avant la formation (positive = before 1st session)
+      { taskTitle: "Envoyer la convocation", daysBefore: 14, category: "Avant la formation" },
+      { taskTitle: "Envoyer le questionnaire de positionnement", daysBefore: 21, category: "Avant la formation" },
+      { taskTitle: "Valider le programme avec le client", daysBefore: 30, category: "Avant la formation" },
+      { taskTitle: "Reserver la salle", daysBefore: 30, category: "Avant la formation" },
+      { taskTitle: "Preparer les supports de formation", daysBefore: 7, category: "Avant la formation" },
+      { taskTitle: "Envoyer les consignes au formateur", daysBefore: 7, category: "Avant la formation" },
+      // Pendant la formation (0 = day of session)
+      { taskTitle: "Verifier les emargements", daysBefore: 0, category: "Pendant la formation" },
+      { taskTitle: "Suivre le bon deroulement", daysBefore: 0, category: "Pendant la formation" },
+      // Apres la formation (negative = after last session)
+      { taskTitle: "Envoyer le questionnaire de satisfaction", daysBefore: -1, category: "Apres la formation" },
+      { taskTitle: "Recuperer les emargements signes", daysBefore: -3, category: "Apres la formation" },
+      { taskTitle: "Faire le bilan avec le formateur", daysBefore: -7, category: "Apres la formation" },
+      { taskTitle: "Envoyer les attestations", daysBefore: -14, category: "Apres la formation" },
+      { taskTitle: "Envoyer le compte-rendu au client", daysBefore: -14, category: "Apres la formation" },
+      { taskTitle: "Facturer la mission", daysBefore: -30, category: "Apres la formation" },
+    ];
+
+    for (const d of defaults) {
+      await storage.createTaskDeadlineDefault(d);
+    }
+    console.log(`Seeded ${defaults.length} task deadline defaults`);
+  } catch (err) {
+    console.error('Error seeding task deadline defaults:', err);
   }
 }

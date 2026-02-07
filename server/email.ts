@@ -526,6 +526,99 @@ CQFD Formation
   });
 }
 
+// ==================== WELCOME EMAIL ====================
+
+export async function sendWelcomeEmail(
+  email: string,
+  firstName: string,
+  lastName: string,
+  setupToken: string,
+  baseUrl: string
+): Promise<boolean> {
+  const setupUrl = `${baseUrl}/reset-password?token=${setupToken}`;
+  const fullName = `${firstName || ''} ${lastName || ''}`.trim() || 'Utilisateur';
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #10b981; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center; }
+        h1 { margin: 0; font-size: 24px; }
+        .btn { display: inline-block; background-color: #10b981; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+        .info-box { background-color: white; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .info-box .label { font-weight: bold; color: #6b7280; }
+        .warning { background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 15px 0; color: #92400e; }
+        .link-text { word-break: break-all; background-color: #f3f4f6; padding: 10px; border-radius: 4px; font-size: 12px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Bienvenue sur CQFD Formation</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour ${fullName},</p>
+          <p>Un compte a été créé pour vous sur la plateforme <strong>CQFD Formation</strong>.</p>
+
+          <div class="info-box">
+            <p><span class="label">Votre identifiant de connexion :</span> ${email}</p>
+          </div>
+
+          <p>Pour activer votre compte, veuillez définir votre mot de passe en cliquant sur le bouton ci-dessous :</p>
+
+          <p style="text-align: center;">
+            <a href="${setupUrl}" class="btn">Définir mon mot de passe</a>
+          </p>
+
+          <div class="warning">
+            <strong>Important :</strong> Ce lien est valable pendant <strong>72 heures</strong>.
+            Passé ce délai, vous devrez demander un nouveau lien via la page de connexion.
+          </div>
+
+          <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
+          <p class="link-text">${setupUrl}</p>
+        </div>
+        <div class="footer">
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce message.</p>
+          <p>CQFD Formation - Gestion des formations</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Bienvenue sur CQFD Formation
+
+Bonjour ${fullName},
+
+Un compte a été créé pour vous sur la plateforme CQFD Formation.
+
+Votre identifiant de connexion : ${email}
+
+Pour activer votre compte, veuillez définir votre mot de passe en cliquant sur le lien suivant :
+${setupUrl}
+
+Ce lien est valable pendant 72 heures.
+
+Si vous n'avez pas demandé la création de ce compte, veuillez ignorer cet email.
+
+CQFD Formation
+  `;
+
+  return sendEmail({
+    to: email,
+    subject: 'Bienvenue sur CQFD Formation - Activez votre compte',
+    html,
+    text,
+  });
+}
+
 // ==================== MISSION NOTIFICATION EMAILS ====================
 
 interface MissionNotificationData {
