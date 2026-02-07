@@ -23,11 +23,17 @@ const createTransporter = () => {
 
 const transporter = createTransporter();
 
+interface EmailAttachment {
+  filename: string;
+  path: string;
+}
+
 interface EmailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
@@ -40,6 +46,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     console.log(`  À: ${options.to}`);
     console.log(`  Sujet: ${options.subject}`);
     console.log(`  Contenu HTML: ${options.html.substring(0, 200)}...`);
+    if (options.attachments?.length) {
+      console.log(`  Pièces jointes: ${options.attachments.map(a => a.filename).join(', ')}`);
+    }
     return true;
   }
 
@@ -50,6 +59,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       subject: options.subject,
       html: options.html,
       text: options.text,
+      attachments: options.attachments,
     });
     console.log(`[Email] Email envoyé avec succès à ${options.to}`);
     return true;
@@ -57,6 +67,76 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     console.error('[Email] Erreur lors de l\'envoi:', error);
     return false;
   }
+}
+
+// ==================== EXPORT QUOTIDIEN PAR EMAIL ====================
+
+export async function sendDailyExportEmail(
+  adminEmail: string,
+  adminName: string,
+  exportFilePath: string,
+  exportFileName: string
+): Promise<boolean> {
+  if (!adminEmail) {
+    console.log('[Email] Pas d\'email admin, export non envoyé');
+    return false;
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center; }
+        h1 { margin: 0; font-size: 22px; }
+        .info-box { background-color: white; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin: 15px 0; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Extraction quotidienne des missions</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour ${adminName},</p>
+          <p>Veuillez trouver ci-joint l'extraction complète des missions en date du <strong>${dateStr}</strong>.</p>
+          <div class="info-box">
+            <p><strong>Fichier joint :</strong> ${exportFileName}</p>
+            <p>Ce fichier Excel contient :</p>
+            <ul>
+              <li>La liste de toutes les missions</li>
+              <li>Les participants inscrits</li>
+              <li>Les sessions de formation</li>
+              <li>Les statistiques globales</li>
+            </ul>
+          </div>
+          <p>Cet export est généré automatiquement chaque nuit à 1h00.</p>
+        </div>
+        <div class="footer">
+          <p>CQFD Formation - Export automatique quotidien</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Bonjour ${adminName},\n\nVeuillez trouver ci-joint l'extraction complète des missions du ${dateStr}.\n\nCQFD Formation`;
+
+  return sendEmail({
+    to: adminEmail,
+    subject: `[CQFD] Extraction quotidienne des missions - ${dateStr}`,
+    html,
+    text,
+    attachments: [{ filename: exportFileName, path: exportFilePath }],
+  });
 }
 
 export async function sendMissionAssignmentEmail(

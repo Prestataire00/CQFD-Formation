@@ -30,6 +30,8 @@ import {
 import type { UpsertUser } from "@shared/models/auth";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
 
 export interface IStorage {
   // Users
@@ -708,6 +710,19 @@ export class DatabaseStorage implements IStorage {
     return result.length;
   }
 
+  // Helper: delete uploaded files from disk
+  private deleteUploadedFile(fileUrl: string) {
+    if (!fileUrl || !fileUrl.startsWith('/uploads/')) return;
+    try {
+      const filePath = path.join(process.cwd(), fileUrl);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (err) {
+      console.error(`[storage] Failed to delete file ${fileUrl}:`, err);
+    }
+  }
+
   async deleteMission(id: number): Promise<boolean> {
     // Delete all related records before deleting the mission itself
     // Order matters: delete child tables before parent tables to avoid FK constraint violations.
@@ -733,6 +748,12 @@ export class DatabaseStorage implements IStorage {
     await db.delete(missionParticipants).where(eq(missionParticipants.missionId, id));
     await db.delete(evaluations).where(eq(evaluations.missionId, id));
     await db.delete(invoices).where(eq(invoices.missionId, id));
+
+    // Delete uploaded files from disk before removing document records
+    const missionDocs = await this.getDocumentsByMission(id);
+    for (const doc of missionDocs) {
+      this.deleteUploadedFile(doc.url);
+    }
     await db.delete(documents).where(eq(documents.missionId, id));
     await db.delete(messages).where(eq(messages.missionId, id));
     await db.delete(clientInvoices).where(eq(clientInvoices.missionId, id));
@@ -1120,6 +1141,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteDocument(id: number): Promise<boolean> {
+    const doc = await this.getDocument(id);
+    if (doc?.url) {
+      this.deleteUploadedFile(doc.url);
+    }
     await db.delete(documents).where(eq(documents.id, id));
     return true;
   }

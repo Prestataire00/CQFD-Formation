@@ -97,6 +97,7 @@ import {
   useMissionDocuments,
   useCreateDocument,
   useDeleteDocument,
+  useUpdateDocument,
   useUploadDocument,
   useMissionTrainers,
   useAddTrainerToMission,
@@ -584,6 +585,7 @@ export default function MissionDetail() {
   const deleteStep = useDeleteMissionStep();
   const createDocument = useCreateDocument();
   const deleteDocument = useDeleteDocument();
+  const updateDocument = useUpdateDocument();
   const uploadDocument = useUploadDocument();
   const addTrainer = useAddTrainerToMission();
   const removeTrainer = useRemoveTrainerFromMission();
@@ -798,11 +800,37 @@ export default function MissionDetail() {
   const handleAddDocument = async () => {
     if (!newDocTitle.trim()) return;
     try {
+      const docType = newDocType || "Autre";
+      // Versioning: check existing docs with same title+type
+      const baseTitle = newDocTitle.trim();
+      const matchingDocs = documents?.filter((d: any) => {
+        const titleMatch = d.title === baseTitle || d.title.match(new RegExp(`^${baseTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} V\\d+$`));
+        return titleMatch && d.type === docType;
+      }) || [];
+      let finalTitle = baseTitle;
+      if (matchingDocs.length > 0) {
+        // Find highest existing version
+        let maxVersion = 1;
+        for (const d of matchingDocs) {
+          const vMatch = d.title.match(/ V(\d+)$/);
+          if (vMatch) {
+            maxVersion = Math.max(maxVersion, parseInt(vMatch[1]));
+          }
+        }
+        // Rename the first doc to V1 if it doesn't have a version yet
+        const unversioned = matchingDocs.find((d: any) => d.title === baseTitle);
+        if (unversioned) {
+          await updateDocument.mutateAsync({ id: unversioned.id, missionId, data: { title: `${baseTitle} V1` } });
+          maxVersion = Math.max(maxVersion, 1);
+        }
+        finalTitle = `${baseTitle} V${maxVersion + 1}`;
+      }
+
       const newDoc = await createDocument.mutateAsync({
         missionId,
         data: {
-          title: newDocTitle,
-          type: newDocType || "Autre",
+          title: finalTitle,
+          type: docType,
           url: "",
         },
       });

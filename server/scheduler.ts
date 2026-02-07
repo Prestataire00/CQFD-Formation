@@ -1,8 +1,9 @@
 import cron from 'node-cron';
 import { storage } from './storage';
-import { sendReminderEmail, sendAdminFormationReminderEmail } from './email';
+import { sendReminderEmail, sendAdminFormationReminderEmail, sendDailyExportEmail } from './email';
 import { log } from './index';
 import { generateMissionsExcel, cleanOldExports } from './excel-export';
+import path from 'path';
 
 // Variable pour suivre si le scheduler est actif
 let isSchedulerRunning = false;
@@ -376,15 +377,31 @@ async function runReminderTask(): Promise<void> {
 }
 
 /**
- * Génère l'export Excel quotidien des missions
+ * Génère l'export Excel quotidien des missions et l'envoie par email aux admins
  */
 async function runDailyExportTask(): Promise<void> {
   log('[Scheduler] Démarrage de l\'export Excel quotidien', 'scheduler');
-  
+
   try {
     const filepath = await generateMissionsExcel();
     log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
-    
+
+    // Envoyer par email à tous les admins actifs
+    const admins = (await storage.getUsers()).filter(u => u.role === 'admin' && u.status === 'ACTIF');
+    const filename = path.basename(filepath);
+
+    for (const admin of admins) {
+      if (admin.email) {
+        const adminName = `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin';
+        const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
+        if (sent) {
+          log(`[Scheduler] Export envoyé par email à ${admin.email}`, 'scheduler');
+        } else {
+          log(`[Scheduler] Échec envoi export à ${admin.email}`, 'scheduler');
+        }
+      }
+    }
+
     await cleanOldExports(7);
     log('[Scheduler] Nettoyage des anciens exports terminé', 'scheduler');
   } catch (error) {
@@ -405,8 +422,8 @@ export function startReminderScheduler(): void {
     await runReminderTask();
   });
 
-  // Export Excel quotidien à 6h00 du matin
-  cron.schedule('0 6 * * *', async () => {
+  // Export Excel quotidien à 1h00 du matin + envoi par email
+  cron.schedule('0 1 * * *', async () => {
     await runDailyExportTask();
   });
 
@@ -418,7 +435,7 @@ export function startReminderScheduler(): void {
     await runDailyExportTask();
   }, 30000);
 
-  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 6h00', 'scheduler');
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00', 'scheduler');
 }
 
 /**

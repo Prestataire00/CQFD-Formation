@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { db } from './db';
-import { missions, users, clients, participants, missionSessions, missionParticipants, attendanceRecords } from '@shared/schema';
+import { missions, users, clients, missionSessions, missionSteps, documents, invoices } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,31 +36,43 @@ function translateStatus(status: string): string {
     'sent': 'Envoyée',
     'paid': 'Payée',
     'overdue': 'En retard',
-    'registered': 'Inscrit',
-    'attending': 'Présent',
-    'absent': 'Absent',
-    'abandoned': 'Abandonné',
   };
   return statusMap[status] || status;
 }
 
-function translateTypology(typology: string): string {
-  const typologyMap: Record<string, string> = {
-    'Inter': 'Inter-entreprise',
-    'Intra': 'Intra-entreprise',
-    'Conseil': 'Conseil',
-  };
-  return typologyMap[typology] || typology;
+function getStepStatus(steps: any[], title: string): string {
+  const step = steps.find(s => s.title?.toLowerCase().includes(title.toLowerCase()));
+  if (!step) return '';
+  if (step.isCompleted) return 'Fait';
+  if (step.status === 'late') return 'En retard';
+  if (step.status === 'priority') return 'Prioritaire';
+  if (step.status === 'na') return 'N/A';
+  return 'A faire';
 }
 
-function translateLocationType(locationType: string): string {
-  const locationMap: Record<string, string> = {
-    'presentiel': 'Présentiel',
-    'distanciel': 'Distanciel',
-    'hybride': 'Hybride',
-  };
-  return locationMap[locationType] || locationType;
+function getDocByType(docs: any[], type: string): string {
+  const doc = docs.find(d => d.type?.toLowerCase().includes(type.toLowerCase()));
+  if (!doc) return '';
+  return doc.url ? 'Oui' : 'En attente';
 }
+
+const HEADER_FILL: ExcelJS.FillPattern = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFD9E2F3' },
+};
+
+const HEADER_FONT: Partial<ExcelJS.Font> = {
+  bold: true,
+  size: 11,
+  name: 'Calibri',
+};
+
+const THIN_BORDER: Partial<ExcelJS.Borders> = {
+  left: { style: 'thin' },
+  right: { style: 'thin' },
+  top: { style: 'medium' },
+};
 
 export async function generateMissionsExcel(): Promise<string> {
   const workbook = new ExcelJS.Workbook();
@@ -70,189 +82,203 @@ export async function generateMissionsExcel(): Promise<string> {
   const allMissions = await db.select().from(missions);
   const allUsers = await db.select().from(users);
   const allClients = await db.select().from(clients);
-  const allParticipants = await db.select().from(participants);
-  const allMissionParticipants = await db.select().from(missionParticipants);
   const allSessions = await db.select().from(missionSessions);
-  const allAttendance = await db.select().from(attendanceRecords);
+  const allSteps = await db.select().from(missionSteps);
+  const allDocuments = await db.select().from(documents);
+
+  let allInvoices: any[] = [];
+  try {
+    allInvoices = await db.select().from(invoices);
+  } catch {}
 
   const usersMap = new Map(allUsers.map(u => [u.id, u]));
   const clientsMap = new Map(allClients.map(c => [c.id, c]));
-  const participantsMap = new Map(allParticipants.map(p => [p.id, p]));
 
-  const missionsSheet = workbook.addWorksheet('Missions');
-  missionsSheet.columns = [
-    { header: 'Référence', key: 'reference', width: 25 },
-    { header: 'Titre', key: 'title', width: 30 },
-    { header: 'Description', key: 'description', width: 40 },
-    { header: 'Statut', key: 'status', width: 15 },
-    { header: 'Typologie', key: 'typology', width: 18 },
-    { header: 'Type lieu', key: 'locationType', width: 15 },
-    { header: 'Lieu', key: 'location', width: 25 },
-    { header: 'Date début', key: 'startDate', width: 12 },
-    { header: 'Date fin', key: 'endDate', width: 12 },
-    { header: 'Heures totales', key: 'totalHours', width: 14 },
-    { header: 'Formateur', key: 'trainer', width: 25 },
-    { header: 'Email formateur', key: 'trainerEmail', width: 30 },
-    { header: 'Client', key: 'client', width: 25 },
-    { header: 'Contact client', key: 'clientContact', width: 25 },
-    { header: 'Email client', key: 'clientEmail', width: 30 },
-    { header: 'Nb participants', key: 'participantCount', width: 15 },
-    { header: 'Nb sessions', key: 'sessionCount', width: 12 },
-    { header: 'Mission parent', key: 'parentMission', width: 25 },
-    { header: 'Date création', key: 'createdAt', width: 18 },
-    { header: 'Dernière MAJ', key: 'updatedAt', width: 18 },
+  const sheet = workbook.addWorksheet('Projets');
+
+  const columns = [
+    { header: 'Statut mission', key: 'statutMission', width: 14 },
+    { header: 'Intervenant', key: 'intervenant', width: 20 },
+    { header: 'Dates intervention', key: 'datesIntervention', width: 18 },
+    { header: 'Nom du client', key: 'nomClient', width: 22 },
+    { header: 'Contact et Tél', key: 'contactTel', width: 20 },
+    { header: 'Adresse de facturation', key: 'adresseFacturation', width: 25 },
+    { header: 'Origine', key: 'origine', width: 14 },
+    { header: 'Réseaux sociaux', key: 'reseauxSociaux', width: 14 },
+    { header: 'Titre formation et Modalité\n(inter intra conseil conf)', key: 'titreFormation', width: 28 },
+    { header: 'Prog initial', key: 'progInitial', width: 12 },
+    { header: 'Observations', key: 'observations', width: 20 },
+    { header: 'Pub / Communication', key: 'pubCommunication', width: 14 },
+    { header: 'Base tarifaire', key: 'baseTarifaire', width: 14 },
+    { header: 'Convention', key: 'convention', width: 12 },
+    { header: 'Modalité financière', key: 'modaliteFinanciere', width: 16 },
+    { header: 'Récap', key: 'recap', width: 10 },
+    { header: 'Nbre pax', key: 'nbrePax', width: 10 },
+    { header: 'Liste participants', key: 'listeParticipants', width: 20 },
+    { header: "Situation d'handicap", key: 'situationHandicap', width: 14 },
+    { header: 'Coordonnées des stagiaires', key: 'coordonneesStagiaires', width: 20 },
+    { header: 'Envoi questionnaire\nde cadrage', key: 'questionnaireCadrage', width: 14 },
+    { header: 'Questionnaire\nde positionnement\n+ programme', key: 'questionnairePositionnement', width: 14 },
+    { header: 'Besoin salle matériel\net repas formateur', key: 'besoinSalle', width: 14 },
+    { header: 'Envoi Convocation', key: 'envoiConvocation', width: 14 },
+    { header: 'Observation', key: 'observation2', width: 16 },
+    { header: 'Horaires', key: 'horaires', width: 14 },
+    { header: 'Adresse formation', key: 'adresseFormation', width: 22 },
+    { header: 'Questionnaire de cadrage\net coordonnées référent', key: 'questionnaireCadrageRef', width: 14 },
+    { header: 'Compte rendu\nentretien et liste besoins', key: 'compteRenduEntretien', width: 14 },
+    { header: 'Programme ajusté\n(le cas échéant)\n+ Séquençage envisagé', key: 'programmeAjuste', width: 14 },
+    { header: 'Commande spécifique', key: 'commandeSpecifique', width: 14 },
+    { header: 'Envoi au client\nProg ajusté / séquençage', key: 'envoiProgAjuste', width: 14 },
+    { header: 'Lien visio\n(si f° à distance)', key: 'lienVisio', width: 14 },
+    { header: 'Consignes formateurs', key: 'consignesFormateurs', width: 14 },
+    { header: 'Cahier des charges\net Bonnes pratiques', key: 'cahierCharges', width: 14 },
+    { header: 'Budget dépl/héb', key: 'budgetDeplHeb', width: 14 },
+    { header: 'Contrat CDD\net déclaration urssaf', key: 'contratCDD', width: 14 },
+    { header: 'Contrat prestation\nde sous-traitance', key: 'contratPrestation', width: 14 },
+    { header: 'Livret à imprimer\net annexes', key: 'livretImprimer', width: 14 },
+    { header: 'Envoi par CQFD du dossier\navec feuilles de présence\net quest. Satisf', key: 'envoiDossier', width: 14 },
+    { header: 'Scan feuille de présence', key: 'scanPresence', width: 14 },
+    { header: 'Scan avis satisfaction', key: 'scanSatisfaction', width: 14 },
+    { header: 'Bilan qualité', key: 'bilanQualite', width: 14 },
+    { header: 'Scan annexes', key: 'scanAnnexes', width: 14 },
+    { header: 'Synthèse évaluation\ndes acquis', key: 'syntheseEvaluation', width: 14 },
+    { header: 'Envoi par courrier\ndes originaux', key: 'envoiOriginaux', width: 14 },
+    { header: 'Fiche de paie,\nattestation et STC', key: 'fichePaie', width: 14 },
+    { header: 'Facture(s) prestataires', key: 'facturePrestataires', width: 14 },
   ];
 
-  const headerRow = missionsSheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF0055A4' }
+  sheet.columns = columns;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 120;
+  headerRow.font = HEADER_FONT;
+  headerRow.fill = HEADER_FILL;
+  headerRow.alignment = {
+    vertical: 'middle',
+    wrapText: true,
+    textRotation: 77,
   };
-  headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+  headerRow.border = THIN_BORDER;
 
   for (const mission of allMissions) {
     const trainer = mission.trainerId ? usersMap.get(mission.trainerId) : null;
     const client = mission.clientId ? clientsMap.get(mission.clientId) : null;
-    const parentMission = mission.parentMissionId 
-      ? allMissions.find(m => m.id === mission.parentMissionId)?.reference 
-      : null;
-    const missionPartCount = allMissionParticipants.filter(mp => mp.missionId === mission.id).length;
-    const missionSessionCount = allSessions.filter(s => s.missionId === mission.id).length;
+    const missionSess = allSessions.filter(s => s.missionId === mission.id);
+    const missionStepsList = allSteps.filter(s => s.missionId === mission.id);
+    const missionDocs = allDocuments.filter(d => d.missionId === mission.id);
+    const missionInvoices = allInvoices.filter((inv: any) => inv.missionId === mission.id);
 
-    missionsSheet.addRow({
-      reference: mission.reference,
-      title: mission.title,
-      description: mission.description,
-      status: translateStatus(mission.status),
-      typology: translateTypology(mission.typology),
-      locationType: mission.locationType ? translateLocationType(mission.locationType) : '',
-      location: mission.location,
-      startDate: formatDate(mission.startDate),
-      endDate: formatDate(mission.endDate),
-      totalHours: mission.totalHours,
-      trainer: trainer ? `${trainer.firstName} ${trainer.lastName}` : '',
-      trainerEmail: trainer?.email || '',
-      client: client?.name || '',
-      clientContact: client?.contactName || '',
-      clientEmail: client?.email || '',
-      participantCount: missionPartCount,
-      sessionCount: missionSessionCount,
-      parentMission: parentMission || '',
-      createdAt: formatDateTime(mission.createdAt),
-      updatedAt: formatDateTime(mission.updatedAt),
+    const datesStr = mission.startDate && mission.endDate
+      ? `${formatDate(mission.startDate)} - ${formatDate(mission.endDate)}`
+      : mission.startDate ? formatDate(mission.startDate)
+      : '';
+
+    const contactTel = client
+      ? [client.contactName, client.contactPhone || client.phone].filter(Boolean).join(' - ')
+      : '';
+
+    const billingAddr = client
+      ? [client.billingAddress, client.billingPostalCode, client.billingCity].filter(Boolean).join(', ')
+      : '';
+
+    const horaires = missionSess.length > 0
+      ? missionSess.map(s => `${s.startTime || ''}-${s.endTime || ''}`).filter(h => h !== '-')[0] || ''
+      : '';
+
+    const trainerName = trainer ? `${trainer.firstName} ${trainer.lastName}` : '';
+    const typologyStr = mission.typology || '';
+    const titleFormation = `${mission.title} - ${typologyStr}`;
+
+    const hasInvoice = missionInvoices.length > 0 ? 'Oui' : '';
+
+    sheet.addRow({
+      statutMission: translateStatus(mission.status),
+      intervenant: trainerName,
+      datesIntervention: datesStr,
+      nomClient: client?.name || '',
+      contactTel: contactTel,
+      adresseFacturation: billingAddr,
+      origine: client?.origine || '',
+      reseauxSociaux: client?.socialMedia || '',
+      titreFormation: titleFormation,
+      progInitial: mission.programTitle || '',
+      observations: mission.description || '',
+      pubCommunication: '',
+      baseTarifaire: mission.rateBase ? `${mission.rateBase}` : '',
+      convention: '',
+      modaliteFinanciere: mission.financialTerms || '',
+      recap: '',
+      nbrePax: mission.expectedParticipants ? `${mission.expectedParticipants}` : '',
+      listeParticipants: mission.participantsList || '',
+      situationHandicap: mission.hasDisability ? (mission.disabilityDetails || 'Oui') : 'Non',
+      coordonneesStagiaires: '',
+      questionnaireCadrage: getStepStatus(missionStepsList, 'questionnaire de cadrage'),
+      questionnairePositionnement: getStepStatus(missionStepsList, 'questionnaire de positionnement'),
+      besoinSalle: getStepStatus(missionStepsList, 'salle'),
+      envoiConvocation: getStepStatus(missionStepsList, 'convocation'),
+      observation2: '',
+      horaires: horaires,
+      adresseFormation: mission.location || '',
+      questionnaireCadrageRef: getStepStatus(missionStepsList, 'cadrage'),
+      compteRenduEntretien: getStepStatus(missionStepsList, 'compte-rendu') || getStepStatus(missionStepsList, 'compte rendu') || getStepStatus(missionStepsList, 'bilan'),
+      programmeAjuste: getStepStatus(missionStepsList, 'programme'),
+      commandeSpecifique: '',
+      envoiProgAjuste: getStepStatus(missionStepsList, 'séquençage') || getStepStatus(missionStepsList, 'programme'),
+      lienVisio: mission.locationType === 'distanciel' || mission.locationType === 'hybride' ? '' : 'N/A',
+      consignesFormateurs: getDocByType(missionDocs, 'consigne') || getStepStatus(missionStepsList, 'consignes'),
+      cahierCharges: getDocByType(missionDocs, 'cahier des charges'),
+      budgetDeplHeb: '',
+      contratCDD: '',
+      contratPrestation: '',
+      livretImprimer: getDocByType(missionDocs, 'annexe') || getDocByType(missionDocs, 'impression'),
+      envoiDossier: getStepStatus(missionStepsList, 'dossier') || getStepStatus(missionStepsList, 'feuilles de présence'),
+      scanPresence: getDocByType(missionDocs, 'emargement') || getStepStatus(missionStepsList, 'emargement'),
+      scanSatisfaction: getStepStatus(missionStepsList, 'satisfaction'),
+      bilanQualite: getStepStatus(missionStepsList, 'bilan qualité') || getStepStatus(missionStepsList, 'bilan'),
+      scanAnnexes: getDocByType(missionDocs, 'annexe'),
+      syntheseEvaluation: getStepStatus(missionStepsList, 'évaluation') || getStepStatus(missionStepsList, 'evaluation'),
+      envoiOriginaux: getStepStatus(missionStepsList, 'originaux') || getStepStatus(missionStepsList, 'courrier'),
+      fichePaie: '',
+      facturePrestataires: hasInvoice,
     });
   }
 
-  const participantsSheet = workbook.addWorksheet('Participants');
-  participantsSheet.columns = [
-    { header: 'Mission', key: 'mission', width: 25 },
-    { header: 'Prénom', key: 'firstName', width: 20 },
-    { header: 'Nom', key: 'lastName', width: 20 },
-    { header: 'Email', key: 'email', width: 30 },
-    { header: 'Téléphone', key: 'phone', width: 18 },
-    { header: 'Entreprise', key: 'company', width: 25 },
-    { header: 'Fonction', key: 'function', width: 20 },
-    { header: 'Statut', key: 'status', width: 15 },
-    { header: 'Convocation envoyée', key: 'convocationSent', width: 18 },
-    { header: 'Présence validée', key: 'attendanceValidated', width: 16 },
-    { header: 'Date inscription', key: 'registeredAt', width: 18 },
-  ];
+  for (let r = 2; r <= sheet.rowCount; r++) {
+    const row = sheet.getRow(r);
+    row.alignment = { vertical: 'middle', wrapText: true };
+    row.border = {
+      left: { style: 'thin' },
+      right: { style: 'thin' },
+      bottom: { style: 'thin' },
+    };
 
-  const participantsHeader = participantsSheet.getRow(1);
-  participantsHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  participantsHeader.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF0055A4' }
-  };
+    const statusCell = row.getCell(1);
+    const status = statusCell.value as string;
+    if (status === 'Confirmé') {
+      statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
+    } else if (status === 'En cours') {
+      statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
+    } else if (status === 'Terminé') {
+      statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E2F3' } };
+    } else if (status === 'Annulé') {
+      statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4EC' } };
+    } else if (status === 'En attente') {
+      statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+    }
 
-  for (const mp of allMissionParticipants) {
-    const mission = allMissions.find(m => m.id === mp.missionId);
-    const participant = participantsMap.get(mp.participantId);
-    if (!participant) continue;
-
-    participantsSheet.addRow({
-      mission: mission?.reference || '',
-      firstName: participant.firstName,
-      lastName: participant.lastName,
-      email: participant.email,
-      phone: participant.phone,
-      company: participant.company,
-      function: participant.function,
-      status: translateStatus(mp.status),
-      convocationSent: mp.convocationSentAt ? formatDateTime(mp.convocationSentAt) : 'Non',
-      attendanceValidated: mp.attendanceValidated ? 'Oui' : 'Non',
-      registeredAt: formatDateTime(mp.registeredAt),
-    });
+    for (let c = 21; c <= 48; c++) {
+      const cell = row.getCell(c);
+      const val = cell.value as string;
+      if (val === 'Fait') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
+      } else if (val === 'En retard') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
+        cell.font = { color: { argb: 'FFFF0000' }, bold: true };
+      } else if (val === 'Prioritaire') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+      }
+    }
   }
-
-  const sessionsSheet = workbook.addWorksheet('Sessions');
-  sessionsSheet.columns = [
-    { header: 'Mission', key: 'mission', width: 25 },
-    { header: 'Date', key: 'date', width: 12 },
-    { header: 'Heure début', key: 'startTime', width: 12 },
-    { header: 'Heure fin', key: 'endTime', width: 12 },
-    { header: 'Lieu', key: 'location', width: 25 },
-    { header: 'Nb présents', key: 'presentCount', width: 12 },
-    { header: 'Nb absents', key: 'absentCount', width: 12 },
-  ];
-
-  const sessionsHeader = sessionsSheet.getRow(1);
-  sessionsHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  sessionsHeader.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF0055A4' }
-  };
-
-  for (const session of allSessions) {
-    const mission = allMissions.find(m => m.id === session.missionId);
-    const sessionAttendance = allAttendance.filter(a => a.sessionId === session.id);
-    const presentCount = sessionAttendance.filter(a => a.isPresent).length;
-    const absentCount = sessionAttendance.filter(a => !a.isPresent).length;
-
-    sessionsSheet.addRow({
-      mission: mission?.reference || '',
-      date: formatDate(session.sessionDate),
-      startTime: session.startTime || '',
-      endTime: session.endTime || '',
-      location: session.location || '',
-      presentCount,
-      absentCount,
-    });
-  }
-
-  const statsSheet = workbook.addWorksheet('Statistiques');
-  statsSheet.columns = [
-    { header: 'Indicateur', key: 'indicator', width: 35 },
-    { header: 'Valeur', key: 'value', width: 20 },
-  ];
-
-  const statsHeader = statsSheet.getRow(1);
-  statsHeader.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  statsHeader.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FF0055A4' }
-  };
-
-  const stats = [
-    { indicator: 'Total missions', value: allMissions.length.toString() },
-    { indicator: 'Missions en attente', value: allMissions.filter(m => m.status === 'pending').length.toString() },
-    { indicator: 'Missions confirmées', value: allMissions.filter(m => m.status === 'confirmed').length.toString() },
-    { indicator: 'Missions en cours', value: allMissions.filter(m => m.status === 'in_progress').length.toString() },
-    { indicator: 'Missions terminées', value: allMissions.filter(m => m.status === 'completed').length.toString() },
-    { indicator: 'Missions annulées', value: allMissions.filter(m => m.status === 'cancelled').length.toString() },
-    { indicator: 'Total participants inscrits', value: allMissionParticipants.length.toString() },
-    { indicator: 'Total sessions planifiées', value: allSessions.length.toString() },
-    { indicator: 'Total formateurs', value: allUsers.filter(u => u.role === 'formateur' || u.role === 'prestataire').length.toString() },
-    { indicator: 'Total clients', value: allClients.length.toString() },
-    { indicator: "Date d'extraction", value: format(new Date(), 'dd/MM/yyyy HH:mm', { locale: fr }) },
-  ];
-
-  stats.forEach(stat => statsSheet.addRow(stat));
 
   const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm', { locale: fr });
   const filename = `extraction_missions_${timestamp}.xlsx`;
