@@ -157,8 +157,6 @@ export default function Missions() {
     expectedParticipants: string;
     hasDisability: boolean;
     disabilityDetails: string;
-    rateBase: string;
-    financialTerms: string;
   }>({
     title: "",
     clientIds: [],
@@ -172,8 +170,6 @@ export default function Missions() {
     expectedParticipants: "",
     hasDisability: false,
     disabilityDetails: "",
-    rateBase: "",
-    financialTerms: "",
   });
 
   // Filter trainers based on search
@@ -298,8 +294,6 @@ export default function Missions() {
         expectedParticipants: newMission.expectedParticipants ? parseInt(newMission.expectedParticipants) : null,
         hasDisability: newMission.hasDisability,
         disabilityDetails: newMission.disabilityDetails || null,
-        rateBase: newMission.rateBase || null,
-        financialTerms: newMission.financialTerms || null,
         status: "draft",
       };
 
@@ -362,8 +356,6 @@ export default function Missions() {
         expectedParticipants: "",
         hasDisability: false,
         disabilityDetails: "",
-        rateBase: "",
-        financialTerms: "",
       });
       const participantCount = newMission.participantIds.length;
       toast({
@@ -648,26 +640,6 @@ export default function Missions() {
                           rows={3}
                         />
                       )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="rateBase">Base tarifaire</Label>
-                        <Input
-                          id="rateBase"
-                          placeholder="Ex: 1 200 EUR / jour"
-                          value={newMission.rateBase}
-                          onChange={(e) => setNewMission({ ...newMission, rateBase: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="financialTerms">Modalite financiere</Label>
-                        <Input
-                          id="financialTerms"
-                          placeholder="Ex: Paiement a 30 jours"
-                          value={newMission.financialTerms}
-                          onChange={(e) => setNewMission({ ...newMission, financialTerms: e.target.value })}
-                        />
-                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Participants</Label>

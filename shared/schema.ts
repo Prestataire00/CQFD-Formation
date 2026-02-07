@@ -121,8 +121,6 @@ export const missions = pgTable("missions", {
   expectedParticipants: integer("expected_participants"), // Nombre de participants prévus
   hasDisability: boolean("has_disability").default(false), // Situation de handicap signalée
   disabilityDetails: text("disability_details"), // Détails sur la situation de handicap
-  rateBase: text("rate_base"), // Base tarifaire (saisie libre)
-  financialTerms: text("financial_terms"), // Modalité financière (saisie libre)
   // Multi-trainer duplication fields
   parentMissionId: integer("parent_mission_id"), // Reference to original mission if this is a copy
   isOriginal: boolean("is_original").default(true).notNull(), // true = original, false = copy

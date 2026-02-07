@@ -246,7 +246,6 @@ const quickActions = [
       "Faire le bilan avec le formateur",
       "Envoyer les attestations",
       "Envoyer le compte-rendu au client",
-      "Facturer la mission",
     ]
   },
 ];
@@ -326,7 +325,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-4">
-              {isEditingAssignee ? (
+              {isAdmin && isEditingAssignee ? (
                 <div className="flex items-center gap-2">
                   <Select
                     value={task.assigneeId || "unassigned"}
@@ -350,19 +349,19 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 </div>
               ) : (
                 <button
-                  onClick={() => setIsEditingAssignee(true)}
-                  className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                  onClick={() => isAdmin && setIsEditingAssignee(true)}
+                  className={`flex items-center gap-1 text-sm text-muted-foreground ${isAdmin ? 'hover:text-foreground cursor-pointer' : 'cursor-default'}`}
                 >
                   <User className="w-4 h-4" />
                   {assignee ? (
                     <span className="font-medium text-foreground">{assignee.firstName}</span>
-                  ) : (
+                  ) : isAdmin ? (
                     <span className="italic">Assigner</span>
-                  )}
+                  ) : null}
                 </button>
               )}
 
-              {isEditingDeadline ? (
+              {isAdmin && isEditingDeadline ? (
                 <div className="flex items-center gap-2">
                   <Input
                     type="date"
@@ -377,21 +376,25 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                     <X className="w-3 h-3" />
                   </Button>
                 </div>
-              ) : (
+              ) : task.dueDate ? (
+                <button
+                  onClick={() => isAdmin && setIsEditingDeadline(true)}
+                  className={`flex items-center gap-1 text-sm text-muted-foreground ${isAdmin ? 'hover:text-foreground cursor-pointer' : 'cursor-default'}`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span className={autoStatus === 'late' ? 'text-red-600 font-medium' : ''}>
+                    {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
+                  </span>
+                </button>
+              ) : isAdmin ? (
                 <button
                   onClick={() => setIsEditingDeadline(true)}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
                 >
                   <Calendar className="w-4 h-4" />
-                  {task.dueDate ? (
-                    <span className={autoStatus === 'late' ? 'text-red-600 font-medium' : ''}>
-                      {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
-                    </span>
-                  ) : (
-                    <span className="italic">Deadline</span>
-                  )}
+                  <span className="italic">Deadline</span>
                 </button>
-              )}
+              ) : null}
             </div>
 
             {task.comment && !isEditingComment && (
@@ -436,13 +439,15 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
             >
               <MessageSquare className="w-4 h-4" />
             </button>
-            <button
-              onClick={handleMarkNA}
-              className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Marquer sans objet"
-            >
-              <MinusCircle className="w-4 h-4" />
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleMarkNA}
+                className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
+                title="Marquer sans objet"
+              >
+                <MinusCircle className="w-4 h-4" />
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => onDelete(task.id)}
@@ -565,9 +570,14 @@ export default function MissionDetail() {
     }
   }, [mission]);
 
-  // Calculate progress
-  const completedSteps = steps?.filter((s: any) => s.status === "done" || s.isCompleted).length || 0;
-  const totalSteps = steps?.length || 0;
+  // Filter steps for non-admin users (formateurs only see tasks assigned to them)
+  const visibleSteps = isAdmin
+    ? steps
+    : steps?.filter((s: any) => s.assigneeId === user?.id);
+
+  // Calculate progress based on visible steps
+  const completedSteps = visibleSteps?.filter((s: any) => s.status === "done" || s.isCompleted).length || 0;
+  const totalSteps = visibleSteps?.length || 0;
   const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
   // Get related data
@@ -996,23 +1006,6 @@ export default function MissionDetail() {
               </div>
             )}
 
-            {(mission.rateBase || mission.financialTerms) && (
-              <div className="pt-3 border-t space-y-1 text-sm">
-                {mission.rateBase && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Base tarifaire :</span>
-                    <span>{mission.rateBase}</span>
-                  </div>
-                )}
-                {mission.financialTerms && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Modalite financiere :</span>
-                    <span>{mission.financialTerms}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Dialog pour ajouter un jour */}
             <Dialog open={isAddSessionOpen} onOpenChange={setIsAddSessionOpen}>
               <DialogContent>
@@ -1403,38 +1396,40 @@ export default function MissionDetail() {
               Gestion des taches avec suivi automatique des statuts
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
-              <Zap className="w-4 h-4 mr-2" />
-              Actions rapides
-            </Button>
-            {isAddingStep ? (
-              <div className="flex gap-2">
-                <Input
-                  value={newStepTitle}
-                  onChange={(e) => setNewStepTitle(e.target.value)}
-                  placeholder="Titre de la tache..."
-                  className="w-64"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
-                />
-                <Button size="sm" onClick={handleAddStep} disabled={createStep.isPending}>
-                  Ajouter
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setIsAddingStep(false)}>
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            ) : (
-              <Button onClick={() => setIsAddingStep(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter une tache
+          {isAdmin && (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
+                <Zap className="w-4 h-4 mr-2" />
+                Actions rapides
               </Button>
-            )}
-          </div>
+              {isAddingStep ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newStepTitle}
+                    onChange={(e) => setNewStepTitle(e.target.value)}
+                    placeholder="Titre de la tache..."
+                    className="w-64"
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddStep()}
+                  />
+                  <Button size="sm" onClick={handleAddStep} disabled={createStep.isPending}>
+                    Ajouter
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setIsAddingStep(false)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button onClick={() => setIsAddingStep(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Ajouter une tache
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Quick Actions Panel */}
-        {showQuickActions && (
+        {/* Quick Actions Panel - Admin only */}
+        {isAdmin && showQuickActions && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -1483,41 +1478,41 @@ export default function MissionDetail() {
         )}
 
         {/* Status summary */}
-        {steps && steps.length > 0 && (
+        {visibleSteps && visibleSteps.length > 0 && (
           <div className="p-4 bg-muted/30 rounded-lg">
             <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-slate-400"></div>
-                <span>{steps.filter((s: any) => getAutoStatus(s) === 'todo').length} A faire</span>
+                <span>{visibleSteps.filter((s: any) => getAutoStatus(s) === 'todo').length} A faire</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                <span>{steps.filter((s: any) => getAutoStatus(s) === 'priority').length} Prioritaire</span>
+                <span>{visibleSteps.filter((s: any) => getAutoStatus(s) === 'priority').length} Prioritaire</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                <span>{steps.filter((s: any) => getAutoStatus(s) === 'late').length} En retard</span>
+                <span>{visibleSteps.filter((s: any) => getAutoStatus(s) === 'late').length} En retard</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                <span>{steps.filter((s: any) => getAutoStatus(s) === 'done').length} Termine</span>
+                <span>{visibleSteps.filter((s: any) => getAutoStatus(s) === 'done').length} Termine</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                <span>{steps.filter((s: any) => getAutoStatus(s) === 'na').length} Sans objet</span>
+                <span>{visibleSteps.filter((s: any) => getAutoStatus(s) === 'na').length} Sans objet</span>
               </div>
             </div>
           </div>
         )}
 
         {/* Tasks list with workflow */}
-        {steps && steps.length > 0 ? (
+        {visibleSteps && visibleSteps.length > 0 ? (
           <div className="relative">
             {/* Vertical workflow line */}
             <div className="absolute left-6 top-8 bottom-8 w-0.5 bg-gradient-to-b from-violet-300 via-violet-400 to-violet-300" />
 
             <div className="space-y-4">
-              {[...steps]
+              {[...visibleSteps]
                 .sort((a: any, b: any) => (a.order || 0) - (b.order || 0))
                 .map((task: any, index: number) => (
                   <div key={task.id} className="relative flex gap-4">
@@ -1563,18 +1558,22 @@ export default function MissionDetail() {
           <Card>
             <CardContent className="py-12 text-center">
               <ListTodo className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground mb-4">Aucune tache definie</p>
-              <div className="flex flex-col items-center gap-2">
-                <Button variant="outline" onClick={() => setIsAddingStep(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ajouter une tache manuellement
-                </Button>
-                <span className="text-sm text-muted-foreground">ou</span>
-                <Button variant="outline" onClick={() => setShowQuickActions(true)}>
-                  <Zap className="w-4 h-4 mr-2" />
-                  Utiliser les actions rapides
-                </Button>
-              </div>
+              <p className="text-muted-foreground mb-4">
+                {isAdmin ? "Aucune tache definie" : "Aucune tache assignee"}
+              </p>
+              {isAdmin && (
+                <div className="flex flex-col items-center gap-2">
+                  <Button variant="outline" onClick={() => setIsAddingStep(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter une tache manuellement
+                  </Button>
+                  <span className="text-sm text-muted-foreground">ou</span>
+                  <Button variant="outline" onClick={() => setShowQuickActions(true)}>
+                    <Zap className="w-4 h-4 mr-2" />
+                    Utiliser les actions rapides
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1936,7 +1935,7 @@ export default function MissionDetail() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {Object.entries(stepStatusConfig).map(([status, config]) => {
-              const count = steps?.filter((s: any) => s.status === status).length || 0;
+              const count = visibleSteps?.filter((s: any) => s.status === status).length || 0;
               return (
                 <div key={status} className={cn("p-3 rounded-lg text-center", config.bgColor)}>
                   <div className={cn("text-2xl font-bold", config.color)}>{count}</div>
