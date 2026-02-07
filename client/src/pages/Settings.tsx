@@ -1144,6 +1144,301 @@ export default function Settings() {
                 </Card>
               </TabsContent>
             )}
+
+            {/* Reminders Tab (Admin only) */}
+            {isAdmin && (
+              <TabsContent value="reminders">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Rappels automatiques par email</CardTitle>
+                        <CardDescription>
+                          Configurez les rappels envoyes automatiquement avant les echeances.
+                          Les rappels sont generes par rapport a la date de debut/fin de formation.
+                          Un rappel J-2 est toujours envoye a l'administrateur avant chaque formation.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsAddingReminder(true)}
+                        disabled={isAddingReminder}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Ajouter un rappel
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingReminders ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Add new reminder form */}
+                        {isAddingReminder && (
+                          <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                            <h4 className="font-medium">Nouveau rappel</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label>Nom du rappel</Label>
+                                <Input
+                                  value={newReminder.name}
+                                  onChange={(e) => setNewReminder({ ...newReminder, name: e.target.value })}
+                                  placeholder="Ex: Rappel J-7"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Jours avant l'evenement</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  value={newReminder.daysBefore}
+                                  onChange={(e) => setNewReminder({ ...newReminder, daysBefore: parseInt(e.target.value) || 0 })}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Type de rappel</Label>
+                                <select
+                                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                                  value={newReminder.reminderType}
+                                  onChange={(e) => setNewReminder({ ...newReminder, reminderType: e.target.value })}
+                                >
+                                  <option value="mission_start">Debut de formation</option>
+                                  <option value="mission_end">Fin de formation</option>
+                                  <option value="task_deadline">Deadline de tache</option>
+                                  <option value="admin_summary">Resume admin</option>
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Sujet de l'email (optionnel)</Label>
+                                <Input
+                                  value={newReminder.emailSubject}
+                                  onChange={(e) => setNewReminder({ ...newReminder, emailSubject: e.target.value })}
+                                  placeholder="Sujet personnalise"
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Destinataires</Label>
+                              <div className="flex flex-wrap gap-4">
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={newReminder.notifyAdmin}
+                                    onChange={(e) => setNewReminder({ ...newReminder, notifyAdmin: e.target.checked })}
+                                    className="rounded"
+                                  />
+                                  Admin
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={newReminder.notifyTrainer}
+                                    onChange={(e) => setNewReminder({ ...newReminder, notifyTrainer: e.target.checked })}
+                                    className="rounded"
+                                  />
+                                  Formateur
+                                </label>
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={newReminder.notifyClient}
+                                    onChange={(e) => setNewReminder({ ...newReminder, notifyClient: e.target.checked })}
+                                    className="rounded"
+                                  />
+                                  Client
+                                </label>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => setIsAddingReminder(false)}>
+                                Annuler
+                              </Button>
+                              <Button size="sm" onClick={handleCreateReminder}>
+                                Ajouter
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Info banner about J-2 admin reminder */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+                          <div className="flex items-center gap-2">
+                            <BellRing className="w-4 h-4 flex-shrink-0" />
+                            <span>
+                              Un rappel automatique J-2 est toujours envoye a l'administrateur avant chaque formation,
+                              avec les details du formateur, client, lieu et dates. Ce rappel ne peut pas etre desactive.
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Existing reminder settings list */}
+                        <div className="space-y-3">
+                          {reminderSettings.map((setting: any) => (
+                            <div
+                              key={setting.id}
+                              className={`border rounded-lg p-4 transition-colors ${setting.isActive ? 'bg-background' : 'bg-muted/50 opacity-60'}`}
+                            >
+                              {editingReminderId === setting.id ? (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                      <Label>Nom</Label>
+                                      <Input
+                                        value={editingReminderData?.name || ""}
+                                        onChange={(e) => setEditingReminderData({ ...editingReminderData, name: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Jours avant</Label>
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        value={editingReminderData?.daysBefore || 0}
+                                        onChange={(e) => setEditingReminderData({ ...editingReminderData, daysBefore: parseInt(e.target.value) || 0 })}
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Type</Label>
+                                      <select
+                                        className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+                                        value={editingReminderData?.reminderType || "mission_start"}
+                                        onChange={(e) => setEditingReminderData({ ...editingReminderData, reminderType: e.target.value })}
+                                      >
+                                        <option value="mission_start">Debut de formation</option>
+                                        <option value="mission_end">Fin de formation</option>
+                                        <option value="task_deadline">Deadline de tache</option>
+                                        <option value="admin_summary">Resume admin</option>
+                                      </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <Label>Sujet email</Label>
+                                      <Input
+                                        value={editingReminderData?.emailSubject || ""}
+                                        onChange={(e) => setEditingReminderData({ ...editingReminderData, emailSubject: e.target.value })}
+                                        placeholder="Sujet personnalise"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Destinataires</Label>
+                                    <div className="flex flex-wrap gap-4">
+                                      <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingReminderData?.notifyAdmin || false}
+                                          onChange={(e) => setEditingReminderData({ ...editingReminderData, notifyAdmin: e.target.checked })}
+                                          className="rounded"
+                                        />
+                                        Admin
+                                      </label>
+                                      <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingReminderData?.notifyTrainer || false}
+                                          onChange={(e) => setEditingReminderData({ ...editingReminderData, notifyTrainer: e.target.checked })}
+                                          className="rounded"
+                                        />
+                                        Formateur
+                                      </label>
+                                      <label className="flex items-center gap-2 text-sm">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingReminderData?.notifyClient || false}
+                                          onChange={(e) => setEditingReminderData({ ...editingReminderData, notifyClient: e.target.checked })}
+                                          className="rounded"
+                                        />
+                                        Client
+                                      </label>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 justify-end">
+                                    <Button variant="outline" size="sm" onClick={() => { setEditingReminderId(null); setEditingReminderData(null); }}>
+                                      <X className="w-3 h-3 mr-1" /> Annuler
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleUpdateReminder(setting.id, editingReminderData)}>
+                                      <Check className="w-3 h-3 mr-1" /> Enregistrer
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <Switch
+                                      checked={setting.isActive}
+                                      onCheckedChange={(checked) => handleToggleReminderActive(setting.id, checked)}
+                                    />
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">{setting.name}</span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-semibold">
+                                          J-{setting.daysBefore}
+                                        </span>
+                                        <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                          {reminderTypeLabels[setting.reminderType] || setting.reminderType}
+                                        </span>
+                                      </div>
+                                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
+                                        {setting.emailSubject && (
+                                          <span>Sujet: {setting.emailSubject}</span>
+                                        )}
+                                        <span className="flex items-center gap-1">
+                                          Destinataires:
+                                          {setting.notifyAdmin && " Admin"}
+                                          {setting.notifyTrainer && " Formateur"}
+                                          {setting.notifyClient && " Client"}
+                                          {!setting.notifyAdmin && !setting.notifyTrainer && !setting.notifyClient && " Aucun"}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => {
+                                        setEditingReminderId(setting.id);
+                                        setEditingReminderData({
+                                          name: setting.name,
+                                          reminderType: setting.reminderType,
+                                          daysBefore: setting.daysBefore,
+                                          emailSubject: setting.emailSubject || "",
+                                          notifyAdmin: setting.notifyAdmin,
+                                          notifyTrainer: setting.notifyTrainer,
+                                          notifyClient: setting.notifyClient,
+                                        });
+                                      }}
+                                    >
+                                      <Edit className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive"
+                                      onClick={() => handleDeleteReminder(setting.id)}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {reminderSettings.length === 0 && !isAddingReminder && (
+                            <div className="text-center py-8 text-muted-foreground">
+                              Aucun rappel configure. Cliquez sur "Ajouter un rappel" pour commencer.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>

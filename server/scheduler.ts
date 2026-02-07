@@ -121,7 +121,72 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
       }
     }
 
+    // Générer les rappels pour les deadlines de tâches
+    const taskDeadlineSettings = activeSettings.filter(s => s.reminderType === 'task_deadline');
+    if (taskDeadlineSettings.length > 0) {
+      const steps = await storage.getMissionSteps(mission.id);
+      const stepsWithDeadline = steps.filter(s => s.dueDate && !s.isCompleted && s.status !== 'na');
+
+      for (const step of stepsWithDeadline) {
+        const stepDueDate = new Date(step.dueDate!);
+
+        // Skip if due date is in the past
+        if (stepDueDate < new Date()) continue;
+
+        for (const setting of taskDeadlineSettings) {
+          const scheduledDate = new Date(stepDueDate);
+          scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
+
+          if (scheduledDate < new Date()) {
+            skipped++;
+            continue;
+          }
+
+          const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+          const taskRecipients: { type: string; email?: string; name?: string }[] = [];
+
+          if (setting.notifyAdmin) {
+            for (const admin of admins) {
+              if (admin.email) {
+                taskRecipients.push({ type: 'admin', email: admin.email, name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin' });
+              }
+            }
+          }
+          if (setting.notifyTrainer && trainer?.email) {
+            taskRecipients.push({ type: 'trainer', email: trainer.email, name: `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur' });
+          }
+
+          for (const recipient of taskRecipients) {
+            const existingReminders = await storage.getRemindersByMission(mission.id);
+            const alreadyExists = existingReminders.some(r =>
+              r.settingId === setting.id &&
+              r.taskId === step.id &&
+              r.recipientEmail === recipient.email &&
+              r.status === 'pending'
+            );
+
+            if (!alreadyExists) {
+              await storage.createReminder({
+                settingId: setting.id,
+                missionId: mission.id,
+                taskId: step.id,
+                scheduledDate,
+                status: 'pending',
+                recipientEmail: recipient.email,
+                recipientName: recipient.name,
+                recipientType: recipient.type,
+              });
+              created++;
+            } else {
+              skipped++;
+            }
+          }
+        }
+      }
+    }
+
     // Ajouter le rappel admin J-2 systématique (si pas déjà créé)
+    if (!mission.startDate) continue;
     const j2Date = new Date(mission.startDate!);
     j2Date.setDate(j2Date.getDate() - 2);
 
@@ -198,6 +263,16 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             client ?? null
           );
         } else {
+          // For task deadline reminders, include the task title in the subject
+          let customSubject = setting?.emailSubject || undefined;
+          if (setting?.reminderType === 'task_deadline' && reminder.taskId) {
+            const steps = await storage.getMissionSteps(mission.id);
+            const step = steps.find(s => s.id === reminder.taskId);
+            if (step && !customSubject) {
+              customSubject = `Rappel: Tache "${step.title}" - ${mission.title}`;
+            }
+          }
+
           // Utiliser le template standard
           emailSent = await sendReminderEmail({
             recipientEmail: reminder.recipientEmail || '',
@@ -207,7 +282,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             trainer,
             client,
             daysBefore,
-            customSubject: setting?.emailSubject || undefined,
+            customSubject,
           });
         }
 
