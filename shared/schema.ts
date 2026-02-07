@@ -119,6 +119,7 @@ export const missions = pgTable("missions", {
   programId: integer("program_id").references(() => trainingPrograms.id),
   programTitle: text("program_title"), // Titre du programme en texte libre
   expectedParticipants: integer("expected_participants"), // Nombre de participants prévus
+  participantsList: text("participants_list"), // Liste des participants (texte libre)
   hasDisability: boolean("has_disability").default(false), // Situation de handicap signalée
   disabilityDetails: text("disability_details"), // Détails sur la situation de handicap
   rateBase: text("rate_base"), // Base tarifaire (saisie libre)

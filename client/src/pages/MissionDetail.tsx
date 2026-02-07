@@ -101,10 +101,6 @@ import {
   useMissionTrainers,
   useAddTrainerToMission,
   useRemoveTrainerFromMission,
-  useMissionParticipants,
-  useParticipants,
-  useAddParticipantToMission,
-  useRemoveParticipantFromMission,
   useMissionSessions,
   useCreateMissionSession,
   useUpdateMissionSession,
@@ -133,7 +129,7 @@ const STEPS = [
   { id: 1, label: "Informations", icon: Info, description: "Dates et details" },
   { id: 2, label: "Description", icon: ClipboardList, description: "Demande client" },
   { id: 3, label: "Taches", icon: ListTodo, description: "Etapes a realiser" },
-  { id: 4, label: "Participants", icon: Users, description: "Stagiaires et documents" },
+  { id: 4, label: "Documents", icon: FolderOpen, description: "Documents de la mission" },
   { id: 5, label: "Progression", icon: TrendingUp, description: "Suivi et avancement" },
 ];
 
@@ -532,8 +528,6 @@ export default function MissionDetail() {
   // Dialog states
   const [isAddStepOpen, setIsAddStepOpen] = useState(false);
   const [isAddingStep, setIsAddingStep] = useState(false);
-  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
-  const [participantSearchTerm, setParticipantSearchTerm] = useState("");
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
   const [trainerComboOpen, setTrainerComboOpen] = useState(false);
   const [trainerSearchTerm, setTrainerSearchTerm] = useState("");
@@ -542,6 +536,7 @@ export default function MissionDetail() {
   const [newStepTitle, setNewStepTitle] = useState("");
   const [newDocTitle, setNewDocTitle] = useState("");
   const [newDocType, setNewDocType] = useState("");
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [newSession, setNewSession] = useState({ date: "", startTime: "09:00", endTime: "17:00" });
@@ -554,8 +549,6 @@ export default function MissionDetail() {
   const { data: steps } = useMissionSteps(missionId);
   const { data: documents } = useMissionDocuments(missionId);
   const { data: missionTrainers } = useMissionTrainers(missionId);
-  const { data: missionParticipants } = useMissionParticipants(missionId);
-  const { data: allParticipants } = useParticipants();
   const { data: allUsers } = useUsers();
   const { data: missionSessions } = useMissionSessions(missionId);
 
@@ -594,8 +587,6 @@ export default function MissionDetail() {
   const uploadDocument = useUploadDocument();
   const addTrainer = useAddTrainerToMission();
   const removeTrainer = useRemoveTrainerFromMission();
-  const addParticipant = useAddParticipantToMission();
-  const removeParticipant = useRemoveParticipantFromMission();
   const createSession = useCreateMissionSession();
   const updateSession = useUpdateMissionSession();
   const deleteSession = useDeleteMissionSession();
@@ -616,6 +607,8 @@ export default function MissionDetail() {
         trainerId: mission.trainerId || "",
         programId: mission.programId?.toString() || "",
         programTitle: mission.programTitle || "",
+        expectedParticipants: mission.expectedParticipants || "",
+        participantsList: mission.participantsList || "",
       });
     }
   }, [mission]);
@@ -652,6 +645,8 @@ export default function MissionDetail() {
           trainerId: editForm.trainerId || undefined,
           programId: editForm.programId ? Number(editForm.programId) : undefined,
           programTitle: editForm.programTitle || undefined,
+          expectedParticipants: editForm.expectedParticipants ? Number(editForm.expectedParticipants) : undefined,
+          participantsList: editForm.participantsList || undefined,
         },
       });
       setIsEditingInfo(false);
@@ -803,7 +798,7 @@ export default function MissionDetail() {
   const handleAddDocument = async () => {
     if (!newDocTitle.trim()) return;
     try {
-      await createDocument.mutateAsync({
+      const newDoc = await createDocument.mutateAsync({
         missionId,
         data: {
           title: newDocTitle,
@@ -811,10 +806,14 @@ export default function MissionDetail() {
           url: "",
         },
       });
+      if (newDocFile && newDoc?.id) {
+        await uploadDocument.mutateAsync({ id: newDoc.id, file: newDocFile, missionId });
+      }
       setNewDocTitle("");
       setNewDocType("");
+      setNewDocFile(null);
       setIsAddDocumentOpen(false);
-      toast({ title: "Document ajoute" });
+      toast({ title: newDocFile ? "Document ajoute avec fichier" : "Document ajoute" });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
     }
@@ -829,23 +828,6 @@ export default function MissionDetail() {
     }
   };
 
-  const handleAddParticipant = async (participantId: number) => {
-    try {
-      await addParticipant.mutateAsync({ missionId, participantId });
-      toast({ title: "Participant ajoute" });
-    } catch (error) {
-      toast({ title: "Erreur", variant: "destructive" });
-    }
-  };
-
-  const handleRemoveParticipant = async (participantId: number) => {
-    try {
-      await removeParticipant.mutateAsync({ missionId, participantId });
-      toast({ title: "Participant retire" });
-    } catch (error) {
-      toast({ title: "Erreur", variant: "destructive" });
-    }
-  };
 
   const handleStatusChange = async (newStatus: MissionStatus) => {
     try {
@@ -957,7 +939,7 @@ export default function MissionDetail() {
       case 3:
         return renderTasksStep();
       case 4:
-        return renderParticipantsStep();
+        return renderDocumentsStep();
       case 5:
         return renderProgressStep();
       default:
@@ -1373,6 +1355,67 @@ export default function MissionDetail() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Participants
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isEditingInfo ? (
+              <>
+                <div>
+                  <Label>Nombre de participants prevus</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.expectedParticipants}
+                    onChange={(e) => setEditForm({ ...editForm, expectedParticipants: e.target.value })}
+                    placeholder="Ex: 12"
+                  />
+                </div>
+                <div>
+                  <Label>Liste des participants</Label>
+                  <Textarea
+                    value={editForm.participantsList}
+                    onChange={(e) => setEditForm({ ...editForm, participantsList: e.target.value })}
+                    placeholder="Saisissez la liste des participants..."
+                    rows={5}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground font-medium">Nombre prevu :</span>
+                  <span className="font-medium">{mission.expectedParticipants ?? "Non defini"}</span>
+                </div>
+                {mission.participantsList ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground font-medium mb-1">Liste :</p>
+                    <p className="text-sm whitespace-pre-line bg-muted/30 rounded-lg p-3 border">{mission.participantsList}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucune liste de participants saisie</p>
+                )}
+              </>
+            )}
+
+            {mission.hasDisability && (
+              <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-medium text-amber-700">Situation de handicap</span>
+                  {mission.disabilityDetails && (
+                    <p className="text-amber-600 text-xs mt-0.5">{mission.disabilityDetails}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
@@ -1666,235 +1709,83 @@ export default function MissionDetail() {
   };
 
   // Step 4: Participants & Documents
-  const renderParticipantsStep = () => {
-    const availableParticipants = allParticipants?.filter(
-      (p: any) => !missionParticipants?.some((mp: any) => mp.participantId === p.id)
-    );
-
+  const renderDocumentsStep = () => {
     return (
       <div className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Participants */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-semibold">Participants</h2>
-                {mission.expectedParticipants != null && (
-                  <p className="text-sm text-muted-foreground">
-                    {missionParticipants?.length || 0} / {mission.expectedParticipants} prevus
-                  </p>
-                )}
-                {mission.hasDisability && (
-                  <div className="mt-1 flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="font-medium text-amber-700">Situation de handicap</span>
-                      {mission.disabilityDetails && (
-                        <p className="text-amber-600 text-xs mt-0.5">{mission.disabilityDetails}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              {isAdmin && (
-                <Button variant="outline" onClick={() => setIsAddParticipantOpen(true)}>
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Ajouter
-                </Button>
-              )}
-            </div>
-
-            {missionParticipants && missionParticipants.length > 0 ? (
-              <div className="space-y-2">
-                {missionParticipants.map((mp: any) => (
-                  <Card key={mp.id}>
-                    <CardContent className="py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                            {mp.participant?.firstName?.[0]}{mp.participant?.lastName?.[0]}
-                          </div>
-                          <div>
-                            <p className="font-medium">
-                              {mp.participant?.firstName} {mp.participant?.lastName}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{mp.participant?.email}</p>
-                          </div>
-                        </div>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            onClick={() => handleRemoveParticipant(mp.participantId)}
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <Users className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Aucun participant</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Documents */}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Documents</h2>
-              <Button variant="outline" onClick={() => setIsAddDocumentOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Ajouter
-              </Button>
-            </div>
-
-            {documents && documents.length > 0 ? (
-              <div className="space-y-2">
-                {documents.map((doc: any) => (
-                  <Card key={doc.id}>
-                    <CardContent className="py-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <FileText className="w-5 h-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{doc.title}</p>
-                            <p className="text-xs text-muted-foreground">{doc.type}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {doc.url ? (
-                            <Button variant="ghost" size="sm" asChild>
-                              <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                                <Download className="w-4 h-4" />
-                              </a>
-                            </Button>
-                          ) : (
-                            <label className="cursor-pointer">
-                              <input
-                                type="file"
-                                className="hidden"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleFileUpload(doc.id, file);
-                                }}
-                              />
-                              <Button variant="ghost" size="sm" asChild>
-                                <span>
-                                  <Upload className="w-4 h-4" />
-                                </span>
-                              </Button>
-                            </label>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600"
-                            onClick={() => deleteDocument.mutate({ id: doc.id, missionId: mission.id })}
-                            data-testid={`button-delete-document-${doc.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <FolderOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
-                  <p className="text-muted-foreground">Aucun document</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Documents</h2>
+          <Button variant="outline" onClick={() => setIsAddDocumentOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter
+          </Button>
         </div>
 
-        {/* Add participant dialog */}
-        <Dialog open={isAddParticipantOpen} onOpenChange={(open) => {
-          setIsAddParticipantOpen(open);
-          if (!open) setParticipantSearchTerm("");
-        }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Ajouter un participant</DialogTitle>
-            </DialogHeader>
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher par nom, email ou entreprise..."
-                value={participantSearchTerm}
-                onChange={(e) => setParticipantSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="max-h-[300px] overflow-y-auto space-y-2 py-2">
-              {(() => {
-                const searchLower = participantSearchTerm.toLowerCase();
-                const filteredParticipants = availableParticipants?.filter((p: any) => {
-                  if (!participantSearchTerm) return true;
-                  return (
-                    `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchLower) ||
-                    p.email?.toLowerCase().includes(searchLower) ||
-                    p.company?.toLowerCase().includes(searchLower)
-                  );
-                }) || [];
-
-                if (filteredParticipants.length > 0) {
-                  return filteredParticipants.map((p: any) => (
-                    <div
-                      key={p.id}
-                      className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
-                      onClick={() => {
-                        handleAddParticipant(p.id);
-                        setIsAddParticipantOpen(false);
-                        setParticipantSearchTerm("");
-                      }}
-                    >
+        {documents && documents.length > 0 ? (
+          <div className="space-y-2">
+            {documents.map((doc: any) => (
+              <Card key={doc.id}>
+                <CardContent className="py-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-5 h-5 text-muted-foreground" />
                       <div>
-                        <p className="font-medium">{p.firstName} {p.lastName}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{p.email}</span>
-                          {p.company && (
-                            <>
-                              <span>•</span>
-                              <span>{p.company}</span>
-                            </>
-                          )}
-                        </div>
+                        <p className="font-medium">{doc.title}</p>
+                        <p className="text-xs text-muted-foreground">{doc.type}</p>
                       </div>
-                      <Plus className="w-4 h-4 text-primary" />
                     </div>
-                  ));
-                } else if (participantSearchTerm) {
-                  return (
-                    <p className="text-center text-muted-foreground py-4">
-                      Aucun participant correspondant a "{participantSearchTerm}"
-                    </p>
-                  );
-                } else {
-                  return (
-                    <p className="text-center text-muted-foreground py-4">
-                      Tous les participants sont deja assignes
-                    </p>
-                  );
-                }
-              })()}
-            </div>
-          </DialogContent>
-        </Dialog>
+                    <div className="flex items-center gap-2">
+                      {doc.url ? (
+                        <Button variant="ghost" size="sm" asChild>
+                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                            <Download className="w-4 h-4" />
+                          </a>
+                        </Button>
+                      ) : (
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFileUpload(doc.id, file);
+                            }}
+                          />
+                          <Button variant="ghost" size="sm" asChild>
+                            <span>
+                              <Upload className="w-4 h-4" />
+                            </span>
+                          </Button>
+                        </label>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600"
+                        onClick={() => deleteDocument.mutate({ id: doc.id, missionId: mission.id })}
+                        data-testid={`button-delete-document-${doc.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <FolderOpen className="w-12 h-12 mx-auto mb-3 text-muted-foreground opacity-50" />
+              <p className="text-muted-foreground">Aucun document</p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Add document dialog */}
-        <Dialog open={isAddDocumentOpen} onOpenChange={setIsAddDocumentOpen}>
+        <Dialog open={isAddDocumentOpen} onOpenChange={(open) => {
+          setIsAddDocumentOpen(open);
+          if (!open) { setNewDocTitle(""); setNewDocType(""); setNewDocFile(null); }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Ajouter un document</DialogTitle>
@@ -1915,22 +1806,55 @@ export default function MissionDetail() {
                     <SelectValue placeholder="Selectionner un type" />
                   </SelectTrigger>
                   <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="Bilan de fin du formateur" className="focus:bg-violet-200">Bilan de fin du formateur</SelectItem>
+                    <SelectItem value="Compte rendu de l'entretien preparatoire" className="focus:bg-violet-200">Compte rendu de l'entretien preparatoire</SelectItem>
+                    <SelectItem value="Contrat" className="focus:bg-violet-200">Contrat</SelectItem>
+                    <SelectItem value="Evaluations des acquis : Preuves" className="focus:bg-violet-200">Evaluations des acquis : Preuves</SelectItem>
+                    <SelectItem value="Evaluations des acquis : Synthese" className="focus:bg-violet-200">Evaluations des acquis : Synthese</SelectItem>
+                    <SelectItem value="Facture" className="focus:bg-violet-200">Facture</SelectItem>
+                    <SelectItem value="Feuille de presence" className="focus:bg-violet-200">Feuille de presence</SelectItem>
+                    <SelectItem value="Impression : Annexes" className="focus:bg-violet-200">Impression : Annexes</SelectItem>
+                    <SelectItem value="Impression : Livret" className="focus:bg-violet-200">Impression : Livret</SelectItem>
+                    <SelectItem value="Liste des participants" className="focus:bg-violet-200">Liste des participants</SelectItem>
                     <SelectItem value="Programme" className="focus:bg-violet-200">Programme</SelectItem>
-                    <SelectItem value="Convocation" className="focus:bg-violet-200">Convocation</SelectItem>
-                    <SelectItem value="Emargement" className="focus:bg-violet-200">Emargement</SelectItem>
-                    <SelectItem value="Evaluation" className="focus:bg-violet-200">Evaluation</SelectItem>
-                    <SelectItem value="Attestation" className="focus:bg-violet-200">Attestation</SelectItem>
+                    <SelectItem value="Questionnaire referent de preparation" className="focus:bg-violet-200">Questionnaire referent de preparation</SelectItem>
+                    <SelectItem value="Questionnaires de satisfaction des stagiaires" className="focus:bg-violet-200">Questionnaires de satisfaction des stagiaires</SelectItem>
+                    <SelectItem value="Questionnaires stagiaires de positionnement" className="focus:bg-violet-200">Questionnaires stagiaires de positionnement</SelectItem>
+                    <SelectItem value="Sequencage" className="focus:bg-violet-200">Sequencage</SelectItem>
                     <SelectItem value="Autre" className="focus:bg-violet-200">Autre</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label>Fichier</Label>
+                <div className="flex items-center gap-2 mt-1">
+                  <label className="cursor-pointer flex-1">
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => setNewDocFile(e.target.files?.[0] || null)}
+                    />
+                    <div className="flex items-center gap-2 px-3 py-2 border rounded-md hover:bg-muted/50 text-sm">
+                      <Upload className="w-4 h-4 text-muted-foreground" />
+                      <span className={newDocFile ? "text-foreground" : "text-muted-foreground"}>
+                        {newDocFile ? newDocFile.name : "Parcourir..."}
+                      </span>
+                    </div>
+                  </label>
+                  {newDocFile && (
+                    <Button variant="ghost" size="sm" onClick={() => setNewDocFile(null)} className="h-8 w-8 p-0">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDocumentOpen(false)}>
                 Annuler
               </Button>
-              <Button onClick={handleAddDocument} disabled={!newDocTitle.trim()}>
-                Ajouter
+              <Button onClick={handleAddDocument} disabled={!newDocTitle.trim() || createDocument.isPending || uploadDocument.isPending}>
+                {(createDocument.isPending || uploadDocument.isPending) ? "Envoi..." : "Ajouter"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1967,8 +1891,8 @@ export default function MissionDetail() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <div className="text-4xl font-bold">{missionParticipants?.length || 0}</div>
-              <p className="text-sm text-muted-foreground mt-1">Participants inscrits</p>
+              <div className="text-4xl font-bold">{mission.expectedParticipants || 0}</div>
+              <p className="text-sm text-muted-foreground mt-1">Participants prevus</p>
             </div>
           </CardContent>
         </Card>
