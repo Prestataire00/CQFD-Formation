@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { Button } from "./button";
 import { Bold, Italic, Underline, List, ListOrdered } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,10 +12,23 @@ interface RichTextEditorProps {
 
 export function RichTextEditor({ value, onChange, placeholder, className }: RichTextEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const isInternalChange = useRef(false);
 
-  const execCommand = useCallback((command: string, value?: string) => {
-    document.execCommand(command, false, value);
+  // Only set innerHTML from outside when value changes externally (not from typing)
+  useEffect(() => {
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  const execCommand = useCallback((command: string, val?: string) => {
+    document.execCommand(command, false, val);
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
     editorRef.current?.focus();
@@ -23,6 +36,7 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
 
   const handleInput = useCallback(() => {
     if (editorRef.current) {
+      isInternalChange.current = true;
       onChange(editorRef.current.innerHTML);
     }
   }, [onChange]);
@@ -97,7 +111,6 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Rich
         className="min-h-[80px] p-3 text-sm focus:outline-none prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4"
         onInput={handleInput}
         onPaste={handlePaste}
-        dangerouslySetInnerHTML={{ __html: value }}
         data-placeholder={placeholder}
         style={{
           position: "relative",

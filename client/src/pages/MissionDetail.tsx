@@ -79,6 +79,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
@@ -196,13 +197,27 @@ const stepStatusConfig: Record<StepStatus, {
   },
 };
 
-// Get task status - uses stored status directly (manually controlled)
+// Get task status - auto-computed from due date when status is 'todo', manual override otherwise
 function getAutoStatus(task: any): StepStatus {
+  // Manual overrides (user explicitly set a status)
   if (task.isCompleted || task.status === 'done') return 'done';
   if (task.status === 'na') return 'na';
   if (task.status === 'priority') return 'priority';
   if (task.status === 'late') return 'late';
+
+  // Auto-compute for tasks in 'todo' status
+  if (!task.dueDate) return 'todo';
+  const now = new Date();
+  const dueDate = new Date(task.dueDate);
+  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return 'late';
+  if (diffDays <= 3) return 'priority';
   return 'todo';
+}
+
+// Check if status was manually overridden (not 'todo' which is the auto-compute default)
+function isManualStatus(task: any): boolean {
+  return task.status !== 'todo' && !task.isCompleted;
 }
 
 // Quick actions predefined
@@ -272,6 +287,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
 
   const autoStatus = getAutoStatus(task);
   const config = stepStatusConfig[autoStatus] || stepStatusConfig.todo;
+  const isManual = isManualStatus(task);
   const assignee = users?.find((u: any) => u.id === task.assigneeId);
   const commentAuthor = users?.find((u: any) => u.id === task.commentAuthorId);
 
@@ -312,7 +328,19 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 {config.icon}
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[160px]">
+            <DropdownMenuContent align="start" className="min-w-[180px]">
+              {isManual && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => handleStatusChange('todo')}
+                    className="text-violet-600"
+                  >
+                    <Clock className="w-4 h-4 mr-2" />
+                    Revenir en automatique
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               {(Object.entries(stepStatusConfig) as [StepStatus, typeof stepStatusConfig[StepStatus]][]).map(([status, statusConfig]) => (
                 <DropdownMenuItem
                   key={status}
@@ -332,7 +360,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 {task.title}
               </h4>
               <span className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} border ${config.borderColor}`}>
-                {config.label}
+                {config.label}{isManual ? ' (manuel)' : ''}
               </span>
             </div>
 
