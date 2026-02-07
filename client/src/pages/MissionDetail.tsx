@@ -196,18 +196,12 @@ const stepStatusConfig: Record<StepStatus, {
   },
 };
 
-// Calculate automatic status based on due date
+// Get task status - uses stored status directly (manually controlled)
 function getAutoStatus(task: any): StepStatus {
-  if (task.isCompleted) return 'done';
+  if (task.isCompleted || task.status === 'done') return 'done';
   if (task.status === 'na') return 'na';
-  if (!task.dueDate) return 'todo';
-
-  const now = new Date();
-  const dueDate = new Date(task.dueDate);
-  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return 'late';
-  if (diffDays <= 3) return 'priority';
+  if (task.status === 'priority') return 'priority';
+  if (task.status === 'late') return 'late';
   return 'todo';
 }
 
@@ -281,8 +275,12 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
   const assignee = users?.find((u: any) => u.id === task.assigneeId);
   const commentAuthor = users?.find((u: any) => u.id === task.commentAuthorId);
 
-  const handleToggleComplete = () => {
-    onUpdate(task.id, { isCompleted: !task.isCompleted });
+  const handleStatusChange = (newStatus: StepStatus) => {
+    if (newStatus === 'done') {
+      onUpdate(task.id, { status: 'done', isCompleted: true });
+    } else {
+      onUpdate(task.id, { status: newStatus, isCompleted: false });
+    }
   };
 
   const handleSaveComment = () => {
@@ -303,32 +301,39 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
     setIsEditingAssignee(false);
   };
 
-  const handleMarkNA = () => {
-    onUpdate(task.id, { status: task.status === 'na' ? 'todo' : 'na' });
-  };
-
   return (
     <div className={`rounded-xl border-2 ${config.borderColor} ${config.bgColor} overflow-hidden`}>
       <div className="p-4">
         <div className="flex items-start gap-3">
-          <button
-            onClick={handleToggleComplete}
-            className="mt-0.5 flex-shrink-0"
-            disabled={task.status === 'na'}
-          >
-            {task.isCompleted ? (
-              <CheckSquare className="w-5 h-5 text-green-600" />
-            ) : (
-              <Square className={`w-5 h-5 ${task.status === 'na' ? 'text-gray-300' : 'text-gray-400 hover:text-gray-600'}`} />
-            )}
-          </button>
+          {/* Status selector dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="mt-0.5 flex-shrink-0 cursor-pointer" title="Changer le statut">
+                {config.icon}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[160px]">
+              {(Object.entries(stepStatusConfig) as [StepStatus, typeof stepStatusConfig[StepStatus]][]).map(([status, statusConfig]) => (
+                <DropdownMenuItem
+                  key={status}
+                  onClick={() => handleStatusChange(status)}
+                  className={autoStatus === status ? 'bg-accent font-medium' : ''}
+                >
+                  <span className="mr-2">{statusConfig.icon}</span>
+                  {statusConfig.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              {config.icon}
-              <h4 className={`font-medium ${task.isCompleted ? 'line-through text-green-700' : config.color}`}>
+              <h4 className={`font-medium ${task.isCompleted || autoStatus === 'done' ? 'line-through text-green-700' : config.color}`}>
                 {task.title}
               </h4>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} border ${config.borderColor}`}>
+                {config.label}
+              </span>
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-4">
@@ -464,13 +469,6 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
               title="Commentaire"
             >
               <MessageSquare className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleMarkNA}
-              className={`p-1.5 rounded hover:bg-white/50 ${task.status === 'na' ? 'text-gray-600' : 'text-gray-400 hover:text-gray-600'}`}
-              title="Marquer sans objet"
-            >
-              <MinusCircle className="w-4 h-4" />
             </button>
             {isAdmin && (
               <button
