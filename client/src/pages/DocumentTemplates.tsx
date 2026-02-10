@@ -95,6 +95,7 @@ export default function DocumentTemplates() {
     type: "",
     customType: "",
     forRole: "formateur",
+    forTypology: "",
     description: "",
     clientId: "",
     changeNotes: "",
@@ -107,6 +108,7 @@ export default function DocumentTemplates() {
       type: "",
       customType: "",
       forRole: "formateur",
+      forTypology: "",
       description: "",
       clientId: "",
       changeNotes: "",
@@ -141,6 +143,7 @@ export default function DocumentTemplates() {
     data.append("type", effectiveType);
     data.append("forRole", formData.forRole);
     if (formData.description) data.append("description", formData.description);
+    if (formData.forTypology) data.append("forTypology", formData.forTypology);
     if (formData.clientId) data.append("clientId", formData.clientId);
     if (formData.depositDate) data.append("depositDate", formData.depositDate);
     if (selectedFile) data.append("file", selectedFile);
@@ -172,6 +175,7 @@ export default function DocumentTemplates() {
     if (effectiveType) data.append("type", effectiveType);
     if (formData.forRole) data.append("forRole", formData.forRole);
     if (formData.description !== undefined) data.append("description", formData.description);
+    if (formData.forTypology !== undefined) data.append("forTypology", formData.forTypology);
     if (formData.clientId !== undefined) data.append("clientId", formData.clientId);
     if (formData.depositDate) data.append("depositDate", formData.depositDate);
     if (formData.changeNotes) data.append("changeNotes", formData.changeNotes);
@@ -222,6 +226,7 @@ export default function DocumentTemplates() {
       type: isPredefinedType ? template.type : "autre",
       customType: isPredefinedType ? "" : template.type,
       forRole: template.forRole,
+      forTypology: (template as any).forTypology || "",
       description: template.description || "",
       clientId: template.clientId?.toString() || "",
       changeNotes: "",
@@ -285,6 +290,7 @@ export default function DocumentTemplates() {
                     <TableHead>Type</TableHead>
                     <TableHead>Date de dépôt</TableHead>
                     <TableHead>Rôle</TableHead>
+                    <TableHead>Typologie</TableHead>
                     <TableHead>Client</TableHead>
                     <TableHead>Version</TableHead>
                     <TableHead>Statut</TableHead>
@@ -314,6 +320,13 @@ export default function DocumentTemplates() {
                         <Badge variant="outline">
                           {template.forRole === "formateur" ? "Formateur" : "Prestataire"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {(template as any).forTypology ? (
+                          <Badge variant="secondary">{(template as any).forTypology}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">Toutes</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         {template.clientId ? (
@@ -467,6 +480,23 @@ export default function DocumentTemplates() {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="forTypology">Typologie</Label>
+              <Select
+                value={formData.forTypology || "_all_"}
+                onValueChange={(value) => setFormData({ ...formData, forTypology: value === "_all_" ? "" : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Toutes les typologies" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="_all_" className="focus:bg-violet-200">Toutes</SelectItem>
+                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="clientId">Client (optionnel)</Label>
               <Select
                 value={formData.clientId || "_global_"}
@@ -590,6 +620,23 @@ export default function DocumentTemplates() {
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="formateur" className="focus:bg-violet-200">Formateur</SelectItem>
                   <SelectItem value="prestataire" className="focus:bg-violet-200">Prestataire</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-forTypology">Typologie</Label>
+              <Select
+                value={formData.forTypology || "_all_"}
+                onValueChange={(value) => setFormData({ ...formData, forTypology: value === "_all_" ? "" : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Toutes les typologies" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="_all_" className="focus:bg-violet-200">Toutes</SelectItem>
+                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
                 </SelectContent>
               </Select>
             </div>

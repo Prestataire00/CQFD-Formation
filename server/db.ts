@@ -91,6 +91,23 @@ export async function ensureSchemaSync() {
       }
     }
 
+    // Sync document_templates table
+    const dtCols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'document_templates' AND table_schema = 'public'`
+    );
+    const dtColNames = dtCols.rows.map((r: any) => r.column_name);
+    const dtColumns: Record<string, string> = {
+      for_typology: 'TEXT',
+      client_id: 'INTEGER',
+      version: 'INTEGER DEFAULT 1',
+    };
+    for (const [col, type] of Object.entries(dtColumns)) {
+      if (!dtColNames.includes(col)) {
+        await pool.query(`ALTER TABLE document_templates ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        console.log(`[db] Added missing column ${col} to document_templates`);
+      }
+    }
+
   } catch (e: any) {
     console.error('[db] Schema sync error:', e.message);
   }

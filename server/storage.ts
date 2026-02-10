@@ -1240,12 +1240,11 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(documentTemplates).orderBy(desc(documentTemplates.createdAt));
   }
 
-  async getActiveDocumentTemplatesByRole(role: string, clientId?: number): Promise<DocumentTemplate[]> {
-    // Get both global and client-specific templates
-    const conditions: any[] = [
-      eq(documentTemplates.isActive, true),
-      eq(documentTemplates.forRole, role)
-    ];
+  async getActiveDocumentTemplatesByRole(role: string, clientId?: number, typology?: string): Promise<DocumentTemplate[]> {
+    // Build typology filter: match templates with forTypology NULL (global) or equal to the mission's typology
+    const typologyFilter = typology
+      ? sql`(${documentTemplates.forTypology} IS NULL OR ${documentTemplates.forTypology} = ${typology})`
+      : sql`${documentTemplates.forTypology} IS NULL`;
 
     // If clientId is provided, get both global templates and templates for that client
     if (clientId) {
@@ -1253,7 +1252,8 @@ export class DatabaseStorage implements IStorage {
         .where(and(
           eq(documentTemplates.isActive, true),
           eq(documentTemplates.forRole, role),
-          sql`(${documentTemplates.clientId} IS NULL OR ${documentTemplates.clientId} = ${clientId})`
+          sql`(${documentTemplates.clientId} IS NULL OR ${documentTemplates.clientId} = ${clientId})`,
+          typologyFilter
         ));
     }
 
@@ -1262,7 +1262,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(documentTemplates.isActive, true),
         eq(documentTemplates.forRole, role),
-        sql`${documentTemplates.clientId} IS NULL`
+        sql`${documentTemplates.clientId} IS NULL`,
+        typologyFilter
       ));
   }
 
@@ -1344,8 +1345,9 @@ export class DatabaseStorage implements IStorage {
     const mission = await this.getMission(missionId);
     const clientId = mission?.clientId;
 
-    // Get appropriate templates based on trainer role and client
-    const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId || undefined);
+    // Get appropriate templates based on trainer role, client, and mission typology
+    const typology = mission?.typology || undefined;
+    const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId || undefined, typology);
 
     // Attach each template document to the mission
     for (const template of templates) {

@@ -2287,7 +2287,7 @@ export async function registerRoutes(
 
   app.post('/api/document-templates', isAuthenticated, requireRole('admin'), upload.single('file'), async (req, res) => {
     try {
-      const { title, type, forRole, description } = req.body;
+      const { title, type, forRole, description, forTypology } = req.body;
 
       if (!title || !type || !forRole) {
         res.status(400).json({ message: 'Champs manquants' });
@@ -2302,6 +2302,7 @@ export async function registerRoutes(
         forRole,
         url: fileUrl,
         description: description || null,
+        forTypology: forTypology || null,
         isActive: true,
       });
 
@@ -2315,7 +2316,7 @@ export async function registerRoutes(
   app.put('/api/document-templates/:id', isAuthenticated, requireRole('admin'), upload.single('file'), async (req, res) => {
     try {
       const templateId = Number(req.params.id);
-      const { title, type, forRole, description, isActive, clientId, changeNotes } = req.body;
+      const { title, type, forRole, description, isActive, clientId, changeNotes, forTypology } = req.body;
       const user = req.user!;
 
       const updateData: any = {};
@@ -2325,6 +2326,7 @@ export async function registerRoutes(
       if (description !== undefined) updateData.description = description;
       if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
       if (clientId !== undefined) updateData.clientId = clientId ? Number(clientId) : null;
+      if (forTypology !== undefined) updateData.forTypology = forTypology || null;
       if (req.file) updateData.url = `/uploads/${req.file.filename}`;
 
       // The storage method now handles versioning and notifications automatically

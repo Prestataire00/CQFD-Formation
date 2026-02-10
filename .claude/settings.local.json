@@ -53,7 +53,9 @@
       "Bash(git -C /home/runner/workspace add server/routes.ts client/src/pages/MissionDetail.tsx shared/schema.ts shared/routes.ts client/src/hooks/use-missions.ts migrations/0010_add_mission_step_late_date.sql)",
       "Bash(git commit:*)",
       "Bash(printenv:*)",
-      "Bash(PGPASSWORD=password psql:*)"
+      "Bash(PGPASSWORD=password psql:*)",
+      "Bash(git -C /home/runner/workspace diff --stat)",
+      "Bash(pgrep:*)"
     ]
   }
 }

@@ -354,6 +354,7 @@ export const documentTemplates = pgTable("document_templates", {
   title: text("title").notNull(),
   type: text("type").notNull(), // 'consignes_formateurs', 'cahier_charges', 'bonnes_pratiques'
   forRole: text("for_role").notNull(), // 'formateur' (salarié) ou 'prestataire'
+  forTypology: text("for_typology"), // null = toutes typologies, 'Intra', 'Inter'
   url: text("url").notNull(), // URL de la dernière version du document
   description: text("description"),
   version: integer("version").default(1).notNull(), // Numéro de version

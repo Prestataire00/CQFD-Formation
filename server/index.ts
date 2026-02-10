@@ -64,10 +64,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await ensureSchemaSync();
   await registerRoutes(httpServer, app);
   
   // Créer un admin par défaut si aucun n'existe
-  await ensureSchemaSync();
   await seedDefaultAdmin();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
