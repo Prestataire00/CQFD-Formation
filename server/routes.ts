@@ -829,7 +829,7 @@ export async function registerRoutes(
     try {
       const input = api.missions.steps.update.input.parse(req.body);
       const stepId = Number(req.params.stepId);
-      const missionId = Number(req.params.id);
+      const missionId = Number(req.params.missionId);
       const userRole = req.user?.role;
 
       // Get current step to detect assignee change

@@ -936,19 +936,15 @@ export default function MissionDetail() {
     }
   };
 
-  // Compute due date based on first session date and deadline defaults
+  // Compute due date based on mission end date and deadline defaults
   const computeDueDate = (taskTitle: string): string | null => {
     const daysBefore = deadlineDefaults[taskTitle];
-    if (daysBefore === undefined || !missionSessions || missionSessions.length === 0) return null;
+    if (daysBefore === undefined || !mission?.endDate) return null;
 
-    // Sort sessions to get the first one
-    const sortedSessions = [...missionSessions].sort(
-      (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
-    );
-    const firstSessionDate = new Date(sortedSessions[0].sessionDate);
+    const referenceDate = new Date(mission.endDate);
 
-    // daysBefore > 0 means before session, < 0 means after session, 0 means same day
-    const dueDate = new Date(firstSessionDate);
+    // daysBefore > 0 means before end date, < 0 means after, 0 means same day
+    const dueDate = new Date(referenceDate);
     dueDate.setDate(dueDate.getDate() - daysBefore);
     return dueDate.toISOString();
   };
@@ -1021,16 +1017,13 @@ export default function MissionDetail() {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
       let dueDate: string | null = null;
       let lateDate: string | null = null;
-      if (overrideDaysBefore !== undefined && missionSessions && missionSessions.length > 0) {
-        const sortedSessions = [...missionSessions].sort(
-          (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
-        );
-        const firstSessionDate = new Date(sortedSessions[0].sessionDate);
-        const d = new Date(firstSessionDate);
+      if (overrideDaysBefore !== undefined && mission?.endDate) {
+        const referenceDate = new Date(mission.endDate);
+        const d = new Date(referenceDate);
         d.setDate(d.getDate() - overrideDaysBefore);
         dueDate = d.toISOString();
         if (overrideLateDaysBefore !== undefined) {
-          const ld = new Date(firstSessionDate);
+          const ld = new Date(referenceDate);
           ld.setDate(ld.getDate() - overrideLateDaysBefore);
           lateDate = ld.toISOString();
         }
@@ -1094,15 +1087,12 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (missionSessions && missionSessions.length > 0) {
-          const sortedSessions = [...missionSessions].sort(
-            (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
-          );
-          const firstSessionDate = new Date(sortedSessions[0].sessionDate);
-          const d = new Date(firstSessionDate);
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
-          const ld = new Date(firstSessionDate);
+          const ld = new Date(referenceDate);
           ld.setDate(ld.getDate() - task.lateDaysBefore);
           lateDate = ld.toISOString();
         }
@@ -1485,6 +1475,59 @@ export default function MissionDetail() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Dates de la mission
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isEditingInfo ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Date de debut</Label>
+                  <Input
+                    type="date"
+                    value={editForm.startDate || ""}
+                    onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Date de fin (deadline)</Label>
+                  <Input
+                    type="date"
+                    value={editForm.endDate || ""}
+                    onChange={(e) => setEditForm({ ...editForm, endDate: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Les deadlines des taches se calent sur cette date.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de debut</p>
+                  <p className="font-medium">
+                    {mission.startDate
+                      ? format(new Date(mission.startDate), "d MMMM yyyy", { locale: fr })
+                      : "Non definie"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Date de fin (deadline)</p>
+                  <p className="font-medium">
+                    {mission.endDate
+                      ? format(new Date(mission.endDate), "d MMMM yyyy", { locale: fr })
+                      : "Non definie"}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -149,6 +149,7 @@ export default function Missions() {
     clientIds: string[];
     trainerId: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
+    endDate: string;
     locationType: LocationType;
     location: string;
     typology: string;
@@ -164,6 +165,7 @@ export default function Missions() {
     clientIds: [],
     trainerId: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
+    endDate: "",
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
@@ -279,17 +281,16 @@ export default function Missions() {
     }
 
     try {
-      // Calculer les dates globales (min et max) pour la mission si des jours sont définis
+      // Calculer la date de debut depuis les jours de formation (min)
       const allDates = validDays.length > 0 ? validDays.map(d => d.date).sort() : [];
       const globalStartDate = allDates.length > 0 ? allDates[0] : null;
-      const globalEndDate = allDates.length > 0 ? allDates[allDates.length - 1] : null;
 
       const missionData = {
         title: newMission.title,
         clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
         startDate: globalStartDate,
-        endDate: globalEndDate,
+        endDate: newMission.endDate || null,
         locationType: newMission.locationType,
         location: newMission.location || null,
         typology: newMission.typology,
@@ -352,6 +353,7 @@ export default function Missions() {
         clientIds: [],
         trainerId: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
+        endDate: "",
         locationType: "presentiel",
         location: "",
         typology: "Intra",
@@ -880,6 +882,17 @@ export default function Missions() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Ajoutez chaque jour de formation avec ses horaires (ex: 18 janv 9h-17h, 24 janv 9h-17h).
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Date de fin de mission (deadline)</Label>
+                      <Input
+                        type="date"
+                        value={newMission.endDate}
+                        onChange={(e) => setNewMission({ ...newMission, endDate: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Les deadlines des taches seront calculees par rapport a cette date.
                       </p>
                     </div>
                     <div className="space-y-2 pt-2 border-t">
