@@ -216,8 +216,7 @@ export default function Missions() {
   // Filter missions
   const filteredMissions = missions?.filter((mission: Mission) => {
     const matchesSearch =
-      (mission.title?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
-      (mission.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+      (mission.title?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     const matchesStatus = statusFilter === "all" || mission.status === statusFilter;
     const matchesTrainer = trainerFilter === "all" || mission.trainerId === trainerFilter;
     const matchesTypology = typologyFilter === "all" || (mission.typology || "") === typologyFilter;
@@ -286,7 +285,6 @@ export default function Missions() {
       const globalEndDate = allDates.length > 0 ? allDates[allDates.length - 1] : null;
 
       const missionData = {
-        reference: `MIS-${Date.now()}`,
         title: newMission.title,
         clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
@@ -1079,7 +1077,6 @@ export default function Missions() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted/50">
-                    <th className="text-left p-3 font-medium text-sm">Reference</th>
                     <th className="text-left p-3 font-medium text-sm">Titre</th>
                     <th className="text-left p-3 font-medium text-sm">Client</th>
                     <th className="text-left p-3 font-medium text-sm">Formateur</th>
@@ -1104,9 +1101,6 @@ export default function Missions() {
                     const rowClass = rowStatusStyles[mission.status as MissionStatus] || rowStatusStyles.draft;
                     return (
                       <tr key={mission.id} className={`border-b last:border-0 hover:bg-muted/30 transition-colors ${rowClass}`}>
-                        <td className="p-3 text-sm font-mono text-muted-foreground">
-                          {mission.reference || "-"}
-                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
                             <Link href={`/missions/${mission.id}`} className="font-medium hover:text-primary transition-colors">
@@ -1149,7 +1143,18 @@ export default function Missions() {
                                 checked={mission.status === "completed"}
                                 onCheckedChange={(checked) => {
                                   const newStatus = checked ? "completed" : "in_progress";
-                                  updateMissionStatus.mutate({ id: mission.id, status: newStatus as MissionStatus });
+                                  updateMissionStatus.mutate(
+                                    { id: mission.id, status: newStatus as MissionStatus },
+                                    {
+                                      onError: (error: any) => {
+                                        if (error?.data?.issues) {
+                                          toast({ title: error.data.message, description: error.data.issues.join(" | "), variant: "destructive", duration: 10000 });
+                                        } else {
+                                          toast({ title: "Erreur", variant: "destructive" });
+                                        }
+                                      },
+                                    }
+                                  );
                                 }}
                                 className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
                                 title={mission.status === "completed" ? "Marquer comme en cours" : "Marquer comme terminée"}
@@ -1220,7 +1225,18 @@ export default function Missions() {
                             checked={mission.status === "completed"}
                             onCheckedChange={(checked) => {
                               const newStatus = checked ? "completed" : "in_progress";
-                              updateMissionStatus.mutate({ id: mission.id, status: newStatus as MissionStatus });
+                              updateMissionStatus.mutate(
+                                { id: mission.id, status: newStatus as MissionStatus },
+                                {
+                                  onError: (error: any) => {
+                                    if (error?.data?.issues) {
+                                      toast({ title: error.data.message, description: error.data.issues.join(" | "), variant: "destructive", duration: 10000 });
+                                    } else {
+                                      toast({ title: "Erreur", variant: "destructive" });
+                                    }
+                                  },
+                                }
+                              );
                             }}
                             onClick={(e) => e.stopPropagation()}
                             className="data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"

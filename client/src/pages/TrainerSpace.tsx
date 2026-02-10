@@ -290,7 +290,6 @@ export default function TrainerSpace() {
         `Client: ${clientName}`,
         mission.typology ? `Type: ${mission.typology}` : "",
         mission.totalHours ? `Durée: ${mission.totalHours}h` : "",
-        mission.reference ? `Réf: ${mission.reference}` : "",
       ]
         .filter(Boolean)
         .join("\\n");

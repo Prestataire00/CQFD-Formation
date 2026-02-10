@@ -99,7 +99,12 @@ export function useUpdateMissionStatus() {
         credentials: 'include',
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Failed to update mission status");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const err: any = new Error(data.message || "Failed to update mission status");
+        err.data = data;
+        throw err;
+      }
       return res.json();
     },
     onSuccess: (_, { id }) => {

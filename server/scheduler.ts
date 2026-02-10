@@ -349,6 +349,39 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
 }
 
 /**
+ * Marque automatiquement les steps en retard (due_date passée, status 'todo', non complétées)
+ * Ne touche pas aux steps en 'priority' (choix manuel de l'utilisateur)
+ */
+async function markLateStepsServerSide(): Promise<number> {
+  const missions = await storage.getMissions();
+  const activeMissions = missions.filter(m =>
+    m.status !== 'cancelled' &&
+    m.status !== 'completed' &&
+    m.status !== 'draft'
+  );
+
+  const now = new Date();
+  let marked = 0;
+
+  for (const mission of activeMissions) {
+    const steps = await storage.getMissionSteps(mission.id);
+    for (const step of steps) {
+      if (
+        step.dueDate &&
+        new Date(step.dueDate) < now &&
+        step.status === 'todo' &&
+        !step.isCompleted
+      ) {
+        await storage.updateMissionStep(step.id, { status: 'late' });
+        marked++;
+      }
+    }
+  }
+
+  return marked;
+}
+
+/**
  * Tâche principale du scheduler qui génère et envoie les rappels
  */
 async function runReminderTask(): Promise<void> {
@@ -368,6 +401,12 @@ async function runReminderTask(): Promise<void> {
     // Étape 2: Traiter et envoyer les rappels en attente
     const processResult = await processPendingReminders();
     log(`[Scheduler] Rappels traités: ${processResult.processed} traités, ${processResult.sent} envoyés, ${processResult.failed} échoués`, 'scheduler');
+
+    // Étape 3: Marquer les tâches en retard
+    const lateCount = await markLateStepsServerSide();
+    if (lateCount > 0) {
+      log(`[Scheduler] ${lateCount} tâche(s) marquée(s) en retard`, 'scheduler');
+    }
 
   } catch (error) {
     log(`[Scheduler] Erreur lors de l'exécution: ${error instanceof Error ? error.message : 'Unknown error'}`, 'scheduler');
@@ -431,8 +470,6 @@ export function startReminderScheduler(): void {
   setTimeout(async () => {
     log('[Scheduler] Exécution initiale après démarrage', 'scheduler');
     await runReminderTask();
-    // Générer aussi un export initial
-    await runDailyExportTask();
   }, 30000);
 
   log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00', 'scheduler');

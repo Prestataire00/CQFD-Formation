@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail } from "./email";
+import { sendMissionAssignmentEmail, sendTaskAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
@@ -455,7 +455,44 @@ export async function registerRoutes(
   app.patch(api.missions.updateStatus.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.missions.updateStatus.input.parse(req.body);
-      const mission = await storage.updateMissionStatus(Number(req.params.id), input.status);
+      const missionIdParam = Number(req.params.id);
+
+      // Block completion if dossier is incomplete
+      if (input.status === 'completed') {
+        const steps = await storage.getMissionSteps(missionIdParam);
+        const incompleteTasks = steps.filter(s => s.status !== 'done' && s.status !== 'na' && !s.isCompleted);
+
+        const docs = await storage.getDocumentsByMission(missionIdParam);
+        const templates = await storage.getDocumentTemplates();
+        // Documents linked to a template whose URL still matches the template = not uploaded
+        const missingDocs: string[] = [];
+        for (const doc of docs) {
+          if (doc.templateId) {
+            const template = templates.find(t => t.id === doc.templateId);
+            if (template && doc.url === template.url) {
+              missingDocs.push(doc.title);
+            }
+          }
+        }
+
+        const issues: string[] = [];
+        if (incompleteTasks.length > 0) {
+          issues.push(`${incompleteTasks.length} tache(s) non terminee(s) : ${incompleteTasks.map(t => t.title).join(', ')}`);
+        }
+        if (missingDocs.length > 0) {
+          issues.push(`${missingDocs.length} document(s) non depose(s) : ${missingDocs.join(', ')}`);
+        }
+
+        if (issues.length > 0) {
+          res.status(400).json({
+            message: "Impossible de cloturer la mission : dossier incomplet",
+            issues,
+          });
+          return;
+        }
+      }
+
+      const mission = await storage.updateMissionStatus(missionIdParam, input.status);
       if (!mission) {
         res.status(404).json({ message: "Mission non trouvée" });
         return;
@@ -741,10 +778,34 @@ export async function registerRoutes(
   app.post(api.missions.steps.create.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.missions.steps.create.input.parse(req.body);
+      const missionId = Number(req.params.id);
       const step = await storage.createMissionStep({
         ...input,
-        missionId: Number(req.params.id),
+        missionId,
       });
+
+      // Notify assignee if set at creation
+      if (step.assigneeId) {
+        try {
+          const assignee = await storage.getUser(step.assigneeId);
+          const mission = await storage.getMission(missionId);
+          if (assignee && mission) {
+            await storage.createInAppNotification({
+              userId: assignee.id,
+              type: 'task_assignment',
+              title: 'Nouvelle tache assignee',
+              message: `La tache "${step.title}" vous a ete assignee sur la mission : ${mission.title}`,
+              missionId: mission.id,
+            });
+            if (assignee.email) {
+              await sendTaskAssignmentEmail(assignee, mission, step.title, step.dueDate);
+            }
+          }
+        } catch (notifErr) {
+          console.error('[Step Create] Error sending assignment notification:', notifErr);
+        }
+      }
+
       res.status(201).json(step);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -758,14 +819,63 @@ export async function registerRoutes(
   app.put(api.missions.steps.update.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.missions.steps.update.input.parse(req.body);
-      const step = await storage.updateMissionStep(Number(req.params.stepId), {
-        ...input,
-        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+      const stepId = Number(req.params.stepId);
+      const missionId = Number(req.params.id);
+      const userRole = req.user?.role;
+
+      // Get current step to detect assignee change
+      const currentSteps = await storage.getMissionSteps(missionId);
+      const currentStep = currentSteps.find(s => s.id === stepId);
+      const previousAssigneeId = currentStep?.assigneeId || null;
+      const newAssigneeId = input.assigneeId !== undefined ? input.assigneeId : previousAssigneeId;
+
+      // Role-based restrictions: non-admin users cannot set 'na' status, assign tasks, or modify admin comments
+      const updateData: any = { ...input };
+      if (userRole !== 'admin') {
+        if (updateData.status === 'na') {
+          delete updateData.status;
+        }
+        delete updateData.assigneeId;
+        delete updateData.comment;
+        delete updateData.commentAuthorId;
+      }
+
+      const step = await storage.updateMissionStep(stepId, {
+        ...updateData,
+        dueDate: updateData.dueDate ? new Date(updateData.dueDate) : undefined,
+        trainerCommentUpdatedAt: updateData.trainerComment !== undefined ? new Date() : undefined,
+        commentUpdatedAt: updateData.comment !== undefined ? new Date() : undefined,
       });
       if (!step) {
         res.status(404).json({ message: "Étape non trouvée" });
         return;
       }
+
+      // Notify assignee if changed (new assignee different from previous)
+      if (newAssigneeId && newAssigneeId !== previousAssigneeId) {
+        try {
+          const assignee = await storage.getUser(newAssigneeId);
+          const mission = await storage.getMission(missionId);
+          if (assignee && mission) {
+            // In-app notification
+            await storage.createInAppNotification({
+              userId: assignee.id,
+              type: 'task_assignment',
+              title: 'Nouvelle tache assignee',
+              message: `La tache "${step.title}" vous a ete assignee sur la mission : ${mission.title}`,
+              missionId: mission.id,
+            });
+
+            // Email notification
+            if (assignee.email) {
+              await sendTaskAssignmentEmail(assignee, mission, step.title, step.dueDate);
+            }
+          }
+        } catch (notifErr) {
+          console.error('[Step Update] Error sending assignment notification:', notifErr);
+        }
+      }
+
       res.json(step);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -2265,6 +2375,28 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== TRAINER DELAYS (ADMIN DASHBOARD) ====================
+  app.get('/api/admin/trainer-delays', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const delays = await storage.getTrainerDelays();
+      res.json(delays);
+    } catch (err) {
+      console.error('Error fetching trainer delays:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // ==================== TASK ALERTS (ADMIN DASHBOARD) ====================
+  app.get('/api/admin/task-alerts', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const alerts = await storage.getTaskAlerts();
+      res.json(alerts);
+    } catch (err) {
+      console.error('Error fetching task alerts:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
   // Duplicate mission for another trainer
   app.post('/api/missions/:id/duplicate', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
     try {
@@ -2845,7 +2977,6 @@ async function seedDatabase() {
 
   // Create missions
   const mission1 = await storage.createMission({
-    reference: 'MIS-2024-001',
     title: 'Formation Management TechCorp',
     typology: 'Intra',
     status: 'confirmed',
@@ -2860,7 +2991,6 @@ async function seedDatabase() {
   });
 
   const mission2 = await storage.createMission({
-    reference: 'MIS-2024-002',
     title: 'Cybersécurité OPCO Commerce',
     typology: 'Inter',
     status: 'draft',

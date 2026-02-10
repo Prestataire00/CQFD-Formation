@@ -726,7 +726,6 @@ export function registerFeedbackRoutes(app: Express) {
         ["Questionnaire de satisfaction"],
         [""],
         ["Mission", mission?.title || ""],
-        ["Reference", mission?.reference || ""],
         ["Total participants", tokens.length],
         ["Reponses recues", completedTokens.length],
         ["Taux de reponse", `${tokens.length > 0 ? Math.round((completedTokens.length / tokens.length) * 100) : 0}%`],
@@ -785,7 +784,7 @@ export function registerFeedbackRoutes(app: Express) {
       const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
       // Set headers for download
-      const filename = `feedback_${mission?.reference || missionId}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const filename = `feedback_${missionId}_${new Date().toISOString().split('T')[0]}.xlsx`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(buffer);

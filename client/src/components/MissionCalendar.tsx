@@ -113,9 +113,6 @@ function MissionItem({ mission, compact = false }: { mission: Mission; compact?:
       )}
     >
       <div className="font-medium text-sm">{mission.title}</div>
-      {mission.reference && (
-        <div className="text-xs opacity-75 mt-0.5">{mission.reference}</div>
-      )}
       <div className="flex items-center gap-2 mt-2">
         <Badge variant="outline" className="text-xs">
           {statusLabels[status] || "Brouillon"}

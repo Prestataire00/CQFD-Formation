@@ -21,14 +21,16 @@ export function GridCard({ title, actionLabel, actionLink, children, colSpan = "
       <div className="p-6 flex-1">
         {children}
       </div>
-      <div className="p-4 bg-muted/30 border-t border-border/50">
-        <Link href={actionLink}>
-          <Button variant="ghost" className="w-full justify-between text-primary hover:text-primary hover:bg-primary/5 group">
-            {actionLabel}
-            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
-          </Button>
-        </Link>
-      </div>
+      {actionLabel && actionLink && (
+        <div className="p-4 bg-muted/30 border-t border-border/50">
+          <Link href={actionLink}>
+            <Button variant="ghost" className="w-full justify-between text-primary hover:text-primary hover:bg-primary/5 group">
+              {actionLabel}
+              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover:translate-x-1" />
+            </Button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

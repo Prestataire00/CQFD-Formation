@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, Link } from "wouter";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useParams, Link, useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,7 @@ import {
   ExternalLink,
   ArrowUp,
   ArrowDown,
+  Video,
 } from "lucide-react";
 import { RichTextEditor, RichTextDisplay } from "@/components/ui/rich-text-editor";
 import {
@@ -83,6 +84,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   useMission,
   useUpdateMission,
@@ -277,7 +288,7 @@ interface TaskItemProps {
 
 function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
   const [isEditingComment, setIsEditingComment] = useState(false);
-  const [comment, setComment] = useState(task.comment || "");
+  const [comment, setComment] = useState(isAdmin ? (task.comment || "") : (task.trainerComment || ""));
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
   const [deadline, setDeadline] = useState(task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd") : "");
   const [isEditingAssignee, setIsEditingAssignee] = useState(false);
@@ -287,6 +298,12 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
   const isManual = isManualStatus(task);
   const assignee = users?.find((u: any) => u.id === task.assigneeId);
   const commentAuthor = users?.find((u: any) => u.id === task.commentAuthorId);
+  const trainerCommentAuthor = users?.find((u: any) => u.id === task.trainerCommentAuthorId);
+
+  // Filter status options: non-admin cannot set 'na'
+  const availableStatuses = isAdmin
+    ? Object.entries(stepStatusConfig) as [StepStatus, typeof stepStatusConfig[StepStatus]][]
+    : (Object.entries(stepStatusConfig) as [StepStatus, typeof stepStatusConfig[StepStatus]][]).filter(([status]) => status !== 'na');
 
   const handleStatusChange = (newStatus: StepStatus) => {
     if (newStatus === 'done') {
@@ -297,10 +314,19 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
   };
 
   const handleSaveComment = () => {
-    onUpdate(task.id, {
-      comment: comment || null,
-      commentAuthorId: comment ? currentUserId : null,
-    });
+    if (isAdmin) {
+      // Admin edits the main comment
+      onUpdate(task.id, {
+        comment: comment || null,
+        commentAuthorId: comment ? currentUserId : null,
+      });
+    } else {
+      // Formateur edits the trainer reply comment
+      onUpdate(task.id, {
+        trainerComment: comment || null,
+        trainerCommentAuthorId: comment ? currentUserId : null,
+      });
+    }
     setIsEditingComment(false);
   };
 
@@ -338,7 +364,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                   <DropdownMenuSeparator />
                 </>
               )}
-              {(Object.entries(stepStatusConfig) as [StepStatus, typeof stepStatusConfig[StepStatus]][]).map(([status, statusConfig]) => (
+              {availableStatuses.map(([status, statusConfig]) => (
                 <DropdownMenuItem
                   key={status}
                   onClick={() => handleStatusChange(status)}
@@ -434,27 +460,55 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
               ) : null}
             </div>
 
-            {task.comment && !isEditingComment && (
+            {/* Admin comment - read-only for formateur */}
+            {task.comment && (
               <div className="mt-3 bg-white/50 p-3 rounded-lg border border-gray-100">
-                <RichTextDisplay content={task.comment} className="text-sm" />
-                {commentAuthor && (
+                {isAdmin && isEditingComment ? null : (
+                  <>
+                    <RichTextDisplay content={task.comment} className="text-sm" />
+                    {commentAuthor && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        — {commentAuthor.firstName} {commentAuthor.lastName}
+                        {task.commentUpdatedAt && (
+                          <span className="ml-1">
+                            le {format(new Date(task.commentUpdatedAt), "d MMM yyyy", { locale: fr })}
+                          </span>
+                        )}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Trainer reply comment - read-only for admin */}
+            {task.trainerComment && !((!isAdmin) && isEditingComment) && (
+              <div className="mt-2 bg-blue-50/50 p-3 rounded-lg border border-blue-100">
+                <p className="text-xs font-medium text-blue-600 mb-1">Reponse formateur</p>
+                <RichTextDisplay content={task.trainerComment} className="text-sm" />
+                {trainerCommentAuthor && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    — {commentAuthor.firstName} {commentAuthor.lastName}
-                    {task.commentUpdatedAt && (
+                    — {trainerCommentAuthor.firstName} {trainerCommentAuthor.lastName}
+                    {task.trainerCommentUpdatedAt && (
                       <span className="ml-1">
-                        le {format(new Date(task.commentUpdatedAt), "d MMM yyyy", { locale: fr })}
+                        le {format(new Date(task.trainerCommentUpdatedAt), "d MMM yyyy", { locale: fr })}
                       </span>
                     )}
                   </p>
                 )}
               </div>
             )}
+
+            {/* Comment editor */}
             {isEditingComment && (
               <div className="mt-3 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  {isAdmin ? "Commentaire admin" : "Votre reponse"}
+                </p>
                 <RichTextEditor
                   value={comment}
                   onChange={setComment}
-                  placeholder="Ajouter un commentaire..."
+                  placeholder={isAdmin ? "Ajouter un commentaire..." : "Ajouter votre reponse..."}
                 />
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => setIsEditingComment(false)}>
@@ -489,9 +543,14 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
               </button>
             </div>
             <button
-              onClick={() => setIsEditingComment(!isEditingComment)}
+              onClick={() => {
+                if (!isEditingComment) {
+                  setComment(isAdmin ? (task.comment || "") : (task.trainerComment || ""));
+                }
+                setIsEditingComment(!isEditingComment);
+              }}
               className="p-1.5 text-gray-400 hover:text-gray-600 rounded hover:bg-white/50"
-              title="Commentaire"
+              title={isAdmin ? "Commentaire" : "Repondre"}
             >
               <MessageSquare className="w-4 h-4" />
             </button>
@@ -598,12 +657,12 @@ export default function MissionDetail() {
     if (mission) {
       setEditForm({
         title: mission.title || "",
-        reference: mission.reference || "",
         description: mission.description || "",
         startDate: mission.startDate ? format(new Date(mission.startDate), "yyyy-MM-dd") : "",
         endDate: mission.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : "",
         location: mission.location || "",
         locationType: mission.locationType || "presentiel",
+        videoLink: mission.videoLink || "",
         totalHours: mission.totalHours || "",
         clientId: mission.clientId?.toString() || "",
         trainerId: mission.trainerId || "",
@@ -614,6 +673,112 @@ export default function MissionDetail() {
       });
     }
   }, [mission]);
+
+  // ==================== UNSAVED CHANGES GUARD ====================
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const pendingNavigationRef = useRef<string | null>(null);
+  const [, setLocation] = useLocation();
+
+  // Build the "original" form values from the current mission data (same logic as the useEffect above)
+  const originalForm = useMemo(() => {
+    if (!mission) return null;
+    return {
+      title: mission.title || "",
+      description: mission.description || "",
+      startDate: mission.startDate ? format(new Date(mission.startDate), "yyyy-MM-dd") : "",
+      endDate: mission.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : "",
+      location: mission.location || "",
+      locationType: mission.locationType || "presentiel",
+      videoLink: mission.videoLink || "",
+      totalHours: mission.totalHours || "",
+      clientId: mission.clientId?.toString() || "",
+      trainerId: mission.trainerId || "",
+      programId: mission.programId?.toString() || "",
+      programTitle: mission.programTitle || "",
+      expectedParticipants: mission.expectedParticipants || "",
+      participantsList: mission.participantsList || "",
+    };
+  }, [mission]);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!originalForm) return false;
+    if (!isEditingInfo && !isEditingDescription) return false;
+    if (isEditingInfo) {
+      // Check info fields (all except description)
+      const infoKeys = ["title", "startDate", "endDate", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
+      for (const key of infoKeys) {
+        if (String(editForm[key] ?? "") !== String(originalForm[key] ?? "")) return true;
+      }
+    }
+    if (isEditingDescription) {
+      if (String(editForm.description ?? "") !== String(originalForm.description ?? "")) return true;
+    }
+    return false;
+  }, [editForm, originalForm, isEditingInfo, isEditingDescription]);
+
+  // Browser beforeunload guard
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
+
+  // Navigation guard helper
+  const guardedNavigate = useCallback((href: string) => {
+    if (hasUnsavedChanges) {
+      pendingNavigationRef.current = href;
+      setShowUnsavedDialog(true);
+    } else {
+      setLocation(href);
+    }
+  }, [hasUnsavedChanges, setLocation]);
+
+  const handleConfirmLeave = useCallback(() => {
+    // Reset edit states
+    setIsEditingInfo(false);
+    setIsEditingDescription(false);
+    // Restore original form
+    if (originalForm) setEditForm({ ...originalForm });
+    setShowUnsavedDialog(false);
+    if (pendingNavigationRef.current) {
+      setLocation(pendingNavigationRef.current);
+      pendingNavigationRef.current = null;
+    }
+  }, [originalForm, setLocation]);
+
+  const handleCancelInfo = useCallback(() => {
+    if (hasUnsavedChanges && isEditingInfo) {
+      pendingNavigationRef.current = null;
+      setShowUnsavedDialog(true);
+    } else {
+      setIsEditingInfo(false);
+      if (originalForm) setEditForm((prev: any) => ({ ...prev, ...originalForm }));
+    }
+  }, [hasUnsavedChanges, isEditingInfo, originalForm]);
+
+  const handleCancelDescription = useCallback(() => {
+    if (hasUnsavedChanges && isEditingDescription) {
+      pendingNavigationRef.current = null;
+      setShowUnsavedDialog(true);
+    } else {
+      setIsEditingDescription(false);
+      if (originalForm) setEditForm((prev: any) => ({ ...prev, description: originalForm.description }));
+    }
+  }, [hasUnsavedChanges, isEditingDescription, originalForm]);
+
+  const handleConfirmDiscard = useCallback(() => {
+    setIsEditingInfo(false);
+    setIsEditingDescription(false);
+    if (originalForm) setEditForm({ ...originalForm });
+    setShowUnsavedDialog(false);
+    if (pendingNavigationRef.current) {
+      setLocation(pendingNavigationRef.current);
+      pendingNavigationRef.current = null;
+    }
+  }, [originalForm, setLocation]);
 
   // Filter steps for non-admin users (formateurs only see tasks assigned to them)
   const visibleSteps = isAdmin
@@ -637,11 +802,11 @@ export default function MissionDetail() {
         id: missionId,
         data: {
           title: editForm.title,
-          reference: editForm.reference,
           startDate: editForm.startDate ? new Date(editForm.startDate) : undefined,
           endDate: editForm.endDate ? new Date(editForm.endDate) : undefined,
           location: editForm.location,
           locationType: editForm.locationType,
+          videoLink: editForm.videoLink || null,
           totalHours: editForm.totalHours ? Number(editForm.totalHours) : undefined,
           clientId: editForm.clientId ? Number(editForm.clientId) : undefined,
           trainerId: editForm.trainerId || undefined,
@@ -861,8 +1026,17 @@ export default function MissionDetail() {
     try {
       await updateStatus.mutateAsync({ id: missionId, status: newStatus });
       toast({ title: "Statut mis a jour" });
-    } catch (error) {
-      toast({ title: "Erreur", variant: "destructive" });
+    } catch (error: any) {
+      if (error?.data?.issues) {
+        toast({
+          title: error.data.message || "Impossible de cloturer la mission",
+          description: error.data.issues.join(" | "),
+          variant: "destructive",
+          duration: 10000,
+        });
+      } else {
+        toast({ title: "Erreur", variant: "destructive" });
+      }
     }
   };
 
@@ -988,7 +1162,7 @@ export default function MissionDetail() {
         )}
         {isEditingInfo && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditingInfo(false)}>
+            <Button variant="outline" onClick={handleCancelInfo}>
               <X className="w-4 h-4 mr-2" />
               Annuler
             </Button>
@@ -1177,14 +1351,26 @@ export default function MissionDetail() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label>Adresse</Label>
-                  <Input
-                    value={editForm.location}
-                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                    placeholder="Adresse du lieu"
-                  />
-                </div>
+                {(editForm.locationType === "presentiel" || editForm.locationType === "hybride") && (
+                  <div>
+                    <Label>Adresse</Label>
+                    <Input
+                      value={editForm.location}
+                      onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                      placeholder="Adresse du lieu"
+                    />
+                  </div>
+                )}
+                {(editForm.locationType === "distanciel" || editForm.locationType === "hybride") && (
+                  <div>
+                    <Label>Lien visioconference</Label>
+                    <Input
+                      value={editForm.videoLink}
+                      onChange={(e) => setEditForm({ ...editForm, videoLink: e.target.value })}
+                      placeholder="https://teams.microsoft.com/... ou https://zoom.us/..."
+                    />
+                  </div>
+                )}
               </>
             ) : (
               <>
@@ -1193,6 +1379,18 @@ export default function MissionDetail() {
                 </Badge>
                 {mission.location && (
                   <p className="text-sm text-muted-foreground">{mission.location}</p>
+                )}
+                {mission.videoLink && (
+                  <a
+                    href={mission.videoLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline mt-1"
+                  >
+                    <Video className="w-4 h-4" />
+                    Rejoindre la visioconference
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 )}
               </>
             )}
@@ -1461,7 +1659,7 @@ export default function MissionDetail() {
         )}
         {isEditingDescription && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditingDescription(false)}>
+            <Button variant="outline" onClick={handleCancelDescription}>
               <X className="w-4 h-4 mr-2" />
               Annuler
             </Button>
@@ -1997,12 +2195,10 @@ export default function MissionDetail() {
         <div className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
           <div className="px-6 py-4">
             <div className="flex items-center gap-4 mb-2">
-              <Link href="/missions">
-                <Button variant="ghost" size="sm">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Retour
-                </Button>
-              </Link>
+              <Button variant="ghost" size="sm" onClick={() => guardedNavigate("/missions")}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Retour
+              </Button>
               <div className="flex-1">
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-bold">{mission.title}</h1>
@@ -2015,7 +2211,7 @@ export default function MissionDetail() {
                   )}
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {mission.reference} - {client?.name || "Client non defini"}
+                  {client?.name || "Client non defini"}
                 </p>
               </div>
               {isAdmin && !mission.parentMissionId && (
@@ -2033,7 +2229,7 @@ export default function MissionDetail() {
                 <span className="text-indigo-700">
                   Copie de{" "}
                   <Link href={`/missions/${parentMission.id}`} className="font-medium underline hover:text-indigo-900">
-                    {parentMission.title} ({parentMission.reference})
+                    {parentMission.title}
                   </Link>
                 </span>
                 <Link href={`/missions/${parentMission.id}`}>
@@ -2055,7 +2251,7 @@ export default function MissionDetail() {
                     return (
                       <Link key={child.id} href={`/missions/${child.id}`}>
                         <Badge variant="outline" className="cursor-pointer hover:bg-purple-100 border-purple-300 text-purple-700">
-                          {childTrainer ? `${childTrainer.firstName} ${childTrainer.lastName}` : child.reference}
+                          {childTrainer ? `${childTrainer.firstName} ${childTrainer.lastName}` : `Mission #${child.id}`}
                           {" - "}
                           {getStatusBadge(child.status as MissionStatus)}
                         </Badge>
@@ -2248,6 +2444,26 @@ export default function MissionDetail() {
           </div>
         </div>
       </main>
+
+      {/* Unsaved changes confirmation dialog */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Modifications non enregistrees</AlertDialogTitle>
+            <AlertDialogDescription>
+              Vous avez des modifications non enregistrees. Si vous quittez maintenant, vos changements seront perdus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowUnsavedDialog(false)}>
+              Rester sur la page
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDiscard} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Quitter sans enregistrer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

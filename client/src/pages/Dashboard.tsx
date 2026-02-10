@@ -7,7 +7,13 @@ import { GridCard } from "@/components/DashboardGrid";
 import { Badge } from "@/components/ui/badge";
 import { useStats, useMissions, useAllSessions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
-import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
+import {
+  useUnreadInAppNotifications,
+  useMarkInAppNotificationRead,
+  useMarkAllInAppNotificationsRead,
+  useTaskAlerts,
+} from "@/hooks/use-notifications";
+import type { TaskAlertItem, MissingDocumentAlert } from "@/hooks/use-notifications";
 import {
   Briefcase,
   CheckCircle2,
@@ -18,6 +24,10 @@ import {
   MapPin,
   ArrowRight,
   AlertTriangle,
+  FileX,
+  Bell,
+  CheckCheck,
+  Flag,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -33,6 +43,19 @@ function getMissionStatusLabel(status: MissionStatus): { label: string; color: s
     cancelled: { label: "Annulee", color: "bg-red-100 text-red-700" },
   };
   return styles[status] || styles.draft;
+}
+
+function getRoleBadge(role: string): { label: string; className: string } {
+  switch (role) {
+    case "admin":
+      return { label: "Admin", className: "bg-purple-100 text-purple-700 border-purple-300" };
+    case "formateur":
+      return { label: "Formateur", className: "bg-blue-100 text-blue-700 border-blue-300" };
+    case "prestataire":
+      return { label: "Prestataire", className: "bg-teal-100 text-teal-700 border-teal-300" };
+    default:
+      return { label: role, className: "bg-gray-100 text-gray-700 border-gray-300" };
+  }
 }
 
 export default function Dashboard() {
@@ -55,10 +78,12 @@ export default function Dashboard() {
   }, [allSessions]);
   const { data: inAppNotifications } = useUnreadInAppNotifications();
   const markInAppAsRead = useMarkInAppNotificationRead();
+  const markAllAsRead = useMarkAllInAppNotificationsRead();
 
   const isAdmin = user?.role === "admin";
+  const { data: taskAlerts } = useTaskAlerts(isAdmin);
 
-  // Get 4 most recent notifications
+  // Get 4 most recent notifications (for trainer view)
   const recentNotifications = (inAppNotifications || []).slice(0, 4);
 
   // Handle notification click
@@ -78,6 +103,12 @@ export default function Dashboard() {
       return dateA - dateB;
     })
     .slice(0, 5) || [];
+
+  // Task alerts data
+  const lateTasks = taskAlerts?.lateTasks || [];
+  const priorityTasks = taskAlerts?.priorityTasks || [];
+  const missingDocuments = taskAlerts?.missingDocuments || [];
+  const hasAlerts = lateTasks.length > 0 || priorityTasks.length > 0 || missingDocuments.length > 0;
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -140,6 +171,198 @@ export default function Dashboard() {
 
           {/* Main Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+            {/* ===== ADMIN SECTIONS ===== */}
+
+            {/* Alertes et Rappels (late + priority tasks + missing docs) - admin only */}
+            {isAdmin && hasAlerts && (
+              <GridCard
+                title="Alertes et Rappels"
+                actionLabel=""
+                actionLink=""
+                className="xl:col-span-2"
+              >
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {/* Late tasks - red background */}
+                  {lateTasks.map((task: TaskAlertItem) => {
+                    const roleBadge = getRoleBadge(task.assigneeRole);
+                    return (
+                      <div
+                        key={`late-${task.stepId}`}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
+                        onClick={() => setLocation(`/missions/${task.missionId}`)}
+                      >
+                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm truncate">{task.stepTitle}</p>
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                              J+{task.daysOverdue}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {task.missionTitle}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                              {task.assigneeFirstName} {task.assigneeLastName}
+                            </span>
+                            <Badge className={`text-[10px] px-1.5 py-0 ${roleBadge.className}`}>
+                              {roleBadge.label}
+                            </Badge>
+                            {task.dueDate && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      </div>
+                    );
+                  })}
+
+                  {/* Priority tasks - orange background */}
+                  {priorityTasks.map((task: TaskAlertItem) => {
+                    const roleBadge = getRoleBadge(task.assigneeRole);
+                    return (
+                      <div
+                        key={`priority-${task.stepId}`}
+                        className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
+                        onClick={() => setLocation(`/missions/${task.missionId}`)}
+                      >
+                        <Flag className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium text-sm truncate">{task.stepTitle}</p>
+                            <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-orange-100 text-orange-700 border-orange-300">
+                              Prioritaire
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {task.missionTitle}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                              {task.assigneeFirstName} {task.assigneeLastName}
+                            </span>
+                            <Badge className={`text-[10px] px-1.5 py-0 ${roleBadge.className}`}>
+                              {roleBadge.label}
+                            </Badge>
+                            {task.dueDate && (
+                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      </div>
+                    );
+                  })}
+
+                  {/* Missing documents - light orange background */}
+                  {missingDocuments.map((doc: MissingDocumentAlert) => (
+                    <div
+                      key={`doc-${doc.documentId}`}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                      onClick={() => setLocation(`/missions/${doc.missionId}`)}
+                    >
+                      <FileX className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="font-medium text-sm truncate">{doc.documentTitle}</p>
+                          <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-amber-100 text-amber-700 border-amber-300">
+                            Non depose
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          {doc.missionTitle}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
+                            {doc.trainerFirstName} {doc.trainerLastName}
+                          </span>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </GridCard>
+            )}
+
+            {/* Historique des modifications (in-app notifications) - admin only */}
+            {isAdmin && (
+              <GridCard
+                title="Historique des modifications"
+                actionLabel=""
+                actionLink=""
+              >
+                <div className="space-y-3">
+                  {(inAppNotifications || []).length > 0 ? (
+                    <>
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-muted-foreground hover:text-foreground gap-1.5"
+                          onClick={() => markAllAsRead.mutate()}
+                          disabled={markAllAsRead.isPending}
+                        >
+                          <CheckCheck className="w-3.5 h-3.5" />
+                          Tout marquer comme lu
+                        </Button>
+                      </div>
+                      {(inAppNotifications || []).slice(0, 8).map((notification: InAppNotification) => (
+                        <div
+                          key={notification.id}
+                          className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"
+                          onClick={() => handleNotificationClick(notification)}
+                        >
+                          {notification.type === 'admin_alert' ? (
+                            <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                          ) : (
+                            <Bell className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{notification.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                              {notification.message}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                              {notification.metadata?.trainerName && (
+                                <span className="bg-muted px-1.5 py-0.5 rounded">
+                                  {notification.metadata.trainerName}
+                                </span>
+                              )}
+                              {notification.metadata?.clientName && (
+                                <span className="bg-muted px-1.5 py-0.5 rounded">
+                                  {notification.metadata.clientName}
+                                </span>
+                              )}
+                              {notification.metadata?.startDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(notification.metadata.startDate), "d MMM", { locale: fr })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground text-sm">
+                      Aucune notification non lue
+                    </div>
+                  )}
+                </div>
+              </GridCard>
+            )}
 
             {/* Prochaines Missions */}
             <GridCard
@@ -215,62 +438,7 @@ export default function Dashboard() {
               </div>
             </GridCard>
 
-            {/* Alertes et Rappels for admin */}
-            {isAdmin && recentNotifications.length > 0 && (
-              <GridCard
-                title="Alertes et Rappels"
-                actionLabel=""
-                actionLink=""
-              >
-                <div className="space-y-3">
-                  {recentNotifications.map((notification: InAppNotification) => (
-                    <div
-                      key={notification.id}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
-                      onClick={() => handleNotificationClick(notification)}
-                    >
-                      {notification.type === 'admin_alert' ? (
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <Clock className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm truncate">{notification.title}</p>
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                            Nouveau
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                          {notification.message}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-muted-foreground">
-                          {notification.metadata?.trainerName && (
-                            <span className="bg-muted px-1.5 py-0.5 rounded">
-                              {notification.metadata.trainerName}
-                            </span>
-                          )}
-                          {notification.metadata?.clientName && (
-                            <span className="bg-muted px-1.5 py-0.5 rounded">
-                              {notification.metadata.clientName}
-                            </span>
-                          )}
-                          {notification.metadata?.startDate && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {format(new Date(notification.metadata.startDate), "d MMM", { locale: fr })}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    </div>
-                  ))}
-                </div>
-              </GridCard>
-            )}
-
-            {/* Actions cards for admin */}
+            {/* Actions Rapides - admin only */}
             {isAdmin && (
               <GridCard
                 title="Actions Rapides"
@@ -299,6 +467,8 @@ export default function Dashboard() {
                 </div>
               </GridCard>
             )}
+
+            {/* ===== TRAINER/PRESTATAIRE SECTIONS ===== */}
 
             {/* For trainers/prestataires */}
             {!isAdmin && (

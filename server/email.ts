@@ -195,7 +195,6 @@ export async function sendMissionAssignmentEmail(
 
           <div class="mission-info">
             <h2>${missionTitle}</h2>
-            <p><strong>Référence:</strong> ${mission.reference || 'N/A'}</p>
             <p><strong>Date de début:</strong> ${startDate}</p>
             <p><strong>Date de fin:</strong> ${endDate}</p>
             <p><strong>Lieu:</strong> ${mission.location || 'À définir'}</p>
@@ -227,7 +226,6 @@ Bonjour ${trainerName},
 Vous avez été assigné(e) à une nouvelle mission de formation.
 
 Mission: ${missionTitle}
-Référence: ${mission.reference || 'N/A'}
 Date de début: ${startDate}
 Date de fin: ${endDate}
 Lieu: ${mission.location || 'À définir'}
@@ -241,6 +239,89 @@ Connectez-vous à votre espace formateur pour accéder à tous les détails.
   return sendEmail({
     to: trainer.email,
     subject: `Nouvelle mission assignée: ${missionTitle}`,
+    html,
+    text,
+  });
+}
+
+// ==================== EMAIL D'ASSIGNATION DE TACHE ====================
+
+export async function sendTaskAssignmentEmail(
+  assignee: User,
+  mission: Mission,
+  stepTitle: string,
+  dueDate?: Date | null
+): Promise<boolean> {
+  if (!assignee.email) {
+    console.log(`[Email] Pas d'email pour l'utilisateur ${assignee.id}, email non envoyé`);
+    return false;
+  }
+
+  const assigneeName = `${assignee.firstName || ''} ${assignee.lastName || ''}`.trim() || 'Utilisateur';
+  const missionTitle = mission.title || `Mission #${mission.id}`;
+  const dueDateStr = dueDate
+    ? new Date(dueDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
+    : null;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #f59e0b; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+        .content { background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; }
+        .task-info { background-color: white; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #f59e0b; }
+        h1 { margin: 0; font-size: 24px; }
+        h2 { color: #1f2937; font-size: 18px; margin-top: 0; }
+        .detail-row { margin: 8px 0; }
+        .label { font-weight: bold; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Nouvelle tache assignee</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour ${assigneeName},</p>
+          <p>Une tache vous a ete assignee sur une mission de formation.</p>
+
+          <div class="task-info">
+            <h2>${stepTitle}</h2>
+            <div class="detail-row">
+              <span class="label">Mission :</span> ${missionTitle}
+            </div>
+            ${dueDateStr ? `<div class="detail-row"><span class="label">Echeance :</span> ${dueDateStr}</div>` : ''}
+          </div>
+
+          <p>Connectez-vous a votre espace pour consulter les details de cette tache.</p>
+        </div>
+        <div class="footer">
+          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Bonjour ${assigneeName},
+
+Une tache vous a ete assignee sur une mission de formation.
+
+Tache : ${stepTitle}
+Mission : ${missionTitle}
+${dueDateStr ? `Echeance : ${dueDateStr}` : ''}
+
+Connectez-vous a votre espace pour consulter les details.
+  `;
+
+  return sendEmail({
+    to: assignee.email,
+    subject: `Nouvelle tache assignee : ${stepTitle} - ${missionTitle}`,
     html,
     text,
   });
@@ -324,9 +405,6 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
           <div class="mission-info">
             <h2>${missionTitle}</h2>
             <div class="detail-row">
-              <span class="label">Référence:</span> ${mission.reference || 'N/A'}
-            </div>
-            <div class="detail-row">
               <span class="label">Date de début:</span> ${startDate}
             </div>
             <div class="detail-row">
@@ -362,7 +440,6 @@ Bonjour ${recipientName},
 Une formation est prévue dans ${daysBefore} jour(s).
 
 Mission: ${missionTitle}
-Référence: ${mission.reference || 'N/A'}
 Date de début: ${startDate}
 Date de fin: ${endDate}
 Lieu: ${locationInfo}
@@ -456,9 +533,6 @@ export async function sendAdminFormationReminderEmail(
             <div class="section-title">Informations Formation</div>
             <div class="detail-row">
               <span class="label">Mission:</span> ${missionTitle}
-            </div>
-            <div class="detail-row">
-              <span class="label">Référence:</span> ${mission.reference || 'N/A'}
             </div>
             <div class="detail-row">
               <span class="label">Date début:</span> ${startDate}
@@ -797,9 +871,6 @@ export async function sendMissionNotificationEmail(data: MissionNotificationData
           <div class="mission-info">
             <h2>${missionTitle}</h2>
             <div class="detail-row">
-              <span class="label">Référence:</span> ${mission.reference || 'N/A'}
-            </div>
-            <div class="detail-row">
               <span class="label">Client:</span> ${clientName}
             </div>
             <div class="detail-row">
@@ -828,7 +899,6 @@ Bonjour ${recipientName},
 ${modifierName} (${modifierRole}) a effectué une modification sur la mission "${missionTitle}".
 
 Mission: ${missionTitle}
-Référence: ${mission.reference || 'N/A'}
 Client: ${clientName}
 Date de début: ${startDate}
 

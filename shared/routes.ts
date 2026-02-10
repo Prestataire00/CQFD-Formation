@@ -348,6 +348,8 @@ export const api = {
           assigneeId: z.string().nullable().optional(),
           comment: z.string().nullable().optional(),
           commentAuthorId: z.string().nullable().optional(),
+          trainerComment: z.string().nullable().optional(),
+          trainerCommentAuthorId: z.string().nullable().optional(),
         }),
         responses: {
           200: z.custom<typeof missionSteps.$inferSelect>(),

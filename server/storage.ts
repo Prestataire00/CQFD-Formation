@@ -281,6 +281,73 @@ export interface IStorage {
   createPersonalNote(note: InsertPersonalNote): Promise<PersonalNote>;
   updatePersonalNote(id: number, data: Partial<PersonalNote>): Promise<PersonalNote | undefined>;
   deletePersonalNote(id: number): Promise<boolean>;
+
+  // Task Alerts (admin dashboard - late + priority tasks)
+  getTaskAlerts(): Promise<{
+    lateTasks: Array<{
+      stepId: number;
+      stepTitle: string;
+      stepStatus: string;
+      dueDate: string | null;
+      missionId: number;
+      missionTitle: string;
+      assigneeId: string;
+      assigneeFirstName: string | null;
+      assigneeLastName: string | null;
+      assigneeRole: string;
+      daysOverdue: number;
+    }>;
+    priorityTasks: Array<{
+      stepId: number;
+      stepTitle: string;
+      stepStatus: string;
+      dueDate: string | null;
+      missionId: number;
+      missionTitle: string;
+      assigneeId: string;
+      assigneeFirstName: string | null;
+      assigneeLastName: string | null;
+      assigneeRole: string;
+      daysOverdue: number;
+    }>;
+    missingDocuments: Array<{
+      documentId: number;
+      documentTitle: string;
+      documentType: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      templateTitle: string;
+    }>;
+  }>;
+
+  // Trainer Delays (admin dashboard)
+  getTrainerDelays(): Promise<{
+    lateSteps: Array<{
+      stepId: number;
+      stepTitle: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      dueDate: string;
+      daysOverdue: number;
+    }>;
+    missingDocuments: Array<{
+      documentId: number;
+      documentTitle: string;
+      documentType: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      templateTitle: string;
+    }>;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -610,13 +677,8 @@ export class DatabaseStorage implements IStorage {
         // Create mission copy
         const { id, createdAt, updatedAt, isOriginal, parentMissionId, ...missionData } = originalMission;
 
-        // Generate new reference with trainer suffix
-        const trainerSuffix = trainer.lastName?.toUpperCase().slice(0, 3) || trainerId.slice(0, 3);
-        const newReference = `${missionData.reference || 'MISS'}-${trainerSuffix}`;
-
         const [newMission] = await db.insert(missions).values({
           ...missionData,
-          reference: newReference,
           trainerId,
           parentMissionId: originalMissionId,
           isOriginal: false,
@@ -1913,6 +1975,244 @@ export class DatabaseStorage implements IStorage {
   async deletePersonalNote(id: number): Promise<boolean> {
     await db.delete(personalNotes).where(eq(personalNotes.id, id));
     return true;
+  }
+
+  // ==================== TASK ALERTS (ADMIN DASHBOARD) ====================
+  async getTaskAlerts(): Promise<{
+    lateTasks: Array<{
+      stepId: number;
+      stepTitle: string;
+      stepStatus: string;
+      dueDate: string | null;
+      missionId: number;
+      missionTitle: string;
+      assigneeId: string;
+      assigneeFirstName: string | null;
+      assigneeLastName: string | null;
+      assigneeRole: string;
+      daysOverdue: number;
+    }>;
+    priorityTasks: Array<{
+      stepId: number;
+      stepTitle: string;
+      stepStatus: string;
+      dueDate: string | null;
+      missionId: number;
+      missionTitle: string;
+      assigneeId: string;
+      assigneeFirstName: string | null;
+      assigneeLastName: string | null;
+      assigneeRole: string;
+      daysOverdue: number;
+    }>;
+    missingDocuments: Array<{
+      documentId: number;
+      documentTitle: string;
+      documentType: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      templateTitle: string;
+    }>;
+  }> {
+    // Query: All late + priority tasks with assignee info
+    const tasksResult = await db.execute(sql`
+      SELECT
+        ms.id AS "stepId",
+        ms.title AS "stepTitle",
+        ms.status AS "stepStatus",
+        ms.due_date AS "dueDate",
+        m.id AS "missionId",
+        m.title AS "missionTitle",
+        COALESCE(u.id, t.id) AS "assigneeId",
+        COALESCE(u.first_name, t.first_name) AS "assigneeFirstName",
+        COALESCE(u.last_name, t.last_name) AS "assigneeLastName",
+        COALESCE(u.role, t.role) AS "assigneeRole",
+        CASE WHEN ms.due_date < NOW() THEN EXTRACT(DAY FROM NOW() - ms.due_date)::int ELSE 0 END AS "daysOverdue"
+      FROM mission_steps ms
+      JOIN missions m ON ms.mission_id = m.id
+      LEFT JOIN users u ON ms.assignee_id = u.id
+      LEFT JOIN users t ON m.trainer_id = t.id
+      WHERE ms.is_completed = false
+        AND ms.status NOT IN ('done', 'na')
+        AND (ms.status IN ('late', 'priority') OR ms.due_date < NOW())
+        AND m.status NOT IN ('draft', 'cancelled', 'completed')
+      ORDER BY
+        CASE WHEN ms.status = 'late' OR ms.due_date < NOW() THEN 1 ELSE 2 END,
+        ms.due_date ASC NULLS LAST
+      LIMIT 50
+    `);
+
+    // Query: Missing documents (same as getTrainerDelays)
+    const missingDocsResult = await db.execute(sql`
+      SELECT
+        d.id AS "documentId",
+        d.title AS "documentTitle",
+        d.type AS "documentType",
+        m.id AS "missionId",
+        m.title AS "missionTitle",
+        u.id AS "trainerId",
+        u.first_name AS "trainerFirstName",
+        u.last_name AS "trainerLastName",
+        dt.title AS "templateTitle"
+      FROM documents d
+      JOIN document_templates dt ON d.template_id = dt.id
+      JOIN missions m ON d.mission_id = m.id
+      JOIN users u ON m.trainer_id = u.id
+      WHERE d.template_id IS NOT NULL
+        AND d.url = dt.url
+        AND m.status NOT IN ('draft', 'cancelled', 'completed')
+      ORDER BY m.title ASC
+      LIMIT 50
+    `);
+
+    const rows = (tasksResult.rows || []) as any[];
+    const lateTasks = rows
+      .filter((r: any) => r.stepStatus === 'late' || (r.dueDate && new Date(r.dueDate) < new Date()))
+      .map((row: any) => ({
+        stepId: row.stepId,
+        stepTitle: row.stepTitle,
+        stepStatus: row.stepStatus,
+        dueDate: row.dueDate,
+        missionId: row.missionId,
+        missionTitle: row.missionTitle,
+        assigneeId: row.assigneeId,
+        assigneeFirstName: row.assigneeFirstName,
+        assigneeLastName: row.assigneeLastName,
+        assigneeRole: row.assigneeRole,
+        daysOverdue: row.daysOverdue,
+      }));
+
+    const priorityTasks = rows
+      .filter((r: any) => r.stepStatus === 'priority' && !(r.dueDate && new Date(r.dueDate) < new Date()))
+      .map((row: any) => ({
+        stepId: row.stepId,
+        stepTitle: row.stepTitle,
+        stepStatus: row.stepStatus,
+        dueDate: row.dueDate,
+        missionId: row.missionId,
+        missionTitle: row.missionTitle,
+        assigneeId: row.assigneeId,
+        assigneeFirstName: row.assigneeFirstName,
+        assigneeLastName: row.assigneeLastName,
+        assigneeRole: row.assigneeRole,
+        daysOverdue: row.daysOverdue,
+      }));
+
+    return {
+      lateTasks,
+      priorityTasks,
+      missingDocuments: (missingDocsResult.rows || []).map((row: any) => ({
+        documentId: row.documentId,
+        documentTitle: row.documentTitle,
+        documentType: row.documentType,
+        missionId: row.missionId,
+        missionTitle: row.missionTitle,
+        trainerId: row.trainerId,
+        trainerFirstName: row.trainerFirstName,
+        trainerLastName: row.trainerLastName,
+        templateTitle: row.templateTitle,
+      })),
+    };
+  }
+
+  // ==================== TRAINER DELAYS (ADMIN DASHBOARD) ====================
+  async getTrainerDelays(): Promise<{
+    lateSteps: Array<{
+      stepId: number;
+      stepTitle: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      dueDate: string;
+      daysOverdue: number;
+    }>;
+    missingDocuments: Array<{
+      documentId: number;
+      documentTitle: string;
+      documentType: string;
+      missionId: number;
+      missionTitle: string;
+      trainerId: string;
+      trainerFirstName: string | null;
+      trainerLastName: string | null;
+      templateTitle: string;
+    }>;
+  }> {
+    // Query 1: Late steps (due_date < NOW(), not completed, not done/na, active mission)
+    const lateStepsResult = await db.execute(sql`
+      SELECT
+        ms.id AS "stepId",
+        ms.title AS "stepTitle",
+        m.id AS "missionId",
+        m.title AS "missionTitle",
+        u.id AS "trainerId",
+        u.first_name AS "trainerFirstName",
+        u.last_name AS "trainerLastName",
+        ms.due_date AS "dueDate",
+        EXTRACT(DAY FROM NOW() - ms.due_date)::int AS "daysOverdue"
+      FROM mission_steps ms
+      JOIN missions m ON ms.mission_id = m.id
+      JOIN users u ON m.trainer_id = u.id
+      WHERE ms.due_date < NOW()
+        AND ms.is_completed = false
+        AND ms.status NOT IN ('done', 'na')
+        AND m.status NOT IN ('draft', 'cancelled', 'completed')
+      ORDER BY ms.due_date ASC
+      LIMIT 50
+    `);
+
+    // Query 2: Missing documents (template attached but URL still matches template = not uploaded by trainer)
+    const missingDocsResult = await db.execute(sql`
+      SELECT
+        d.id AS "documentId",
+        d.title AS "documentTitle",
+        d.type AS "documentType",
+        m.id AS "missionId",
+        m.title AS "missionTitle",
+        u.id AS "trainerId",
+        u.first_name AS "trainerFirstName",
+        u.last_name AS "trainerLastName",
+        dt.title AS "templateTitle"
+      FROM documents d
+      JOIN document_templates dt ON d.template_id = dt.id
+      JOIN missions m ON d.mission_id = m.id
+      JOIN users u ON m.trainer_id = u.id
+      WHERE d.template_id IS NOT NULL
+        AND d.url = dt.url
+        AND m.status NOT IN ('draft', 'cancelled', 'completed')
+      ORDER BY m.title ASC
+      LIMIT 50
+    `);
+
+    return {
+      lateSteps: (lateStepsResult.rows || []).map((row: any) => ({
+        stepId: row.stepId,
+        stepTitle: row.stepTitle,
+        missionId: row.missionId,
+        missionTitle: row.missionTitle,
+        trainerId: row.trainerId,
+        trainerFirstName: row.trainerFirstName,
+        trainerLastName: row.trainerLastName,
+        dueDate: row.dueDate,
+        daysOverdue: row.daysOverdue,
+      })),
+      missingDocuments: (missingDocsResult.rows || []).map((row: any) => ({
+        documentId: row.documentId,
+        documentTitle: row.documentTitle,
+        documentType: row.documentType,
+        missionId: row.missionId,
+        missionTitle: row.missionTitle,
+        trainerId: row.trainerId,
+        trainerFirstName: row.trainerFirstName,
+        trainerLastName: row.trainerLastName,
+        templateTitle: row.templateTitle,
+      })),
+    };
   }
 }
 

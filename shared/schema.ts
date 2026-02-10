@@ -104,12 +104,12 @@ export const trainingPrograms = pgTable("training_programs", {
 
 export const missions = pgTable("missions", {
   id: serial("id").primaryKey(),
-  reference: text("reference"), // Référence unique de la mission (ex: MISS-2024-001)
   title: text("title").notNull(),
   description: text("description"), // Description de la mission
   status: text("status").default("confirmed").notNull(),
   typology: text("typology").notNull(), // Intra, Inter, Conseil, Conférence
   locationType: text("location_type").default("presentiel"), // presentiel, distanciel, hybride
+  videoLink: text("video_link"), // Lien visioconference (Teams, Zoom, etc.)
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
   totalHours: integer("total_hours"), // Nombre total d'heures de formation
@@ -161,6 +161,9 @@ export const missionSteps = pgTable("mission_steps", {
   comment: text("comment"),
   commentAuthorId: varchar("comment_author_id").references(() => users.id),
   commentUpdatedAt: timestamp("comment_updated_at"),
+  trainerComment: text("trainer_comment"),
+  trainerCommentAuthorId: varchar("trainer_comment_author_id").references(() => users.id),
+  trainerCommentUpdatedAt: timestamp("trainer_comment_updated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

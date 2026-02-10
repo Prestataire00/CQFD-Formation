@@ -249,7 +249,6 @@ export default function Feedback() {
     const searchLower = searchTerm.toLowerCase();
     return (
       mission.title.toLowerCase().includes(searchLower) ||
-      mission.reference?.toLowerCase().includes(searchLower) ||
       mission.client?.name.toLowerCase().includes(searchLower)
     );
   }) || [];
@@ -307,7 +306,7 @@ export default function Feedback() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `feedback_${selectedMission.reference || selectedMission.id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = `feedback_${selectedMission.id}_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -543,7 +542,7 @@ export default function Feedback() {
                         <div className="text-left">
                           <h3 className="font-semibold">{mission.title}</h3>
                           <p className="text-sm text-muted-foreground">
-                            {mission.reference} - {mission.client?.name}
+                            {mission.client?.name}
                           </p>
                           {mission.startDate && (
                             <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
