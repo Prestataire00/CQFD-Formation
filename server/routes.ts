@@ -900,8 +900,13 @@ export async function registerRoutes(
   });
 
   app.delete(api.missions.steps.delete.path, isAuthenticated, async (req, res) => {
-    await storage.deleteMissionStep(Number(req.params.stepId));
-    res.json({ success: true });
+    try {
+      await storage.deleteMissionStep(Number(req.params.stepId));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete step error:", error.message);
+      res.status(500).json({ message: "Erreur lors de la suppression de l'étape" });
+    }
   });
 
   // Send step link by email

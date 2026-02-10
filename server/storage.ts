@@ -972,7 +972,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMissionStep(id: number): Promise<boolean> {
-    // First delete all tasks associated with this step
+    // First delete all reminders referencing this step
+    await db.delete(reminders).where(eq(reminders.taskId, id));
+    // Then delete all tasks associated with this step
     await db.delete(stepTasks).where(eq(stepTasks.stepId, id));
     await db.delete(missionSteps).where(eq(missionSteps.id, id));
     return true;
