@@ -898,6 +898,10 @@ export default function MissionDetail() {
   // Handlers
   const handleSaveInfo = async () => {
     try {
+      const newEndDate = editForm.endDate || null;
+      const oldEndDate = mission?.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : null;
+      const endDateChanged = newEndDate !== oldEndDate;
+
       await updateMission.mutateAsync({
         id: missionId,
         data: {
@@ -916,6 +920,47 @@ export default function MissionDetail() {
           participantsList: editForm.participantsList || undefined,
         },
       });
+
+      // Recalculate task deadlines when endDate changes
+      if (endDateChanged && newEndDate && steps && steps.length > 0) {
+        const referenceDate = new Date(newEndDate);
+        // Build lookup from INTRA_PRESTA_TASKS
+        const intraPrestaMap = new Map<string, { priorityDaysBefore: number; lateDaysBefore: number }>();
+        for (const t of INTRA_PRESTA_TASKS) {
+          intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+        }
+
+        let updatedCount = 0;
+        for (const step of steps) {
+          const template = intraPrestaMap.get(step.title);
+          if (template) {
+            const d = new Date(referenceDate);
+            d.setDate(d.getDate() - template.priorityDaysBefore);
+            const ld = new Date(referenceDate);
+            ld.setDate(ld.getDate() - template.lateDaysBefore);
+            await updateStep.mutateAsync({
+              missionId,
+              stepId: step.id,
+              data: { dueDate: d.toISOString(), lateDate: ld.toISOString() },
+            });
+            updatedCount++;
+          } else if (deadlineDefaults[step.title] !== undefined) {
+            const days = deadlineDefaults[step.title];
+            const d = new Date(referenceDate);
+            d.setDate(d.getDate() - days);
+            await updateStep.mutateAsync({
+              missionId,
+              stepId: step.id,
+              data: { dueDate: d.toISOString() },
+            });
+            updatedCount++;
+          }
+        }
+        if (updatedCount > 0) {
+          toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
+        }
+      }
+
       setIsEditingInfo(false);
       toast({ title: "Informations mises a jour" });
     } catch (error) {
