@@ -771,8 +771,13 @@ export async function registerRoutes(
 
   // Mission Steps (étapes chronologiques)
   app.get(api.missions.steps.list.path, isAuthenticated, async (req, res) => {
-    const steps = await storage.getMissionSteps(Number(req.params.id));
-    res.json(steps);
+    try {
+      const steps = await storage.getMissionSteps(Number(req.params.id));
+      res.json(steps);
+    } catch (error: any) {
+      console.error('Mission steps error:', error);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.post(api.missions.steps.create.path, isAuthenticated, async (req, res) => {
