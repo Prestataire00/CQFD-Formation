@@ -782,7 +782,11 @@ export async function registerRoutes(
 
   app.post(api.missions.steps.create.path, isAuthenticated, async (req, res) => {
     try {
-      const input = api.missions.steps.create.input.parse(req.body);
+      // Convert date strings to Date objects before zod parsing (drizzle-zod expects Date, not string)
+      const body = { ...req.body };
+      if (body.dueDate && typeof body.dueDate === 'string') body.dueDate = new Date(body.dueDate);
+      if (body.lateDate && typeof body.lateDate === 'string') body.lateDate = new Date(body.lateDate);
+      const input = api.missions.steps.create.input.parse(body);
       const missionId = Number(req.params.id);
       const step = await storage.createMissionStep({
         ...input,
