@@ -323,6 +323,18 @@ export interface IStorage {
     }>;
   }>;
 
+  getMissionTasksProgress(): Promise<Array<{
+    missionId: number;
+    missionTitle: string;
+    assigneeFirstName: string | null;
+    assigneeLastName: string | null;
+    assigneeRole: string;
+    totalSteps: number;
+    completedSteps: number;
+    progress: number;
+    updatedAt: string | null;
+  }>>;
+
   // Trainer Delays (admin dashboard)
   getTrainerDelays(): Promise<{
     lateSteps: Array<{
@@ -2213,6 +2225,53 @@ export class DatabaseStorage implements IStorage {
         templateTitle: row.templateTitle,
       })),
     };
+  }
+  async getMissionTasksProgress(): Promise<Array<{
+    missionId: number;
+    missionTitle: string;
+    assigneeFirstName: string | null;
+    assigneeLastName: string | null;
+    assigneeRole: string;
+    totalSteps: number;
+    completedSteps: number;
+    progress: number;
+    updatedAt: string | null;
+  }>> {
+    const result = await db.execute(sql`
+      SELECT
+        m.id AS "missionId",
+        m.title AS "missionTitle",
+        COALESCE(u.first_name, '') AS "assigneeFirstName",
+        COALESCE(u.last_name, '') AS "assigneeLastName",
+        COALESCE(u.role, 'formateur') AS "assigneeRole",
+        COUNT(ms.id)::int AS "totalSteps",
+        COUNT(CASE WHEN ms.is_completed = true OR ms.status = 'done' THEN 1 END)::int AS "completedSteps",
+        CASE
+          WHEN COUNT(ms.id) = 0 THEN 0
+          ELSE ROUND((COUNT(CASE WHEN ms.is_completed = true OR ms.status = 'done' THEN 1 END)::numeric / COUNT(ms.id)::numeric) * 100)::int
+        END AS "progress",
+        MAX(ms.updated_at)::text AS "updatedAt"
+      FROM missions m
+      LEFT JOIN mission_steps ms ON ms.mission_id = m.id
+      LEFT JOIN users u ON m.trainer_id = u.id
+      WHERE m.status NOT IN ('cancelled')
+      GROUP BY m.id, m.title, u.first_name, u.last_name, u.role
+      HAVING COUNT(ms.id) > 0
+      ORDER BY MAX(ms.updated_at) DESC NULLS LAST
+      LIMIT 20
+    `);
+
+    return (result.rows || []).map((row: any) => ({
+      missionId: row.missionId,
+      missionTitle: row.missionTitle,
+      assigneeFirstName: row.assigneeFirstName,
+      assigneeLastName: row.assigneeLastName,
+      assigneeRole: row.assigneeRole,
+      totalSteps: row.totalSteps,
+      completedSteps: row.completedSteps,
+      progress: row.progress,
+      updatedAt: row.updatedAt,
+    }));
   }
 }
 

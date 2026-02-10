@@ -157,6 +157,7 @@ export const missionSteps = pgTable("mission_steps", {
   isCompleted: boolean("is_completed").default(false).notNull(),
   order: integer("order").notNull(),
   dueDate: timestamp("due_date"),
+  lateDate: timestamp("late_date"),
   assigneeId: varchar("assignee_id").references(() => users.id),
   comment: text("comment"),
   commentAuthorId: varchar("comment_author_id").references(() => users.id),

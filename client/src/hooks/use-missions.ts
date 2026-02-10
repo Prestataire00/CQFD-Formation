@@ -385,7 +385,7 @@ export function useMissionSteps(missionId: number) {
 export function useCreateMissionStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null; assigneeId?: string | null } }) => {
+    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null; lateDate?: string | null; assigneeId?: string | null } }) => {
       const url = buildUrl(api.missions.steps.create.path, { id: missionId });
       const res = await fetch(url, {
         method: 'POST',
@@ -405,7 +405,7 @@ export function useCreateMissionStep() {
 export function useUpdateMissionStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, stepId, data }: { missionId: number; stepId: number; data: { title?: string; status?: string; order?: number; dueDate?: string | null } }) => {
+    mutationFn: async ({ missionId, stepId, data }: { missionId: number; stepId: number; data: { title?: string; status?: string; order?: number; dueDate?: string | null; lateDate?: string | null } }) => {
       const url = buildUrl(api.missions.steps.update.path, { missionId, stepId });
       const res = await fetch(url, {
         method: 'PUT',

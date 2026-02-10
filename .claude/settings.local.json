@@ -43,7 +43,8 @@
       "Bash(npx vite build:*)",
       "Bash(SMTP_USER=\"ani2saaa.aaa@gmail.com\" SMTP_PASS=\"mhtj aaod dmpx xonp\" SMTP_FROM=\"ani2saaa.aaa@gmail.com\" npx tsx:*)",
       "Bash(python3:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(node:*)"
     ]
   }
 }

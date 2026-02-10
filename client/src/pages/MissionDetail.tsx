@@ -135,6 +135,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { MissionStatus } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Step configuration
 const STEPS = [
@@ -216,6 +217,17 @@ function getAutoStatus(task: any): StepStatus {
   // Auto-compute for tasks in 'todo' status
   if (!task.dueDate) return 'todo';
   const now = new Date();
+
+  // If lateDate exists, use per-task thresholds: past lateDate → late, past dueDate → priority
+  if (task.lateDate) {
+    const lateDate = new Date(task.lateDate);
+    if (now >= lateDate) return 'late';
+    const dueDate = new Date(task.dueDate);
+    if (now >= dueDate) return 'priority';
+    return 'todo';
+  }
+
+  // Fallback: generic thresholds (dueDate only)
   const dueDate = new Date(task.dueDate);
   const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return 'late';
@@ -269,6 +281,52 @@ const quickActions = [
     ]
   },
 ];
+
+// Intra + Prestataire predefined tasks
+interface IntraPrestaTaskTemplate {
+  title: string;
+  priorityDaysBefore: number; // positive = before first session (J-X), negative = after (J+X)
+  lateDaysBefore: number;
+  assigneeType: 'admin' | 'formateur';
+}
+
+const INTRA_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse de formation", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaire de cadrage", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaires de positionnement", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Cahier des charges et Consignes", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi contrat de prestation de sous-traitance", priorityDaysBefore: 40, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi pour impressions livret et annexes", priorityDaysBefore: 35, lateDaysBefore: 21, assigneeType: "formateur" },
+  { title: "Impression docs et envoi dossier", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Scan annexes (qcm...)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi Synthèse éval des acquis + détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des originaux par courrier", priorityDaysBefore: -5, lateDaysBefore: -10, assigneeType: "formateur" },
+  { title: "Envoi facture", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isIntraPrestataire(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Intra") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "prestataire";
+}
 
 // TaskItem component
 interface TaskItemProps {
@@ -916,18 +974,37 @@ export default function MissionDetail() {
     }
   };
 
-  const handleAddQuickAction = async (actionTitle: string) => {
+  const handleAddQuickAction = async (actionTitle: string, overrideDaysBefore?: number, overrideAssigneeId?: string | null, overrideLateDaysBefore?: number) => {
     try {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
-      const dueDate = computeDueDate(actionTitle);
+      let dueDate: string | null = null;
+      let lateDate: string | null = null;
+      if (overrideDaysBefore !== undefined && missionSessions && missionSessions.length > 0) {
+        const sortedSessions = [...missionSessions].sort(
+          (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
+        );
+        const firstSessionDate = new Date(sortedSessions[0].sessionDate);
+        const d = new Date(firstSessionDate);
+        d.setDate(d.getDate() - overrideDaysBefore);
+        dueDate = d.toISOString();
+        if (overrideLateDaysBefore !== undefined) {
+          const ld = new Date(firstSessionDate);
+          ld.setDate(ld.getDate() - overrideLateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+      } else {
+        dueDate = computeDueDate(actionTitle);
+      }
+      const assigneeId = overrideAssigneeId !== undefined ? overrideAssigneeId : (mission?.trainerId || null);
       await createStep.mutateAsync({
         missionId,
         data: {
           title: actionTitle,
           status: "todo",
           order: maxOrder + 1,
-          assigneeId: mission?.trainerId || null,
+          assigneeId,
           dueDate: dueDate || undefined,
+          lateDate: lateDate || undefined,
         },
       });
       toast({ title: "Tache ajoutee" });
@@ -957,6 +1034,48 @@ export default function MissionDetail() {
         });
       }
       toast({ title: `${categoryData.actions.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllIntraPrestaTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of INTRA_PRESTA_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (missionSessions && missionSessions.length > 0) {
+          const sortedSessions = [...missionSessions].sort(
+            (a: any, b: any) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime()
+          );
+          const firstSessionDate = new Date(sortedSessions[0].sessionDate);
+          const d = new Date(firstSessionDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(firstSessionDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+          },
+        });
+      }
+      toast({ title: `${INTRA_PRESTA_TASKS.length} taches ajoutees` });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
     }
@@ -1789,42 +1908,91 @@ export default function MissionDetail() {
                 Actions rapides predefinies
               </CardTitle>
               <CardDescription>
-                Cliquez sur une action pour l'ajouter ou ajoutez toutes les actions d'une categorie
+                {isIntraPrestataire(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Intra + Prestataire. Cliquez pour ajouter."
+                  : "Cliquez sur une action pour l'ajouter ou ajoutez toutes les actions d'une categorie"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {quickActions.map((category) => (
-                  <div
-                    key={category.category}
-                    className={`p-4 rounded-lg border-2 ${category.borderColor} ${category.bgColor}`}
+              {isIntraPrestataire(mission, allUsers || []) ? (
+                <div>
+                  <Button
+                    className="w-full mb-4"
+                    onClick={handleAddAllIntraPrestaTasks}
+                    disabled={createStep.isPending}
                   >
-                    <div className="flex justify-between items-center mb-3">
-                      <h4 className={`font-semibold ${category.color}`}>{category.category}</h4>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className={category.color}
-                        onClick={() => handleAddAllQuickActions(category.category)}
-                      >
-                        Tout ajouter
-                      </Button>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Tout ajouter ({INTRA_PRESTA_TASKS.length} taches)
+                  </Button>
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-1">
+                      {INTRA_PRESTA_TASKS.map((task, idx) => {
+                        const adminUser = allUsers?.find((u: any) => u.role === "admin");
+                        const assigneeId = task.assigneeType === "admin" ? (adminUser?.id || null) : (mission?.trainerId || null);
+                        const deadlineLabel = task.priorityDaysBefore >= 0
+                          ? `J-${task.priorityDaysBefore}`
+                          : `J+${Math.abs(task.priorityDaysBefore)}`;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => handleAddQuickAction(task.title, task.priorityDaysBefore, assigneeId, task.lateDaysBefore)}
+                            className="w-full text-left text-sm p-2.5 rounded-lg hover:bg-muted/50 transition-colors flex items-center gap-2 group"
+                            disabled={createStep.isPending}
+                          >
+                            <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground flex-shrink-0" />
+                            <span className="flex-1 min-w-0 truncate">{task.title}</span>
+                            <Badge variant="outline" className="text-xs flex-shrink-0 font-mono">
+                              {deadlineLabel}
+                            </Badge>
+                            <Badge
+                              className={`text-xs flex-shrink-0 ${
+                                task.assigneeType === "admin"
+                                  ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                                  : "bg-green-100 text-green-700 hover:bg-green-100"
+                              }`}
+                            >
+                              {task.assigneeType === "admin" ? "Admin" : "Formateur"}
+                            </Badge>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <div className="space-y-2">
-                      {category.actions.map((action) => (
-                        <button
-                          key={action}
-                          onClick={() => handleAddQuickAction(action)}
-                          className="w-full text-left text-sm p-2 rounded hover:bg-white/50 transition-colors"
+                  </ScrollArea>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {quickActions.map((category) => (
+                    <div
+                      key={category.category}
+                      className={`p-4 rounded-lg border-2 ${category.borderColor} ${category.bgColor}`}
+                    >
+                      <div className="flex justify-between items-center mb-3">
+                        <h4 className={`font-semibold ${category.color}`}>{category.category}</h4>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={category.color}
+                          onClick={() => handleAddAllQuickActions(category.category)}
                         >
-                          <Plus className="w-3 h-3 inline mr-2" />
-                          {action}
-                        </button>
-                      ))}
+                          Tout ajouter
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {category.actions.map((action) => (
+                          <button
+                            key={action}
+                            onClick={() => handleAddQuickAction(action)}
+                            className="w-full text-left text-sm p-2 rounded hover:bg-white/50 transition-colors"
+                          >
+                            <Plus className="w-3 h-3 inline mr-2" />
+                            {action}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         )}

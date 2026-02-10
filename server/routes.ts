@@ -848,6 +848,7 @@ export async function registerRoutes(
       const step = await storage.updateMissionStep(stepId, {
         ...updateData,
         dueDate: updateData.dueDate ? new Date(updateData.dueDate) : undefined,
+        lateDate: updateData.lateDate ? new Date(updateData.lateDate) : undefined,
         trainerCommentUpdatedAt: updateData.trainerComment !== undefined ? new Date() : undefined,
         commentUpdatedAt: updateData.comment !== undefined ? new Date() : undefined,
       });
@@ -2398,6 +2399,16 @@ export async function registerRoutes(
       res.json(alerts);
     } catch (err) {
       console.error('Error fetching task alerts:', err);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  app.get('/api/admin/mission-tasks-progress', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const tasks = await storage.getMissionTasksProgress();
+      res.json(tasks);
+    } catch (err) {
+      console.error('Error fetching mission tasks progress:', err);
       res.status(500).json({ message: 'Erreur serveur' });
     }
   });

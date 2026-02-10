@@ -345,6 +345,7 @@ export const api = {
           isCompleted: z.boolean().optional(),
           order: z.number().optional(),
           dueDate: z.string().nullable().optional(),
+          lateDate: z.string().nullable().optional(),
           assigneeId: z.string().nullable().optional(),
           comment: z.string().nullable().optional(),
           commentAuthorId: z.string().nullable().optional(),

@@ -12,8 +12,10 @@ import {
   useMarkInAppNotificationRead,
   useMarkAllInAppNotificationsRead,
   useTaskAlerts,
+  useMissionTasksProgress,
 } from "@/hooks/use-notifications";
-import type { TaskAlertItem, MissingDocumentAlert } from "@/hooks/use-notifications";
+import type { TaskAlertItem, MissingDocumentAlert, MissionTaskProgress } from "@/hooks/use-notifications";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Briefcase,
   CheckCircle2,
@@ -28,8 +30,9 @@ import {
   Bell,
   CheckCheck,
   Flag,
+  ListChecks,
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useMemo } from "react";
 import type { Mission, MissionStatus, MissionSession, InAppNotification } from "@shared/schema";
@@ -82,6 +85,7 @@ export default function Dashboard() {
 
   const isAdmin = user?.role === "admin";
   const { data: taskAlerts } = useTaskAlerts(isAdmin);
+  const { data: missionTasksProgress } = useMissionTasksProgress(isAdmin);
 
   // Get 4 most recent notifications (for trainer view)
   const recentNotifications = (inAppNotifications || []).slice(0, 4);
@@ -174,120 +178,129 @@ export default function Dashboard() {
 
             {/* ===== ADMIN SECTIONS ===== */}
 
-            {/* Alertes et Rappels (late + priority tasks + missing docs) - admin only */}
-            {isAdmin && hasAlerts && (
+            {/* Suivi des Taches - checklist style */}
+            {isAdmin && (missionTasksProgress || []).length > 0 && (
               <GridCard
-                title="Alertes et Rappels"
-                actionLabel=""
-                actionLink=""
+                title="Suivi des Taches"
+                actionLabel="Voir les missions"
+                actionLink="/missions"
                 className="xl:col-span-2"
               >
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {/* Late tasks - red background */}
-                  {lateTasks.map((task: TaskAlertItem) => {
-                    const roleBadge = getRoleBadge(task.assigneeRole);
+                <div className="divide-y divide-border">
+                  {(missionTasksProgress || []).map((task: MissionTaskProgress) => {
+                    const initials = `${(task.assigneeFirstName || "?")[0]}${(task.assigneeLastName || "?")[0]}`.toUpperCase();
+                    const fullName = `${task.assigneeFirstName || ""} ${task.assigneeLastName || ""}`.trim() || "Non assigne";
+                    const progressColor = task.progress === 100
+                      ? "bg-green-500"
+                      : task.progress >= 50
+                        ? "bg-primary"
+                        : "bg-sky-400";
                     return (
                       <div
-                        key={`late-${task.stepId}`}
-                        className="flex items-start gap-3 p-3 rounded-lg bg-red-50 border border-red-200 hover:bg-red-100 transition-colors cursor-pointer"
+                        key={`task-${task.missionId}`}
+                        data-testid={`task-row-${task.missionId}`}
+                        className="flex items-center gap-4 py-3 px-2 hover-elevate cursor-pointer rounded-md"
                         onClick={() => setLocation(`/missions/${task.missionId}`)}
                       >
-                        <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <ListChecks className="w-4 h-4 text-primary" />
+                        </div>
+
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{task.stepTitle}</p>
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                              J+{task.daysOverdue}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                          <p className="font-medium text-sm truncate" data-testid={`task-title-${task.missionId}`}>
                             {task.missionTitle}
                           </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                              {task.assigneeFirstName} {task.assigneeLastName}
+                          <p className="text-xs text-muted-foreground truncate">
+                            {task.completedSteps}/{task.totalSteps} taches
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Avatar className="h-7 w-7">
+                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary font-medium">
+                              {initials}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-muted-foreground hidden sm:block max-w-[120px] truncate" data-testid={`task-assignee-${task.missionId}`}>
+                            {fullName}
+                          </span>
+                        </div>
+
+                        <div className="hidden md:flex items-center gap-2 flex-shrink-0 text-xs text-muted-foreground min-w-[130px]">
+                          <Clock className="w-3 h-3" />
+                          {task.updatedAt
+                            ? formatDistanceToNow(new Date(task.updatedAt), { addSuffix: true, locale: fr })
+                            : "---"}
+                        </div>
+
+                        <div className="w-24 lg:w-32 flex-shrink-0" data-testid={`task-progress-${task.missionId}`}>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${progressColor}`}
+                                style={{ width: `${task.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] text-muted-foreground w-8 text-right">
+                              {task.progress}%
                             </span>
-                            <Badge className={`text-[10px] px-1.5 py-0 ${roleBadge.className}`}>
-                              {roleBadge.label}
-                            </Badge>
-                            {task.dueDate && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
-                              </span>
-                            )}
                           </div>
                         </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                       </div>
                     );
                   })}
+                </div>
+              </GridCard>
+            )}
 
-                  {/* Priority tasks - orange background */}
-                  {priorityTasks.map((task: TaskAlertItem) => {
-                    const roleBadge = getRoleBadge(task.assigneeRole);
-                    return (
-                      <div
-                        key={`priority-${task.stepId}`}
-                        className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 transition-colors cursor-pointer"
-                        onClick={() => setLocation(`/missions/${task.missionId}`)}
-                      >
-                        <Flag className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm truncate">{task.stepTitle}</p>
-                            <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-orange-100 text-orange-700 border-orange-300">
-                              Prioritaire
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {task.missionTitle}
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                              {task.assigneeFirstName} {task.assigneeLastName}
-                            </span>
-                            <Badge className={`text-[10px] px-1.5 py-0 ${roleBadge.className}`}>
-                              {roleBadge.label}
-                            </Badge>
-                            {task.dueDate && (
-                              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                <Calendar className="w-3 h-3" />
-                                {format(new Date(task.dueDate), "d MMM yyyy", { locale: fr })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+            {/* Alertes (late + priority + missing docs) - admin only */}
+            {isAdmin && hasAlerts && (
+              <GridCard
+                title="Alertes"
+                actionLabel=""
+                actionLink=""
+              >
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {lateTasks.map((task: TaskAlertItem) => (
+                    <div
+                      key={`late-${task.stepId}`}
+                      className="flex items-center gap-3 p-2 rounded-md bg-red-50 dark:bg-red-950/30 cursor-pointer hover-elevate"
+                      onClick={() => setLocation(`/missions/${task.missionId}`)}
+                    >
+                      <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{task.stepTitle}</p>
+                        <p className="text-xs text-muted-foreground truncate">{task.missionTitle} - {task.assigneeFirstName} {task.assigneeLastName}</p>
                       </div>
-                    );
-                  })}
-
-                  {/* Missing documents - light orange background */}
+                      <Badge variant="destructive" className="text-[10px] flex-shrink-0">J+{task.daysOverdue}</Badge>
+                    </div>
+                  ))}
+                  {priorityTasks.map((task: TaskAlertItem) => (
+                    <div
+                      key={`priority-${task.stepId}`}
+                      className="flex items-center gap-3 p-2 rounded-md bg-orange-50 dark:bg-orange-950/30 cursor-pointer hover-elevate"
+                      onClick={() => setLocation(`/missions/${task.missionId}`)}
+                    >
+                      <Flag className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm truncate">{task.stepTitle}</p>
+                        <p className="text-xs text-muted-foreground truncate">{task.missionTitle} - {task.assigneeFirstName} {task.assigneeLastName}</p>
+                      </div>
+                      <Badge className="text-[10px] flex-shrink-0 bg-orange-100 text-orange-700 border-orange-300">Prioritaire</Badge>
+                    </div>
+                  ))}
                   {missingDocuments.map((doc: MissingDocumentAlert) => (
                     <div
                       key={`doc-${doc.documentId}`}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                      className="flex items-center gap-3 p-2 rounded-md bg-amber-50 dark:bg-amber-950/30 cursor-pointer hover-elevate"
                       onClick={() => setLocation(`/missions/${doc.missionId}`)}
                     >
-                      <FileX className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                      <FileX className="w-4 h-4 text-amber-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-medium text-sm truncate">{doc.documentTitle}</p>
-                          <Badge className="text-[10px] px-1.5 py-0 flex-shrink-0 bg-amber-100 text-amber-700 border-amber-300">
-                            Non depose
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                          {doc.missionTitle}
-                        </p>
-                        <div className="flex flex-wrap items-center gap-2 mt-1">
-                          <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded">
-                            {doc.trainerFirstName} {doc.trainerLastName}
-                          </span>
-                        </div>
+                        <p className="text-sm truncate">{doc.documentTitle}</p>
+                        <p className="text-xs text-muted-foreground truncate">{doc.missionTitle} - {doc.trainerFirstName} {doc.trainerLastName}</p>
                       </div>
-                      <ArrowRight className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <Badge className="text-[10px] flex-shrink-0 bg-amber-100 text-amber-700 border-amber-300">Non depose</Badge>
                     </div>
                   ))}
                 </div>

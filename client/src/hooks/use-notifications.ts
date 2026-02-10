@@ -50,6 +50,33 @@ export function useTaskAlerts(enabled: boolean = true) {
   });
 }
 
+export interface MissionTaskProgress {
+  missionId: number;
+  missionTitle: string;
+  assigneeFirstName: string | null;
+  assigneeLastName: string | null;
+  assigneeRole: string;
+  totalSteps: number;
+  completedSteps: number;
+  progress: number;
+  updatedAt: string | null;
+}
+
+export function useMissionTasksProgress(enabled: boolean = true) {
+  return useQuery<MissionTaskProgress[]>({
+    queryKey: ["missionTasksProgress"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/mission-tasks-progress", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch mission tasks progress");
+      return res.json();
+    },
+    refetchInterval: 60000,
+    enabled,
+  });
+}
+
 // Trainer delays types
 export interface TrainerDelay {
   lateSteps: Array<{
