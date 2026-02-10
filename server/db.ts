@@ -42,6 +42,55 @@ export async function ensureSchemaSync() {
       await pool.query(`ALTER TABLE mission_steps ADD COLUMN trainer_comment_updated_at TIMESTAMP`);
       console.log('[db] Added missing column trainer_comment_updated_at to mission_steps');
     }
+    // Sync participants table
+    const partCols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'participants' AND table_schema = 'public'`
+    );
+    const partColNames = partCols.rows.map((r: any) => r.column_name);
+    const participantColumns: Record<string, string> = {
+      address: 'TEXT',
+      company: 'TEXT',
+      function: 'TEXT',
+      client_id: 'INTEGER',
+      phone: 'TEXT',
+    };
+    for (const [col, type] of Object.entries(participantColumns)) {
+      if (!partColNames.includes(col)) {
+        await pool.query(`ALTER TABLE participants ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        console.log(`[db] Added missing column ${col} to participants`);
+      }
+    }
+
+    // Sync clients table
+    const clientCols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'clients' AND table_schema = 'public'`
+    );
+    const clientColNames = clientCols.rows.map((r: any) => r.column_name);
+    const clientColumns: Record<string, string> = {
+      address: 'TEXT',
+      city: 'TEXT',
+      postal_code: 'TEXT',
+      billing_address: 'TEXT',
+      billing_postal_code: 'TEXT',
+      billing_city: 'TEXT',
+      training_address: 'TEXT',
+      training_postal_code: 'TEXT',
+      training_city: 'TEXT',
+      origine: 'TEXT',
+      social_media: 'TEXT',
+      demand: 'TEXT',
+      type: 'TEXT',
+      contract_status: "TEXT DEFAULT 'prospect'",
+      contract_amount: 'INTEGER DEFAULT 0',
+      assigned_trainer_id: 'TEXT',
+    };
+    for (const [col, type] of Object.entries(clientColumns)) {
+      if (!clientColNames.includes(col)) {
+        await pool.query(`ALTER TABLE clients ADD COLUMN ${col} ${type}`);
+        console.log(`[db] Added missing column ${col} to clients`);
+      }
+    }
+
   } catch (e: any) {
     console.error('[db] Schema sync error:', e.message);
   }

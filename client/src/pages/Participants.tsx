@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { Link } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Input } from "@/components/ui/input";
@@ -9,121 +10,125 @@ import {
   Search,
   Mail,
   Phone,
-  UserCog,
-  GraduationCap,
+  Building2,
   Briefcase,
+  ExternalLink,
+  MapPin,
 } from "lucide-react";
-import { useUsers } from "@/hooks/use-users";
+import { useParticipants, useMissions } from "@/hooks/use-missions";
 
-interface User {
-  id: string;
-  email: string | null;
-  firstName: string | null;
-  lastName: string | null;
-  role: string;
-  status: string;
-  phone?: string | null;
-  specialties?: string[] | null;
-}
+export default function Participants() {
+  const { data: participants, isLoading } = useParticipants();
+  const { data: missions } = useMissions();
+  const [searchTerm, setSearchTerm] = useState("");
 
-function UserCard({ user }: { user: User }) {
-  const initials = user.firstName && user.lastName
-    ? `${user.firstName[0]}${user.lastName[0]}`.toUpperCase()
-    : user.email?.substring(0, 2).toUpperCase() || "U";
+  // Build a map of missionId -> mission for quick lookup
+  const missionMap = useMemo(() => {
+    const map = new Map<number, any>();
+    missions?.forEach((m: any) => map.set(m.id, m));
+    return map;
+  }, [missions]);
 
-  const fullName = user.firstName && user.lastName
-    ? `${user.firstName} ${user.lastName}`
-    : user.email || "Utilisateur";
+  // Filter participants based on search term
+  const filteredParticipants = useMemo(() => {
+    return participants?.filter((p: any) => {
+      const fullName = `${p.firstName || ""} ${p.lastName || ""}`.toLowerCase();
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        fullName.includes(searchLower) ||
+        p.email?.toLowerCase().includes(searchLower) ||
+        p.phone?.toLowerCase().includes(searchLower) ||
+        p.company?.toLowerCase().includes(searchLower) ||
+        p.address?.toLowerCase().includes(searchLower)
+      );
+    }) || [];
+  }, [participants, searchTerm]);
 
-  return (
-    <div className="p-4 bg-muted/30 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold flex-shrink-0">
+  // Group participants by mission
+  const participantsByMission = useMemo(() => {
+    const groups = new Map<number, { mission: any; participants: any[] }>();
+    const noMission: any[] = [];
+
+    for (const p of filteredParticipants) {
+      if (p.missions && p.missions.length > 0) {
+        for (const mp of p.missions) {
+          const mission = missionMap.get(mp.missionId);
+          if (mission) {
+            if (!groups.has(mission.id)) {
+              groups.set(mission.id, { mission, participants: [] });
+            }
+            groups.get(mission.id)!.participants.push(p);
+          }
+        }
+      } else {
+        noMission.push(p);
+      }
+    }
+
+    // Sort missions by title
+    const sorted = Array.from(groups.values()).sort((a, b) =>
+      (a.mission.title || "").localeCompare(b.mission.title || "")
+    );
+
+    return { grouped: sorted, noMission };
+  }, [filteredParticipants, missionMap]);
+
+  const renderParticipantRow = (p: any) => {
+    const initials = p.firstName && p.lastName
+      ? `${p.firstName[0]}${p.lastName[0]}`.toUpperCase()
+      : p.email?.substring(0, 2).toUpperCase() || "P";
+
+    return (
+      <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border hover:bg-muted/50 transition-colors">
+        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="font-medium truncate">{fullName}</p>
-          {user.email && (
-            <a
-              href={`mailto:${user.email}`}
-              className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1 truncate"
-            >
-              <Mail className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">{user.email}</span>
-            </a>
-          )}
-          {user.phone && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <Phone className="w-3 h-3 flex-shrink-0" />
-              {user.phone}
-            </p>
-          )}
-          {user.specialties && user.specialties.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {user.specialties.slice(0, 2).map((specialty, index) => (
-                <Badge key={index} variant="secondary" className="text-xs">
-                  {specialty}
-                </Badge>
-              ))}
-              {user.specialties.length > 2 && (
-                <Badge variant="outline" className="text-xs">
-                  +{user.specialties.length - 2}
-                </Badge>
-              )}
-            </div>
-          )}
+          <p className="font-medium text-sm">
+            {p.firstName} {p.lastName}
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {p.email && (
+              <a href={`mailto:${p.email}`} className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1">
+                <Mail className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{p.email}</span>
+              </a>
+            )}
+            {p.phone && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Phone className="w-3 h-3 flex-shrink-0" />
+                {p.phone}
+              </span>
+            )}
+            {p.address && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <MapPin className="w-3 h-3 flex-shrink-0" />
+                <span className="truncate">{p.address}</span>
+              </span>
+            )}
+          </div>
         </div>
+        {p.company && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
+            <Building2 className="w-3 h-3" />
+            {p.company}
+          </span>
+        )}
+        {p.function && (
+          <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
+            <Briefcase className="w-3 h-3" />
+            {p.function}
+          </span>
+        )}
       </div>
-    </div>
-  );
-}
-
-export default function Participants() {
-  const { data: users, isLoading } = useUsers();
-  const [searchTerm, setSearchTerm] = useState("");
-
-  // Filter users based on search term
-  const filteredUsers = users?.filter((user: User) => {
-    const fullName = `${user.firstName || ""} ${user.lastName || ""}`.toLowerCase();
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      fullName.includes(searchLower) ||
-      user.email?.toLowerCase().includes(searchLower) ||
-      user.phone?.toLowerCase().includes(searchLower)
     );
-  }) || [];
-
-  // Separate users by role
-  const prestataires = filteredUsers.filter((u: User) => u.role === "prestataire");
-  const formateurs = filteredUsers.filter((u: User) => u.role === "formateur");
-  const admins = filteredUsers.filter((u: User) => u.role === "admin");
-
-  const roleConfig = {
-    prestataire: {
-      title: "Prestataires",
-      icon: Briefcase,
-      color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-      users: prestataires,
-    },
-    formateur: {
-      title: "Formateurs Salaries",
-      icon: GraduationCap,
-      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      users: formateurs,
-    },
-    admin: {
-      title: "Administrateurs",
-      icon: UserCog,
-      color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      users: admins,
-    },
   };
 
   return (
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <Header title="Equipe" />
+        <Header title="Participants" />
 
         <div className="flex-1 p-6 space-y-6">
           {/* Search bar */}
@@ -131,12 +136,15 @@ export default function Participants() {
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher un membre..."
+                placeholder="Rechercher un participant..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
+            <Badge variant="secondary" className="self-start">
+              {filteredParticipants.length} participant(s)
+            </Badge>
           </div>
 
           {/* Loading state */}
@@ -144,49 +152,56 @@ export default function Participants() {
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredUsers.length === 0 ? (
+          ) : filteredParticipants.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <Users className="w-12 h-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold">Aucun membre trouve</h3>
+              <h3 className="text-lg font-semibold">Aucun participant trouve</h3>
               <p className="text-muted-foreground">
-                {searchTerm ? "Essayez avec un autre terme de recherche." : "Aucun utilisateur enregistre."}
+                {searchTerm ? "Essayez avec un autre terme de recherche." : "Aucun participant enregistre."}
               </p>
             </div>
           ) : (
-            /* Users by role columns */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.entries(roleConfig).map(([role, config]) => {
-                const Icon = config.icon;
-                return (
-                  <Card key={role} className="flex flex-col">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center gap-2 text-lg">
-                        <div className={`p-2 rounded-lg ${config.color}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        {config.title}
-                        <Badge variant="secondary" className="ml-auto">
-                          {config.users.length}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1">
-                      {config.users.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                          <Icon className="w-8 h-8 mb-2 opacity-50" />
-                          <p className="text-sm">Aucun {config.title.toLowerCase()}</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {config.users.map((user: User) => (
-                            <UserCard key={user.id} user={user} />
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="space-y-6">
+              {participantsByMission.grouped.map(({ mission, participants: missionParticipants }) => (
+                <Card key={mission.id}>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Briefcase className="w-4 h-4 text-muted-foreground" />
+                      <Link href={`/missions/${mission.id}`} className="hover:underline flex items-center gap-1.5">
+                        {mission.title}
+                        <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                      </Link>
+                      <Badge variant="secondary" className="ml-auto">
+                        {missionParticipants.length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {missionParticipants.map((p: any) => renderParticipantRow(p))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {participantsByMission.noMission.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2 text-muted-foreground">
+                      <Users className="w-4 h-4" />
+                      Sans mission
+                      <Badge variant="secondary" className="ml-auto">
+                        {participantsByMission.noMission.length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {participantsByMission.noMission.map((p: any) => renderParticipantRow(p))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
         </div>

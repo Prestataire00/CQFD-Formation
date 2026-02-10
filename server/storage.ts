@@ -128,6 +128,7 @@ export interface IStorage {
 
   // Mission Participants
   getMissionParticipants(missionId: number): Promise<(MissionParticipant & { participant: Participant })[]>;
+  getMissionParticipantsByParticipant(participantId: number): Promise<MissionParticipant[]>;
   addParticipantToMission(data: InsertMissionParticipant): Promise<MissionParticipant>;
   removeParticipantFromMission(missionId: number, participantId: number): Promise<boolean>;
   updateMissionParticipant(id: number, data: Partial<MissionParticipant>): Promise<MissionParticipant | undefined>;
@@ -1077,6 +1078,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(missionParticipants.missionId, missionId));
 
     return results;
+  }
+
+  async getMissionParticipantsByParticipant(participantId: number): Promise<MissionParticipant[]> {
+    return await db.select()
+      .from(missionParticipants)
+      .where(eq(missionParticipants.participantId, participantId));
   }
 
   async addParticipantToMission(data: InsertMissionParticipant): Promise<MissionParticipant> {

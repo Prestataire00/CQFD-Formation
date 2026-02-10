@@ -1219,17 +1219,33 @@ export async function registerRoutes(
 
   // ==================== PARTICIPANTS ====================
   app.get(api.participants.list.path, isAuthenticated, async (req, res) => {
-    const participants = await storage.getParticipants();
-    res.json(participants);
+    try {
+    const allParticipants = await storage.getParticipants();
+    const enriched = await Promise.all(
+      allParticipants.map(async (p) => {
+        const mps = await storage.getMissionParticipantsByParticipant(p.id);
+        return { ...p, missions: mps };
+      })
+    );
+    res.json(enriched);
+    } catch (error: any) {
+      console.error("Participants list error:", error.message);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.get(api.participants.get.path, isAuthenticated, async (req, res) => {
+    try {
     const participant = await storage.getParticipant(Number(req.params.id));
     if (!participant) {
       res.status(404).json({ message: "Participant non trouvé" });
       return;
     }
     res.json(participant);
+    } catch (error: any) {
+      console.error("Participant get error:", error.message);
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.post(api.participants.create.path, isAuthenticated, requirePermission('participants:create'), async (req, res) => {

@@ -123,6 +123,11 @@ import {
   useDuplicateMissionMulti,
   useChildMissions,
   useParentMission,
+  useMissionParticipants,
+  useParticipants,
+  useCreateParticipant,
+  useAddParticipantToMission,
+  useRemoveParticipantFromMission,
 } from "@/hooks/use-missions";
 import {
   Dialog,
@@ -318,11 +323,73 @@ const INTRA_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
   { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
   { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
   { title: "Scan annexes (qcm...)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
-  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
   { title: "Envoi Synthèse éval des acquis + détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
   { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
   { title: "Envoi des originaux par courrier", priorityDaysBefore: -5, lateDaysBefore: -10, assigneeType: "formateur" },
   { title: "Envoi facture", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+const INTER_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Pub et communications", priorityDaysBefore: 180, lateDaysBefore: 90, assigneeType: "admin" },
+  { title: "Horaires et adresse de formation", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaires de positionnement", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants et coordonnées", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Cahier des charges et Consignes", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi contrat de prestation de sous-traitance", priorityDaysBefore: 40, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi pour impressions livret et annexes", priorityDaysBefore: 35, lateDaysBefore: 21, assigneeType: "formateur" },
+  { title: "Impression docs et envoi dossier", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Scan annexes (qcm...)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
+  { title: "Envoi Synthèse éval des acquis + détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des originaux par courrier", priorityDaysBefore: -5, lateDaysBefore: -10, assigneeType: "formateur" },
+  { title: "Envoi facture", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+const INTRA_SALARIE_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse de formation", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaire de cadrage", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaires de positionnement", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "DUE et Contrat de travail", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Retour signé de la DUE et du Contrat", priorityDaysBefore: 30, lateDaysBefore: 20, assigneeType: "formateur" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi pour impressions livret et annexes", priorityDaysBefore: 35, lateDaysBefore: 21, assigneeType: "formateur" },
+  { title: "Impression docs et envoi dossier", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Scan annexes (qcm...)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
+  { title: "Envoi Synthèse éval des acquis + détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des originaux par courrier", priorityDaysBefore: -5, lateDaysBefore: -10, assigneeType: "formateur" },
+  { title: "Fiche de paie et paiement", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "admin" },
+  { title: "Envoi solde de tout compte signé", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
 ];
 
 function isIntraPrestataire(mission: any, allUsers: any[]): boolean {
@@ -330,6 +397,180 @@ function isIntraPrestataire(mission: any, allUsers: any[]): boolean {
   if (!mission?.trainerId) return false;
   const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
   return trainer?.role === "prestataire";
+}
+
+function isInterPrestataire(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Inter") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "prestataire";
+}
+
+function isIntraSalarie(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Intra") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "formateur";
+}
+
+const INTER_SALARIE_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Pub et communications", priorityDaysBefore: 180, lateDaysBefore: 90, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse de formation", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Questionnaires de positionnement", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants et coordonnées", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "DUE et Contrat de travail", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Retour signé de la DUE et du Contrat", priorityDaysBefore: 30, lateDaysBefore: 20, assigneeType: "formateur" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi pour impressions livret et annexes", priorityDaysBefore: 35, lateDaysBefore: 21, assigneeType: "formateur" },
+  { title: "Impression docs et envoi dossier", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Scan annexes (qcm...)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
+  { title: "Envoi Synthèse éval des acquis + détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des originaux par courrier", priorityDaysBefore: -5, lateDaysBefore: -10, assigneeType: "formateur" },
+  { title: "Fiche de paie et paiement", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "admin" },
+  { title: "Envoi solde de tout compte signé", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isInterSalarie(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Inter") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "formateur";
+}
+
+const CONSEIL_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Cahier des charges et Consignes", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi contrat de prestation de sous-traitance", priorityDaysBefore: 40, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Envoi du rapport détaillé", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi facture", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isConseilPrestataire(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Conseil") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "prestataire";
+}
+
+const CONSEIL_SALARIE_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "DUE et Contrat de travail", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Retour signé de la DUE et du Contrat", priorityDaysBefore: 30, lateDaysBefore: 20, assigneeType: "formateur" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Envoi du rapport détaillé", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Fiche de paie et paiement", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "admin" },
+  { title: "Envoi solde de tout compte signé", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isConseilSalarie(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Conseil") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "formateur";
+}
+
+const CONFERENCE_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Cahier des charges et Consignes", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi contrat de prestation de sous-traitance", priorityDaysBefore: 40, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi livret et annexes", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "formateur" },
+  { title: "Envoi lien, info, dossier si impression (f. présence)", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
+  { title: "Envoi détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi facture", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isConferencePrestataire(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Conférence") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "prestataire";
+}
+
+const CONFERENCE_SALARIE_TASKS: IntraPrestaTaskTemplate[] = [
+  { title: "Programme initial", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Convention et modalités", priorityDaysBefore: 80, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Horaires et adresse", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
+  { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
+  { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Engagement financier", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Liste des participants", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Exprimer besoins salles, matériel, MP, et repas", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Commande particulière", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "Lien visio (distanciel)", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi de la convocation et programme ajusté", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "admin" },
+  { title: "DUE et Contrat de travail", priorityDaysBefore: 40, lateDaysBefore: 20, assigneeType: "admin" },
+  { title: "Retour signé de la DUE et du Contrat", priorityDaysBefore: 30, lateDaysBefore: 20, assigneeType: "formateur" },
+  { title: "Informer formateur budget dépl/héb", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
+  { title: "Envoi livret et annexes", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "formateur" },
+  { title: "Envoi lien, info, dossier si impression (f. présence)", priorityDaysBefore: 25, lateDaysBefore: 15, assigneeType: "admin" },
+  { title: "Vérifier tous les éléments en mains", priorityDaysBefore: 7, lateDaysBefore: 2, assigneeType: "formateur" },
+  { title: "Scan feuille de présence + quest. Satisfaction", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi du bilan qualité", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur", link: "https://forms.gle/wLRq27F3hN75PWca6" },
+  { title: "Envoi détail des énoncés/études de cas/mises en situation + photos des travaux réalisés", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Envoi des captures d'écran (distanciel)", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "formateur" },
+  { title: "Fiche de paie et paiement", priorityDaysBefore: -3, lateDaysBefore: -5, assigneeType: "admin" },
+  { title: "Envoi solde de tout compte signé", priorityDaysBefore: -10, lateDaysBefore: -15, assigneeType: "formateur" },
+];
+
+function isConferenceSalarie(mission: any, allUsers: any[]): boolean {
+  if (mission?.typology !== "Conférence") return false;
+  if (!mission?.trainerId) return false;
+  const trainer = allUsers?.find((u: any) => u.id === mission.trainerId);
+  return trainer?.role === "formateur";
 }
 
 // TaskItem component
@@ -711,6 +952,17 @@ export default function MissionDetail() {
   const { data: missionTrainers } = useMissionTrainers(missionId);
   const { data: allUsers } = useUsers();
   const { data: missionSessions } = useMissionSessions(missionId);
+  const { data: missionParticipants } = useMissionParticipants(missionId);
+  const { data: allParticipants } = useParticipants();
+  const createParticipant = useCreateParticipant();
+  const addParticipantToMission = useAddParticipantToMission();
+  const removeParticipantFromMission = useRemoveParticipantFromMission();
+
+  // Participant management state
+  const [participantSearchOpen, setParticipantSearchOpen] = useState(false);
+  const [participantSearch, setParticipantSearch] = useState("");
+  const [showNewParticipantForm, setShowNewParticipantForm] = useState(false);
+  const [newParticipant, setNewParticipant] = useState({ firstName: "", lastName: "", email: "", address: "" });
 
   // Task deadline defaults
   const [deadlineDefaults, setDeadlineDefaults] = useState<Record<string, number>>({});
@@ -760,6 +1012,7 @@ export default function MissionDetail() {
         description: mission.description || "",
         startDate: mission.startDate ? format(new Date(mission.startDate), "yyyy-MM-dd") : "",
         endDate: mission.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : "",
+        typology: mission.typology || "Intra",
         location: mission.location || "",
         locationType: mission.locationType || "presentiel",
         videoLink: mission.videoLink || "",
@@ -787,6 +1040,7 @@ export default function MissionDetail() {
       description: mission.description || "",
       startDate: mission.startDate ? format(new Date(mission.startDate), "yyyy-MM-dd") : "",
       endDate: mission.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : "",
+      typology: mission.typology || "Intra",
       location: mission.location || "",
       locationType: mission.locationType || "presentiel",
       videoLink: mission.videoLink || "",
@@ -805,7 +1059,7 @@ export default function MissionDetail() {
     if (!isEditingInfo && !isEditingDescription) return false;
     if (isEditingInfo) {
       // Check info fields (all except description)
-      const infoKeys = ["title", "startDate", "endDate", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
+      const infoKeys = ["title", "startDate", "endDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
       for (const key of infoKeys) {
         if (String(editForm[key] ?? "") !== String(originalForm[key] ?? "")) return true;
       }
@@ -896,16 +1150,91 @@ export default function MissionDetail() {
   const program = programs?.find((p: any) => p.id === mission?.programId);
 
   // Handlers
+  // Recalculate all task deadlines based on a reference end date
+  const recalculateTaskDeadlines = async (endDateStr: string) => {
+    if (!steps || steps.length === 0) return 0;
+    const referenceDate = new Date(endDateStr);
+    // Build lookup from INTRA_PRESTA_TASKS and INTER_PRESTA_TASKS
+    const intraPrestaMap = new Map<string, { priorityDaysBefore: number; lateDaysBefore: number }>();
+    for (const t of INTRA_PRESTA_TASKS) {
+      intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+    }
+    for (const t of INTER_PRESTA_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of INTRA_SALARIE_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of INTER_SALARIE_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of CONSEIL_PRESTA_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of CONSEIL_SALARIE_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of CONFERENCE_PRESTA_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+    for (const t of CONFERENCE_SALARIE_TASKS) {
+      if (!intraPrestaMap.has(t.title)) {
+        intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      }
+    }
+
+    let updatedCount = 0;
+    for (const step of steps) {
+      const template = intraPrestaMap.get(step.title);
+      if (template) {
+        const d = new Date(referenceDate);
+        d.setDate(d.getDate() - template.priorityDaysBefore);
+        const ld = new Date(referenceDate);
+        ld.setDate(ld.getDate() - template.lateDaysBefore);
+        await updateStep.mutateAsync({
+          missionId,
+          stepId: step.id,
+          data: { dueDate: d.toISOString(), lateDate: ld.toISOString() },
+        });
+        updatedCount++;
+      } else if (deadlineDefaults[step.title] !== undefined) {
+        const days = deadlineDefaults[step.title];
+        const d = new Date(referenceDate);
+        d.setDate(d.getDate() - days);
+        await updateStep.mutateAsync({
+          missionId,
+          stepId: step.id,
+          data: { dueDate: d.toISOString() },
+        });
+        updatedCount++;
+      }
+    }
+    return updatedCount;
+  };
+
   const handleSaveInfo = async () => {
     try {
       const newEndDate = editForm.endDate || null;
-      const oldEndDate = mission?.endDate ? format(new Date(mission.endDate), "yyyy-MM-dd") : null;
-      const endDateChanged = newEndDate !== oldEndDate;
+      const typologyChanged = originalForm && editForm.typology !== originalForm.typology;
+      const trainerChanged = originalForm && editForm.trainerId !== originalForm.trainerId;
 
       await updateMission.mutateAsync({
         id: missionId,
         data: {
           title: editForm.title,
+          typology: editForm.typology,
           startDate: editForm.startDate ? new Date(editForm.startDate) : undefined,
           endDate: editForm.endDate ? new Date(editForm.endDate) : undefined,
           location: editForm.location,
@@ -921,43 +1250,72 @@ export default function MissionDetail() {
         },
       });
 
-      // Recalculate task deadlines when endDate changes
-      if (endDateChanged && newEndDate && steps && steps.length > 0) {
-        const referenceDate = new Date(newEndDate);
-        // Build lookup from INTRA_PRESTA_TASKS
-        const intraPrestaMap = new Map<string, { priorityDaysBefore: number; lateDaysBefore: number }>();
-        for (const t of INTRA_PRESTA_TASKS) {
-          intraPrestaMap.set(t.title, { priorityDaysBefore: t.priorityDaysBefore, lateDaysBefore: t.lateDaysBefore });
+      // If typology or trainer changed, replace all tasks with the correct template
+      if ((typologyChanged || trainerChanged) && steps) {
+        // Delete all existing tasks
+        for (const step of steps) {
+          await deleteStep.mutateAsync({ missionId, stepId: step.id });
         }
 
-        let updatedCount = 0;
-        for (const step of steps) {
-          const template = intraPrestaMap.get(step.title);
-          if (template) {
-            const d = new Date(referenceDate);
-            d.setDate(d.getDate() - template.priorityDaysBefore);
-            const ld = new Date(referenceDate);
-            ld.setDate(ld.getDate() - template.lateDaysBefore);
-            await updateStep.mutateAsync({
+        // Determine the correct task template based on new typology + trainer role
+        const newTrainer = allUsers?.find((u: any) => u.id === editForm.trainerId);
+        const trainerRole = newTrainer?.role;
+        const typology = editForm.typology;
+
+        let taskList: IntraPrestaTaskTemplate[] | null = null;
+        if (typology === "Intra" && trainerRole === "prestataire") taskList = INTRA_PRESTA_TASKS;
+        else if (typology === "Intra" && trainerRole === "formateur") taskList = INTRA_SALARIE_TASKS;
+        else if (typology === "Inter" && trainerRole === "prestataire") taskList = INTER_PRESTA_TASKS;
+        else if (typology === "Inter" && trainerRole === "formateur") taskList = INTER_SALARIE_TASKS;
+        else if (typology === "Conseil" && trainerRole === "prestataire") taskList = CONSEIL_PRESTA_TASKS;
+        else if (typology === "Conseil" && trainerRole === "formateur") taskList = CONSEIL_SALARIE_TASKS;
+        else if (typology === "Conférence" && trainerRole === "prestataire") taskList = CONFERENCE_PRESTA_TASKS;
+        else if (typology === "Conférence" && trainerRole === "formateur") taskList = CONFERENCE_SALARIE_TASKS;
+
+        if (taskList) {
+          const adminUser = allUsers?.find((u: any) => u.role === "admin");
+          const adminId = adminUser?.id || null;
+          const formateurId = editForm.trainerId || null;
+          const endDateRef = newEndDate ? new Date(newEndDate) : null;
+
+          let order = 0;
+          for (const task of taskList) {
+            order++;
+            const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+            let dueDate: string | undefined;
+            let lateDate: string | undefined;
+            if (endDateRef) {
+              const d = new Date(endDateRef);
+              d.setDate(d.getDate() - task.priorityDaysBefore);
+              dueDate = d.toISOString();
+              const ld = new Date(endDateRef);
+              ld.setDate(ld.getDate() - task.lateDaysBefore);
+              lateDate = ld.toISOString();
+            }
+            await createStep.mutateAsync({
               missionId,
-              stepId: step.id,
-              data: { dueDate: d.toISOString(), lateDate: ld.toISOString() },
+              data: {
+                title: task.title,
+                status: "todo",
+                order,
+                assigneeId,
+                dueDate,
+                lateDate,
+                link: task.link || undefined,
+              },
             });
-            updatedCount++;
-          } else if (deadlineDefaults[step.title] !== undefined) {
-            const days = deadlineDefaults[step.title];
-            const d = new Date(referenceDate);
-            d.setDate(d.getDate() - days);
-            await updateStep.mutateAsync({
-              missionId,
-              stepId: step.id,
-              data: { dueDate: d.toISOString() },
-            });
-            updatedCount++;
           }
+          toast({ title: `Taches mises a jour (${taskList.length} taches)` });
+        } else {
+          toast({ title: "Taches supprimees (aucun template correspondant)" });
         }
-        if (updatedCount > 0) {
-          toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
+      } else {
+        // Recalculate all task deadlines based on new endDate (only if tasks weren't replaced)
+        if (newEndDate && steps && steps.length > 0) {
+          const updatedCount = await recalculateTaskDeadlines(newEndDate);
+          if (updatedCount > 0) {
+            toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
+          }
         }
       }
 
@@ -1155,6 +1513,286 @@ export default function MissionDetail() {
         });
       }
       toast({ title: `${INTRA_PRESTA_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllInterPrestaTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of INTER_PRESTA_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${INTER_PRESTA_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllIntraSalarieTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of INTRA_SALARIE_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${INTRA_SALARIE_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllInterSalarieTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of INTER_SALARIE_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${INTER_SALARIE_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllConseilPrestaTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of CONSEIL_PRESTA_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${CONSEIL_PRESTA_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllConseilSalarieTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of CONSEIL_SALARIE_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${CONSEIL_SALARIE_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllConferencePrestaTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of CONFERENCE_PRESTA_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${CONFERENCE_PRESTA_TASKS.length} taches ajoutees` });
+    } catch (error) {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleAddAllConferenceSalarieTasks = async () => {
+    const adminUser = allUsers?.find((u: any) => u.role === "admin");
+    const adminId = adminUser?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      for (const task of CONFERENCE_SALARIE_TASKS) {
+        maxOrder++;
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (mission?.endDate) {
+          const referenceDate = new Date(mission.endDate);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        await createStep.mutateAsync({
+          missionId,
+          data: {
+            title: task.title,
+            status: "todo",
+            order: maxOrder,
+            assigneeId,
+            dueDate,
+            lateDate,
+            link: task.link || undefined,
+          },
+        });
+      }
+      toast({ title: `${CONFERENCE_SALARIE_TASKS.length} taches ajoutees` });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
     }
@@ -1579,6 +2217,37 @@ export default function MissionDetail() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Typologie
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditingInfo ? (
+              <Select
+                value={editForm.typology}
+                onValueChange={(value) => setEditForm({ ...editForm, typology: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                  <SelectItem value="Conférence" className="focus:bg-violet-200">Conférence</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <Badge variant="outline" className="capitalize">
+                {mission.typology || "Non definie"}
+              </Badge>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
               <MapPin className="w-4 h-4" />
               Lieu
             </CardTitle>
@@ -1838,46 +2507,216 @@ export default function MissionDetail() {
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4" />
               Participants
+              {missionParticipants && missionParticipants.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{missionParticipants.length} inscrit(s)</Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isEditingInfo ? (
-              <>
-                <div>
-                  <Label>Nombre de participants prevus</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={editForm.expectedParticipants}
-                    onChange={(e) => setEditForm({ ...editForm, expectedParticipants: e.target.value })}
-                    placeholder="Ex: 12"
-                  />
-                </div>
-                <div>
-                  <Label>Liste des participants</Label>
-                  <Textarea
-                    value={editForm.participantsList}
-                    onChange={(e) => setEditForm({ ...editForm, participantsList: e.target.value })}
-                    placeholder="Saisissez la liste des participants..."
-                    rows={5}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground font-medium">Nombre prevu :</span>
-                  <span className="font-medium">{mission.expectedParticipants ?? "Non defini"}</span>
-                </div>
-                {mission.participantsList ? (
-                  <div>
-                    <p className="text-sm text-muted-foreground font-medium mb-1">Liste :</p>
-                    <p className="text-sm whitespace-pre-line bg-muted/30 rounded-lg p-3 border">{mission.participantsList}</p>
+            {isEditingInfo && (
+              <div>
+                <Label>Nombre de participants prevus</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={editForm.expectedParticipants}
+                  onChange={(e) => setEditForm({ ...editForm, expectedParticipants: e.target.value })}
+                  placeholder="Ex: 12"
+                />
+              </div>
+            )}
+            {!isEditingInfo && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground font-medium">Nombre prevu :</span>
+                <span className="font-medium">{mission.expectedParticipants ?? "Non defini"}</span>
+              </div>
+            )}
+
+            {/* Add existing participant */}
+            <div className="space-y-2">
+              <Popover open={participantSearchOpen} onOpenChange={setParticipantSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                    <UserPlus className="w-4 h-4" />
+                    Ajouter un participant existant
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command shouldFilter={false}>
+                    <CommandInput
+                      placeholder="Rechercher par nom, email..."
+                      value={participantSearch}
+                      onValueChange={setParticipantSearch}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Aucun participant trouve</CommandEmpty>
+                      <CommandGroup>
+                        {(allParticipants || [])
+                          .filter((p: any) => {
+                            // Exclude already added participants
+                            const alreadyAdded = missionParticipants?.some((mp: any) => mp.participantId === p.id);
+                            if (alreadyAdded) return false;
+                            if (!participantSearch) return true;
+                            const search = participantSearch.toLowerCase();
+                            return (
+                              `${p.firstName} ${p.lastName}`.toLowerCase().includes(search) ||
+                              p.email?.toLowerCase().includes(search) ||
+                              p.company?.toLowerCase().includes(search)
+                            );
+                          })
+                          .slice(0, 10)
+                          .map((p: any) => (
+                            <CommandItem
+                              key={p.id}
+                              value={p.id.toString()}
+                              onSelect={async () => {
+                                try {
+                                  await addParticipantToMission.mutateAsync({ missionId, participantId: p.id });
+                                  toast({ title: `${p.firstName} ${p.lastName} ajoute` });
+                                  setParticipantSearchOpen(false);
+                                  setParticipantSearch("");
+                                } catch {
+                                  toast({ title: "Erreur", variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <div className="flex flex-col flex-1">
+                                <span className="font-medium">{p.firstName} {p.lastName}</span>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  {p.email && <span>{p.email}</span>}
+                                  {p.address && <><span>·</span><span>{p.address}</span></>}
+                                </div>
+                              </div>
+                              <Plus className="w-4 h-4 text-muted-foreground" />
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Create new participant inline */}
+              {!showNewParticipantForm ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start gap-2 text-muted-foreground"
+                  onClick={() => setShowNewParticipantForm(true)}
+                >
+                  <Plus className="w-4 h-4" />
+                  Creer un nouveau participant
+                </Button>
+              ) : (
+                <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
+                  <p className="text-sm font-medium">Nouveau participant</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="Prenom *"
+                      value={newParticipant.firstName}
+                      onChange={(e) => setNewParticipant({ ...newParticipant, firstName: e.target.value })}
+                    />
+                    <Input
+                      placeholder="Nom *"
+                      value={newParticipant.lastName}
+                      onChange={(e) => setNewParticipant({ ...newParticipant, lastName: e.target.value })}
+                    />
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Aucune liste de participants saisie</p>
-                )}
-              </>
+                  <Input
+                    placeholder="Email *"
+                    type="email"
+                    value={newParticipant.email}
+                    onChange={(e) => setNewParticipant({ ...newParticipant, email: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Adresse"
+                    value={newParticipant.address}
+                    onChange={(e) => setNewParticipant({ ...newParticipant, address: e.target.value })}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!newParticipant.firstName || !newParticipant.lastName || !newParticipant.email}
+                      onClick={async () => {
+                        try {
+                          const created: any = await createParticipant.mutateAsync({
+                            firstName: newParticipant.firstName,
+                            lastName: newParticipant.lastName,
+                            email: newParticipant.email,
+                            address: newParticipant.address || undefined,
+                          } as any);
+                          await addParticipantToMission.mutateAsync({ missionId, participantId: created.id });
+                          toast({ title: `${newParticipant.firstName} ${newParticipant.lastName} cree et ajoute` });
+                          setNewParticipant({ firstName: "", lastName: "", email: "", address: "" });
+                          setShowNewParticipantForm(false);
+                        } catch {
+                          toast({ title: "Erreur", variant: "destructive" });
+                        }
+                      }}
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Creer et ajouter
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setShowNewParticipantForm(false);
+                        setNewParticipant({ firstName: "", lastName: "", email: "", address: "" });
+                      }}
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* List of participants */}
+            {missionParticipants && missionParticipants.length > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground font-medium">Participants rattaches :</p>
+                <div className="space-y-1">
+                  {missionParticipants.map((mp: any) => (
+                    <div key={mp.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 border text-sm">
+                      <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium">
+                          {mp.participant?.firstName} {mp.participant?.lastName}
+                        </span>
+                        {mp.participant?.email && (
+                          <span className="text-muted-foreground ml-2">- {mp.participant.email}</span>
+                        )}
+                        {mp.participant?.address && (
+                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <MapPin className="w-3 h-3" />
+                            {mp.participant.address}
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="outline" className="text-xs capitalize flex-shrink-0">
+                        {mp.status || "inscrit"}
+                      </Badge>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await removeParticipantFromMission.mutateAsync({ missionId, participantId: mp.participantId });
+                            toast({ title: "Participant retire" });
+                          } catch {
+                            toast({ title: "Erreur", variant: "destructive" });
+                          }
+                        }}
+                        className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                        title="Retirer de la mission"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Aucun participant rattache a cette mission</p>
             )}
 
             {mission.hasDisability && (
@@ -2002,6 +2841,24 @@ export default function MissionDetail() {
             </p>
           </div>
           <div className="flex gap-2">
+            {isAdmin && mission?.endDate && steps && steps.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    const endDateStr = format(new Date(mission.endDate), "yyyy-MM-dd");
+                    const count = await recalculateTaskDeadlines(endDateStr);
+                    toast({ title: count > 0 ? `${count} deadline(s) recalculee(s)` : "Aucune tache a recalculer" });
+                  } catch {
+                    toast({ title: "Erreur", variant: "destructive" });
+                  }
+                }}
+                disabled={updateStep.isPending}
+              >
+                <Calendar className="w-4 h-4 mr-2" />
+                Recalculer deadlines
+              </Button>
+            )}
             <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
               <Zap className="w-4 h-4 mr-2" />
               Actions rapides
@@ -2042,23 +2899,54 @@ export default function MissionDetail() {
               <CardDescription>
                 {isIntraPrestataire(mission, allUsers || [])
                   ? "Taches predefinies pour mission Intra + Prestataire. Cliquez pour ajouter."
+                  : isInterPrestataire(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Inter + Prestataire. Cliquez pour ajouter."
+                  : isIntraSalarie(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Intra + Salarie. Cliquez pour ajouter."
+                  : isInterSalarie(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Inter + Salarie. Cliquez pour ajouter."
+                  : isConseilPrestataire(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Conseil + Prestataire. Cliquez pour ajouter."
+                  : isConseilSalarie(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Conseil + Salarie. Cliquez pour ajouter."
+                  : isConferencePrestataire(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Conference + Prestataire. Cliquez pour ajouter."
+                  : isConferenceSalarie(mission, allUsers || [])
+                  ? "Taches predefinies pour mission Conference + Salarie. Cliquez pour ajouter."
                   : "Cliquez sur une action pour l'ajouter ou ajoutez toutes les actions d'une categorie"}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isIntraPrestataire(mission, allUsers || []) ? (
+              {isIntraPrestataire(mission, allUsers || []) || isInterPrestataire(mission, allUsers || []) || isIntraSalarie(mission, allUsers || []) || isInterSalarie(mission, allUsers || []) || isConseilPrestataire(mission, allUsers || []) || isConseilSalarie(mission, allUsers || []) || isConferencePrestataire(mission, allUsers || []) || isConferenceSalarie(mission, allUsers || []) ? (() => {
+                const taskList = isIntraPrestataire(mission, allUsers || []) ? INTRA_PRESTA_TASKS
+                  : isInterPrestataire(mission, allUsers || []) ? INTER_PRESTA_TASKS
+                  : isIntraSalarie(mission, allUsers || []) ? INTRA_SALARIE_TASKS
+                  : isInterSalarie(mission, allUsers || []) ? INTER_SALARIE_TASKS
+                  : isConseilPrestataire(mission, allUsers || []) ? CONSEIL_PRESTA_TASKS
+                  : isConseilSalarie(mission, allUsers || []) ? CONSEIL_SALARIE_TASKS
+                  : isConferencePrestataire(mission, allUsers || []) ? CONFERENCE_PRESTA_TASKS
+                  : CONFERENCE_SALARIE_TASKS;
+                const handleAddAll = isIntraPrestataire(mission, allUsers || []) ? handleAddAllIntraPrestaTasks
+                  : isInterPrestataire(mission, allUsers || []) ? handleAddAllInterPrestaTasks
+                  : isIntraSalarie(mission, allUsers || []) ? handleAddAllIntraSalarieTasks
+                  : isInterSalarie(mission, allUsers || []) ? handleAddAllInterSalarieTasks
+                  : isConseilPrestataire(mission, allUsers || []) ? handleAddAllConseilPrestaTasks
+                  : isConseilSalarie(mission, allUsers || []) ? handleAddAllConseilSalarieTasks
+                  : isConferencePrestataire(mission, allUsers || []) ? handleAddAllConferencePrestaTasks
+                  : handleAddAllConferenceSalarieTasks;
+                return (
                 <div>
                   <Button
                     className="w-full mb-4"
-                    onClick={handleAddAllIntraPrestaTasks}
+                    onClick={handleAddAll}
                     disabled={createStep.isPending}
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Tout ajouter ({INTRA_PRESTA_TASKS.length} taches)
+                    Tout ajouter ({taskList.length} taches)
                   </Button>
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-1">
-                      {INTRA_PRESTA_TASKS.map((task, idx) => {
+                      {taskList.map((task, idx) => {
                         const adminUser = allUsers?.find((u: any) => u.role === "admin");
                         const assigneeId = task.assigneeType === "admin" ? (adminUser?.id || null) : (mission?.trainerId || null);
                         const deadlineLabel = task.priorityDaysBefore >= 0
@@ -2091,7 +2979,8 @@ export default function MissionDetail() {
                     </div>
                   </ScrollArea>
                 </div>
-              ) : (
+                );
+              })() : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {quickActions.map((category) => (
                     <div

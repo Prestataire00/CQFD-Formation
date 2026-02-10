@@ -198,6 +198,7 @@ export const participants = pgTable("participants", {
   phone: text("phone"),
   company: text("company"), // Entreprise du participant
   function: text("function"), // Poste/fonction du participant
+  address: text("address"), // Adresse du participant
   clientId: integer("client_id").references(() => clients.id),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
