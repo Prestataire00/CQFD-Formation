@@ -915,6 +915,81 @@ Connectez-vous à la plateforme pour consulter les détails.
   });
 }
 
+// ==================== ENVOI DE LIEN DE TACHE ====================
+
+export async function sendStepLinkEmail(
+  recipients: { email: string; name: string }[],
+  link: string,
+  missionTitle: string,
+  stepTitle: string
+): Promise<number> {
+  let sent = 0;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
+        .content { background-color: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+        .footer { background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center; }
+        h1 { margin: 0; font-size: 22px; }
+        .info-box { background-color: white; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin: 15px 0; }
+        .btn { display: inline-block; background-color: #2563eb; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+        .link-text { word-break: break-all; background-color: #f3f4f6; padding: 10px; border-radius: 4px; font-size: 12px; color: #6b7280; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>Lien - ${stepTitle}</h1>
+        </div>
+        <div class="content">
+          <p>Bonjour,</p>
+          <p>Vous trouverez ci-dessous le lien associe a la tache <strong>${stepTitle}</strong> de la mission <strong>${missionTitle}</strong>.</p>
+
+          <div class="info-box">
+            <p style="text-align: center;">
+              <a href="${link}" class="btn">Acceder au lien</a>
+            </p>
+          </div>
+
+          <p>Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
+          <p class="link-text">${link}</p>
+        </div>
+        <div class="footer">
+          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+          <p>CQFD Formation</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Bonjour,
+
+Vous trouverez ci-dessous le lien associe a la tache "${stepTitle}" de la mission "${missionTitle}".
+
+Lien : ${link}
+
+CQFD Formation`;
+
+  for (const recipient of recipients) {
+    const success = await sendEmail({
+      to: recipient.email,
+      subject: `Lien - ${stepTitle} - Mission ${missionTitle}`,
+      html,
+      text,
+    });
+    if (success) sent++;
+  }
+
+  return sent;
+}
+
 // Fonction utilitaire pour notifier l'autre partie (admin ou formateur)
 export async function notifyOtherParty(
   mission: Mission,

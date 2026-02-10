@@ -385,7 +385,7 @@ export function useMissionSteps(missionId: number) {
 export function useCreateMissionStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null; lateDate?: string | null; assigneeId?: string | null } }) => {
+    mutationFn: async ({ missionId, data }: { missionId: number; data: { title: string; status: string; order: number; dueDate?: string | null; lateDate?: string | null; assigneeId?: string | null; link?: string | null } }) => {
       const url = buildUrl(api.missions.steps.create.path, { id: missionId });
       const res = await fetch(url, {
         method: 'POST',
@@ -405,7 +405,7 @@ export function useCreateMissionStep() {
 export function useUpdateMissionStep() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, stepId, data }: { missionId: number; stepId: number; data: { title?: string; status?: string; order?: number; dueDate?: string | null; lateDate?: string | null } }) => {
+    mutationFn: async ({ missionId, stepId, data }: { missionId: number; stepId: number; data: { title?: string; status?: string; order?: number; dueDate?: string | null; lateDate?: string | null; link?: string | null } }) => {
       const url = buildUrl(api.missions.steps.update.path, { missionId, stepId });
       const res = await fetch(url, {
         method: 'PUT',
@@ -436,6 +436,23 @@ export function useDeleteMissionStep() {
     },
     onSuccess: (_, { missionId }) => {
       queryClient.invalidateQueries({ queryKey: [api.missions.steps.list.path, missionId] });
+    },
+  });
+}
+
+// Send step link by email
+export function useSendStepLink() {
+  return useMutation({
+    mutationFn: async ({ missionId, stepId }: { missionId: number; stepId: number }) => {
+      const res = await fetch(`/api/missions/${missionId}/steps/${stepId}/send-link`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to send link");
+      }
+      return res.json();
     },
   });
 }

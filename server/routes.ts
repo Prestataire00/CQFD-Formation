@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendTaskAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail } from "./email";
+import { sendMissionAssignmentEmail, sendTaskAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
@@ -899,6 +899,69 @@ export async function registerRoutes(
   app.delete(api.missions.steps.delete.path, isAuthenticated, async (req, res) => {
     await storage.deleteMissionStep(Number(req.params.stepId));
     res.json({ success: true });
+  });
+
+  // Send step link by email
+  app.post(api.missions.steps.sendLink.path, isAuthenticated, async (req, res) => {
+    try {
+      const missionId = Number(req.params.missionId);
+      const stepId = Number(req.params.stepId);
+
+      // Get the step and verify it has a link
+      const steps = await storage.getMissionSteps(missionId);
+      const step = steps.find(s => s.id === stepId);
+      if (!step) {
+        return res.status(404).json({ message: "Tache non trouvee" });
+      }
+      if (!step.link) {
+        return res.status(400).json({ message: "Cette tache n'a pas de lien associe" });
+      }
+
+      // Get mission info
+      const mission = await storage.getMission(missionId);
+      if (!mission) {
+        return res.status(404).json({ message: "Mission non trouvee" });
+      }
+      const missionTitle = mission.title || `Mission #${mission.id}`;
+
+      // Collect recipients: client contactEmail + participant emails
+      const recipients: { email: string; name: string }[] = [];
+
+      // Client contact email
+      if (mission.clientId) {
+        const client = await storage.getClient(mission.clientId);
+        if (client?.contactEmail) {
+          recipients.push({
+            email: client.contactEmail,
+            name: client.contactName || client.name || 'Client',
+          });
+        }
+      }
+
+      // Mission participants
+      const missionParticipants = await storage.getMissionParticipants(missionId);
+      for (const mp of missionParticipants) {
+        if (mp.participant?.email) {
+          // Avoid duplicates
+          if (!recipients.some(r => r.email === mp.participant.email)) {
+            recipients.push({
+              email: mp.participant.email,
+              name: `${mp.participant.firstName || ''} ${mp.participant.lastName || ''}`.trim() || 'Participant',
+            });
+          }
+        }
+      }
+
+      if (recipients.length === 0) {
+        return res.json({ sent: 0 });
+      }
+
+      const sent = await sendStepLinkEmail(recipients, step.link, missionTitle, step.title);
+      res.json({ sent });
+    } catch (error) {
+      console.error('[Send Link] Error:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'envoi du lien' });
+    }
   });
 
   // Step Tasks (taches des etapes)

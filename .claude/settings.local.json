@@ -44,7 +44,16 @@
       "Bash(SMTP_USER=\"ani2saaa.aaa@gmail.com\" SMTP_PASS=\"mhtj aaod dmpx xonp\" SMTP_FROM=\"ani2saaa.aaa@gmail.com\" npx tsx:*)",
       "Bash(python3:*)",
       "Bash(npm run:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(git -C /home/runner/workspace status)",
+      "Bash(git -C /home/runner/workspace diff)",
+      "Bash(git -C /home/runner/workspace log --oneline -5)",
+      "Bash(git -C /home/runner/workspace show --stat 62b3707)",
+      "Bash(git -C /home/runner/workspace diff 62b3707 --stat)",
+      "Bash(git -C /home/runner/workspace add server/routes.ts client/src/pages/MissionDetail.tsx shared/schema.ts shared/routes.ts client/src/hooks/use-missions.ts migrations/0010_add_mission_step_late_date.sql)",
+      "Bash(git commit:*)",
+      "Bash(printenv:*)",
+      "Bash(PGPASSWORD=password psql:*)"
     ]
   }
 }

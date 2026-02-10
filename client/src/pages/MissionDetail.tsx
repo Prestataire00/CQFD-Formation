@@ -71,6 +71,8 @@ import {
   ChevronsUpDown,
   Copy,
   ExternalLink,
+  Send,
+  Loader2,
   ArrowUp,
   ArrowDown,
   Video,
@@ -105,6 +107,7 @@ import {
   useCreateMissionStep,
   useUpdateMissionStep,
   useDeleteMissionStep,
+  useSendStepLink,
   useMissionDocuments,
   useCreateDocument,
   useDeleteDocument,
@@ -288,6 +291,7 @@ interface IntraPrestaTaskTemplate {
   priorityDaysBefore: number; // positive = before first session (J-X), negative = after (J+X)
   lateDaysBefore: number;
   assigneeType: 'admin' | 'formateur';
+  link?: string;
 }
 
 const INTRA_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
@@ -296,7 +300,7 @@ const INTRA_PRESTA_TASKS: IntraPrestaTaskTemplate[] = [
   { title: "Horaires et adresse de formation", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
   { title: "Questionnaire de cadrage", priorityDaysBefore: 70, lateDaysBefore: 60, assigneeType: "admin" },
   { title: "Questionnaires de positionnement", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
-  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur" },
+  { title: "Envoi compte-rendu entretien cadrage", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "formateur", link: "https://forms.gle/G2GRpCVVkYTTcfM27" },
   { title: "Envoi programme ajusté et séquençage", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
   { title: "Envoi des adaptations si handicap", priorityDaysBefore: 50, lateDaysBefore: 30, assigneeType: "formateur" },
   { title: "Saisie dans Récap", priorityDaysBefore: 60, lateDaysBefore: 40, assigneeType: "admin" },
@@ -345,6 +349,8 @@ interface TaskItemProps {
 }
 
 function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
+  const { toast } = useToast();
+  const sendStepLink = useSendStepLink();
   const [isEditingComment, setIsEditingComment] = useState(false);
   const [comment, setComment] = useState(isAdmin ? (task.comment || "") : (task.trainerComment || ""));
   const [isEditingDeadline, setIsEditingDeadline] = useState(false);
@@ -440,6 +446,17 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
               <h4 className={`font-medium ${task.isCompleted || autoStatus === 'done' ? 'line-through text-green-700' : config.color}`}>
                 {task.title}
               </h4>
+              {task.link && (
+                <a
+                  href={task.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:text-blue-700"
+                  title={task.link}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              )}
               <span className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} border ${config.borderColor}`}>
                 {config.label}{isManual ? ' (manuel)' : ''}
               </span>
@@ -600,6 +617,31 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 <ArrowDown className="w-3.5 h-3.5" />
               </button>
             </div>
+            {task.link && (
+              <button
+                onClick={async () => {
+                  try {
+                    const result = await sendStepLink.mutateAsync({ missionId, stepId: task.id });
+                    toast({
+                      title: result.sent > 0
+                        ? `Lien envoye a ${result.sent} destinataire(s)`
+                        : "Aucun destinataire trouve",
+                    });
+                  } catch (error) {
+                    toast({ title: "Erreur lors de l'envoi", variant: "destructive" });
+                  }
+                }}
+                disabled={sendStepLink.isPending}
+                className="p-1.5 text-blue-400 hover:text-blue-600 rounded hover:bg-white/50 disabled:opacity-50"
+                title="Envoyer le lien par email"
+              >
+                {sendStepLink.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </button>
+            )}
             <button
               onClick={() => {
                 if (!isEditingComment) {
@@ -974,7 +1016,7 @@ export default function MissionDetail() {
     }
   };
 
-  const handleAddQuickAction = async (actionTitle: string, overrideDaysBefore?: number, overrideAssigneeId?: string | null, overrideLateDaysBefore?: number) => {
+  const handleAddQuickAction = async (actionTitle: string, overrideDaysBefore?: number, overrideAssigneeId?: string | null, overrideLateDaysBefore?: number, overrideLink?: string) => {
     try {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
       let dueDate: string | null = null;
@@ -1005,6 +1047,7 @@ export default function MissionDetail() {
           assigneeId,
           dueDate: dueDate || undefined,
           lateDate: lateDate || undefined,
+          link: overrideLink || undefined,
         },
       });
       toast({ title: "Tache ajoutee" });
@@ -1072,6 +1115,7 @@ export default function MissionDetail() {
             assigneeId,
             dueDate,
             lateDate,
+            link: task.link || undefined,
           },
         });
       }
@@ -1935,7 +1979,7 @@ export default function MissionDetail() {
                         return (
                           <button
                             key={idx}
-                            onClick={() => handleAddQuickAction(task.title, task.priorityDaysBefore, assigneeId, task.lateDaysBefore)}
+                            onClick={() => handleAddQuickAction(task.title, task.priorityDaysBefore, assigneeId, task.lateDaysBefore, task.link)}
                             className="w-full text-left text-sm p-2.5 rounded-lg hover:bg-muted/50 transition-colors flex items-center gap-2 group"
                             disabled={createStep.isPending}
                           >

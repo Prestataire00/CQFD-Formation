@@ -158,6 +158,7 @@ export const missionSteps = pgTable("mission_steps", {
   order: integer("order").notNull(),
   dueDate: timestamp("due_date"),
   lateDate: timestamp("late_date"),
+  link: text("link"),
   assigneeId: varchar("assignee_id").references(() => users.id),
   comment: text("comment"),
   commentAuthorId: varchar("comment_author_id").references(() => users.id),

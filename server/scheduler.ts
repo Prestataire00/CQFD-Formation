@@ -122,10 +122,14 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
       }
     }
 
-    // Générer les rappels pour les deadlines de tâches
     const taskDeadlineSettings = activeSettings.filter(s => s.reminderType === 'task_deadline');
     if (taskDeadlineSettings.length > 0) {
-      const steps = await storage.getMissionSteps(mission.id);
+      let steps: any[] = [];
+      try {
+        steps = await storage.getMissionSteps(mission.id);
+      } catch (e: any) {
+        log(`[Scheduler] Erreur getMissionSteps mission ${mission.id}: ${e.message}`, 'scheduler');
+      }
       const stepsWithDeadline = steps.filter(s => s.dueDate && !s.isCompleted && s.status !== 'na');
 
       for (const step of stepsWithDeadline) {
@@ -267,8 +271,9 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
           // For task deadline reminders, include the task title in the subject
           let customSubject = setting?.emailSubject || undefined;
           if (setting?.reminderType === 'task_deadline' && reminder.taskId) {
-            const steps = await storage.getMissionSteps(mission.id);
-            const step = steps.find(s => s.id === reminder.taskId);
+            let steps: any[] = [];
+            try { steps = await storage.getMissionSteps(mission.id); } catch {}
+            const step = steps.find((s: any) => s.id === reminder.taskId);
             if (step && !customSubject) {
               customSubject = `Rappel: Tache "${step.title}" - ${mission.title}`;
             }
@@ -364,7 +369,8 @@ async function markLateStepsServerSide(): Promise<number> {
   let marked = 0;
 
   for (const mission of activeMissions) {
-    const steps = await storage.getMissionSteps(mission.id);
+    let steps: any[] = [];
+    try { steps = await storage.getMissionSteps(mission.id); } catch { continue; }
     for (const step of steps) {
       if (
         step.dueDate &&

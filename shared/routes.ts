@@ -346,6 +346,7 @@ export const api = {
           order: z.number().optional(),
           dueDate: z.string().nullable().optional(),
           lateDate: z.string().nullable().optional(),
+          link: z.string().nullable().optional(),
           assigneeId: z.string().nullable().optional(),
           comment: z.string().nullable().optional(),
           commentAuthorId: z.string().nullable().optional(),
@@ -362,6 +363,13 @@ export const api = {
         path: '/api/missions/:missionId/steps/:stepId',
         responses: {
           200: z.object({ success: z.boolean() }),
+        },
+      },
+      sendLink: {
+        method: 'POST' as const,
+        path: '/api/missions/:missionId/steps/:stepId/send-link',
+        responses: {
+          200: z.object({ sent: z.number() }),
         },
       },
       // Step Tasks (taches des etapes)
