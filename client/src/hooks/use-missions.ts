@@ -296,6 +296,32 @@ export function useAssignMultipleTrainers() {
 }
 
 // ==========================================
+// Simple Duplication (without trainer)
+// ==========================================
+export function useDuplicateMissionSimple() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId }: { missionId: number }) => {
+      const res = await fetch(`/api/missions/${missionId}/duplicate-simple`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to duplicate mission");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.list.path] });
+      queryClient.invalidateQueries({ queryKey: [api.stats.get.path] });
+    },
+  });
+}
+
+// ==========================================
 // Multi-Trainer Duplication (legacy)
 // ==========================================
 export function useDuplicateMissionMulti() {

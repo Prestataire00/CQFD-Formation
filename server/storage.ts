@@ -82,6 +82,7 @@ export interface IStorage {
   deleteMission(id: number): Promise<boolean>;
   updateMissionStatus(id: number, status: MissionStatus): Promise<Mission | undefined>;
   duplicateMissionForTrainer(originalMissionId: number, newTrainerId: string): Promise<Mission | undefined>;
+  duplicateMission(originalMissionId: number): Promise<Mission | undefined>;
 
   // Multi-trainer duplication
   duplicateMissionForMultipleTrainers(originalMissionId: number, trainerIds: string[]): Promise<{ created: Mission[]; errors: { trainerId: string; error: string }[] }>;
@@ -646,6 +647,62 @@ export class DatabaseStorage implements IStorage {
       throw new Error(result.errors[0].error);
     }
     return undefined;
+  }
+
+  // ==================== SIMPLE DUPLICATION (without trainer) ====================
+  async duplicateMission(originalMissionId: number): Promise<Mission | undefined> {
+    const originalMission = await this.getMission(originalMissionId);
+    if (!originalMission) {
+      throw new Error("Mission originale non trouvée");
+    }
+
+    // Mark original as original if not already
+    if (!originalMission.isOriginal) {
+      await this.updateMission(originalMissionId, { isOriginal: true });
+    }
+
+    // Create mission copy without trainer
+    const { id, createdAt, updatedAt, isOriginal, parentMissionId, ...missionData } = originalMission;
+
+    const [newMission] = await db.insert(missions).values({
+      ...missionData,
+      trainerId: null,
+      parentMissionId: originalMissionId,
+      isOriginal: false,
+    }).returning();
+
+    // Copy all mission steps
+    const originalSteps = await this.getMissionSteps(originalMissionId);
+    for (const step of originalSteps) {
+      const { id: stepId, missionId, createdAt: stepCreatedAt, updatedAt: stepUpdatedAt, ...stepData } = step;
+      await this.createMissionStep({
+        ...stepData,
+        missionId: newMission.id,
+        isCompleted: false,
+        status: 'todo',
+      });
+    }
+
+    // Copy all sessions
+    const originalSessions = await this.getMissionSessions(originalMissionId);
+    for (const session of originalSessions) {
+      const { id: sessionId, missionId: sessionMissionId, ...sessionData } = session;
+      await this.createMissionSession({
+        ...sessionData,
+        missionId: newMission.id,
+      });
+    }
+
+    // Copy all participants
+    const originalParticipants = await this.getMissionParticipants(originalMissionId);
+    for (const mp of originalParticipants) {
+      await this.addParticipantToMission({
+        missionId: newMission.id,
+        participantId: mp.participantId,
+      });
+    }
+
+    return newMission;
   }
 
   // ==================== MULTI-TRAINER DUPLICATION ====================

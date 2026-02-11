@@ -2528,6 +2528,21 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== SIMPLE DUPLICATION (without trainer) ====================
+  app.post('/api/missions/:id/duplicate-simple', isAuthenticated, requirePermission('missions:create'), async (req, res) => {
+    try {
+      const duplicated = await storage.duplicateMission(Number(req.params.id));
+      if (!duplicated) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+      res.status(201).json(duplicated);
+    } catch (err) {
+      console.error('Simple mission duplication error:', err);
+      res.status(500).json({ message: err instanceof Error ? err.message : 'Erreur lors de la duplication de la mission' });
+    }
+  });
+
   // ==================== MULTI-TRAINER DUPLICATION ====================
   // Duplicate mission for multiple trainers at once
   app.post('/api/missions/:id/duplicate-multi', isAuthenticated, requirePermission('missions:create'), async (req, res) => {

@@ -120,6 +120,7 @@ import {
   useCreateMissionSession,
   useUpdateMissionSession,
   useDeleteMissionSession,
+  useDuplicateMissionSimple,
   useDuplicateMissionMulti,
   useChildMissions,
   useParentMission,
@@ -981,6 +982,7 @@ export default function MissionDetail() {
   const { data: childMissions } = useChildMissions(missionId);
   const { data: parentMission } = useParentMission(missionId, !!mission?.parentMissionId);
   const duplicateMissionMulti = useDuplicateMissionMulti();
+  const duplicateMissionSimple = useDuplicateMissionSimple();
 
   // Duplication dialog state
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
@@ -1933,6 +1935,23 @@ export default function MissionDetail() {
         title: "Duplication reussie",
         description: `${result.created?.length || 0} copie(s) creee(s)${result.errors?.length > 0 ? `, ${result.errors.length} erreur(s)` : ""}`,
       });
+    } catch (error: any) {
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de dupliquer la mission",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDuplicateSimple = async () => {
+    try {
+      const newMission = await duplicateMissionSimple.mutateAsync({ missionId });
+      toast({
+        title: "Duplication reussie",
+        description: "La copie de la mission a ete creee avec succes.",
+      });
+      setLocation(`/missions/${newMission.id}`);
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -3404,9 +3423,14 @@ export default function MissionDetail() {
                 </p>
               </div>
               {isAdmin && !mission.parentMissionId && (
-                <Button variant="outline" size="sm" onClick={() => setIsDuplicateOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDuplicateSimple}
+                  disabled={duplicateMissionSimple.isPending}
+                >
                   <Copy className="w-4 h-4 mr-2" />
-                  Dupliquer pour un formateur
+                  {duplicateMissionSimple.isPending ? "Duplication..." : "Dupliquer"}
                 </Button>
               )}
             </div>
