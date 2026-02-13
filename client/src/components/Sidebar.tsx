@@ -132,10 +132,13 @@ export function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700 bg-slate-800 hidden lg:flex flex-col">
       {/* Logo */}
-      <div className="h-20 flex items-center justify-center px-6 border-b border-slate-700">
-        <div className="flex flex-col items-center gap-0.5">
-          <img src={cqfdLogo} alt="CQFD Formation" className="w-12 h-12 object-contain" />
-          <span className="text-[10px] font-semibold tracking-[0.15em] text-cyan-400 uppercase">Formation</span>
+      <div className="h-20 flex items-center px-6 border-b border-slate-700">
+        <div className="flex items-center gap-3">
+          <img src={cqfdLogo} alt="CQFD Formation" className="w-14 h-14 object-contain flex-shrink-0" />
+          <div className="flex flex-col leading-tight">
+            <span className="text-xl font-black tracking-tight text-white">CQFD</span>
+            <span className="text-[10px] font-semibold tracking-[0.15em] text-cyan-400 uppercase">Formation</span>
+          </div>
         </div>
       </div>
 
