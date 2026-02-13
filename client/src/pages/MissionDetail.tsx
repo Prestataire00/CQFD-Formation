@@ -113,6 +113,7 @@ import {
   useDeleteDocument,
   useUpdateDocument,
   useUploadDocument,
+  useReattachDocuments,
   useMissionTrainers,
   useAddTrainerToMission,
   useRemoveTrainerFromMission,
@@ -145,6 +146,7 @@ import { fr } from "date-fns/locale";
 import type { MissionStatus } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getTaskExplanation } from "@/lib/task-explanations";
 
 // Step configuration
 const STEPS = [
@@ -688,6 +690,36 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
               <h4 className={`font-medium ${task.isCompleted || autoStatus === 'done' ? 'line-through text-green-700' : config.color}`}>
                 {task.title}
               </h4>
+              {(() => {
+                const explanation = getTaskExplanation(task.title);
+                if (!explanation) return null;
+                return (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex-shrink-0 text-muted-foreground transition-colors"
+                        title="Voir les consignes"
+                        data-testid={`btn-task-info-${task.id}`}
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      side="right"
+                      align="start"
+                      className="w-[420px] max-h-[400px] overflow-y-auto p-4"
+                    >
+                      <div className="space-y-2">
+                        <h5 className="font-semibold text-sm" data-testid={`text-task-info-title-${task.id}`}>{task.title}</h5>
+                        <div className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed" data-testid={`text-task-info-content-${task.id}`}>
+                          {explanation}
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                );
+              })()}
               {task.link && (
                 <a
                   href={task.link}
@@ -998,6 +1030,7 @@ export default function MissionDetail() {
   const deleteDocument = useDeleteDocument();
   const updateDocument = useUpdateDocument();
   const uploadDocument = useUploadDocument();
+  const reattachDocuments = useReattachDocuments();
   const addTrainer = useAddTrainerToMission();
   const removeTrainer = useRemoveTrainerFromMission();
   const createSession = useCreateMissionSession();
@@ -1315,6 +1348,15 @@ export default function MissionDetail() {
           if (updatedCount > 0) {
             toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
           }
+        }
+      }
+
+      // Reattach template documents when typology or trainer changes
+      if (typologyChanged || trainerChanged) {
+        try {
+          await reattachDocuments.mutateAsync({ missionId });
+        } catch (e) {
+          console.error('Failed to reattach documents:', e);
         }
       }
 

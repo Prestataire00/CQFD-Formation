@@ -452,6 +452,40 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== REATTACH TEMPLATE DOCUMENTS ====================
+  app.post('/api/missions/:id/reattach-documents', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const mission = await storage.getMission(missionId);
+      if (!mission) {
+        res.status(404).json({ message: "Mission non trouvée" });
+        return;
+      }
+
+      const results: { trainerId: string; removed: number; added: number }[] = [];
+
+      // Reattach for the primary trainer
+      if (mission.trainerId) {
+        const result = await storage.reattachTemplateDocumentsForMission(missionId, mission.trainerId);
+        results.push({ trainerId: mission.trainerId, ...result });
+      }
+
+      // Reattach for all additional trainers
+      const missionTrainers = await storage.getMissionTrainers(missionId);
+      for (const mt of missionTrainers) {
+        // Skip the primary trainer (already handled above)
+        if (mt.trainerId === mission.trainerId) continue;
+        const result = await storage.reattachTemplateDocumentsForMission(missionId, mt.trainerId);
+        results.push({ trainerId: mt.trainerId, ...result });
+      }
+
+      res.json({ success: true, results });
+    } catch (error) {
+      console.error('Reattach documents error:', error);
+      res.status(500).json({ message: 'Erreur lors du rechargement des documents' });
+    }
+  });
+
   app.patch(api.missions.updateStatus.path, isAuthenticated, async (req, res) => {
     try {
       const input = api.missions.updateStatus.input.parse(req.body);

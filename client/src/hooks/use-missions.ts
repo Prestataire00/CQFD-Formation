@@ -740,6 +740,25 @@ export function useUploadDocument() {
   });
 }
 
+export function useReattachDocuments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId }: { missionId: number }) => {
+      const res = await fetch(`/api/missions/${missionId}/reattach-documents`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error("Failed to reattach documents");
+      return res.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: [api.missions.documents.list.path, variables.missionId]
+      });
+    },
+  });
+}
+
 export function useUpdateDocument() {
   const queryClient = useQueryClient();
   return useMutation({

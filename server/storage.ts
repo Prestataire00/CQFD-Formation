@@ -170,6 +170,7 @@ export interface IStorage {
   updateDocumentTemplate(id: number, data: Partial<DocumentTemplate>, uploadedBy?: string, changeNotes?: string): Promise<DocumentTemplate | undefined>;
   deleteDocumentTemplate(id: number): Promise<boolean>;
   attachTemplateDocumentsToMission(missionId: number, trainerId: string): Promise<void>;
+  reattachTemplateDocumentsForMission(missionId: number, trainerId: string): Promise<{ removed: number; added: number }>;
 
   // Template Versions
   getTemplateVersions(templateId: number): Promise<DocumentTemplateVersion[]>;
@@ -1408,8 +1409,17 @@ export class DatabaseStorage implements IStorage {
     const typology = mission?.typology || undefined;
     const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId || undefined, typology);
 
-    // Attach each template document to the mission
+    // Get existing template documents for this trainer+mission to avoid duplicates
+    const existingDocs = await this.getDocumentsByMission(missionId);
+    const existingTemplateIds = new Set(
+      existingDocs
+        .filter((doc: Document) => doc.templateId && doc.userId === trainerId)
+        .map((doc: Document) => doc.templateId)
+    );
+
+    // Attach each template document to the mission (skip if already present)
     for (const template of templates) {
+      if (existingTemplateIds.has(template.id)) continue;
       await db.insert(documents).values({
         title: template.title,
         type: template.type,
@@ -1419,6 +1429,50 @@ export class DatabaseStorage implements IStorage {
         templateId: template.id,
       });
     }
+  }
+
+  async reattachTemplateDocumentsForMission(missionId: number, trainerId: string): Promise<{ removed: number; added: number }> {
+    // Get trainer to determine their role
+    const trainer = await this.getUser(trainerId);
+    if (!trainer) return { removed: 0, added: 0 };
+
+    // Get all documents for this mission that are template-based and belong to this trainer
+    const missionDocs = await this.getDocumentsByMission(missionId);
+    const templateDocs = missionDocs.filter(
+      (doc: Document) => doc.templateId && doc.userId === trainerId
+    );
+
+    // For each template document, check if it was modified by the user (uploaded a different file)
+    let removed = 0;
+    for (const doc of templateDocs) {
+      // Get the original template to compare URLs
+      const template = await this.getDocumentTemplate(doc.templateId!);
+      // Only remove documents that haven't been modified (url still matches template url)
+      if (template && doc.url === template.url) {
+        await this.deleteDocument(doc.id);
+        removed++;
+      }
+      // If template no longer exists, also remove the stale document
+      if (!template) {
+        await this.deleteDocument(doc.id);
+        removed++;
+      }
+    }
+
+    // Re-attach the correct template documents (deduplication handled inside)
+    const docsBeforeAttach = await this.getDocumentsByMission(missionId);
+    const countBefore = docsBeforeAttach.filter(
+      (doc: Document) => doc.templateId && doc.userId === trainerId
+    ).length;
+
+    await this.attachTemplateDocumentsToMission(missionId, trainerId);
+
+    const docsAfterAttach = await this.getDocumentsByMission(missionId);
+    const countAfter = docsAfterAttach.filter(
+      (doc: Document) => doc.templateId && doc.userId === trainerId
+    ).length;
+
+    return { removed, added: countAfter - countBefore };
   }
 
   // ==================== TEMPLATE VERSIONS ====================
