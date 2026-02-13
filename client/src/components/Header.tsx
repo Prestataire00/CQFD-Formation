@@ -43,7 +43,7 @@ function getNotificationIcon(type: string) {
   }
 }
 
-function NotificationItem({ notification, onMarkRead }: { notification: InAppNotification; onMarkRead: () => void }) {
+function NotificationItem({ notification, onMarkRead, onClickBody }: { notification: InAppNotification; onMarkRead: () => void; onClickBody: () => void }) {
   return (
     <div className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors">
       <button
@@ -53,32 +53,36 @@ function NotificationItem({ notification, onMarkRead }: { notification: InAppNot
       >
         <Check className="w-3 h-3 text-transparent hover:text-primary" />
       </button>
-      <div className="mt-0.5">
-        {getNotificationIcon(notification.type)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium">{notification.title}</p>
-          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">Nouveau</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
-        {notification.metadata && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {notification.metadata.location && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                {notification.metadata.location}
-              </span>
-            )}
-            {notification.metadata.trainerName && (
-              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                {notification.metadata.trainerName}
-              </span>
-            )}
+      <div className="flex-1 min-w-0 cursor-pointer" onClick={onClickBody}>
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5">
+            {getNotificationIcon(notification.type)}
           </div>
-        )}
-        <p className="text-xs text-muted-foreground mt-2">
-          {notification.createdAt && format(new Date(notification.createdAt), "PPP a HH:mm", { locale: fr })}
-        </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium">{notification.title}</p>
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">Nouveau</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
+            {notification.metadata && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {notification.metadata.location && (
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                    {notification.metadata.location}
+                  </span>
+                )}
+                {notification.metadata.trainerName && (
+                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                    {notification.metadata.trainerName}
+                  </span>
+                )}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              {notification.createdAt && format(new Date(notification.createdAt), "PPP a HH:mm", { locale: fr })}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -109,9 +113,12 @@ export function Header({ title }: { title: string }) {
     await markTemplateAsRead.mutateAsync(notificationId);
   };
 
-  const handleMarkInAppAsRead = async (notification: InAppNotification) => {
+  const handleMarkInAppAsRead = async (notificationId: number) => {
+    await markInAppAsRead.mutateAsync(notificationId);
+  };
+
+  const handleInAppNotificationClick = async (notification: InAppNotification) => {
     await markInAppAsRead.mutateAsync(notification.id);
-    // Navigate to mission if there's a missionId
     if (notification.missionId) {
       setLocation(`/missions/${notification.missionId}`);
       setIsOpen(false);
@@ -205,7 +212,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {alerts.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification.id)} onClickBody={() => handleInAppNotificationClick(notification)} />
                               ))}
                             </div>
                           </div>
@@ -225,7 +232,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {reminders.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification.id)} onClickBody={() => handleInAppNotificationClick(notification)} />
                               ))}
                             </div>
                           </div>
@@ -245,7 +252,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {assignments.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification.id)} onClickBody={() => handleInAppNotificationClick(notification)} />
                               ))}
                             </div>
                           </div>
@@ -265,7 +272,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {updates.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification.id)} onClickBody={() => handleInAppNotificationClick(notification)} />
                               ))}
                             </div>
                           </div>
@@ -290,7 +297,7 @@ export function Header({ title }: { title: string }) {
                               {templateUpdates.map((item) => {
                                 if (item.kind === 'inapp') {
                                   const notification = item.data as InAppNotification;
-                                  return <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />;
+                                  return <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification.id)} onClickBody={() => handleInAppNotificationClick(notification)} />;
                                 }
                                 const notification = item.data;
                                 return (
