@@ -55,23 +55,21 @@ import type { DocumentTemplate } from "@shared/schema";
 
 // Types de documents disponibles pour les missions
 const DOCUMENT_TYPES = [
-  // Documents automatiques selon le statut du formateur
-  { value: "consignes_formateurs", label: "Consignes formateurs (Salarié)" },
-  { value: "cahier_charges", label: "Cahier des charges (Prestataire)" },
-  { value: "bonnes_pratiques", label: "Bonnes pratiques (Prestataire)" },
-  // Documents standard
-  { value: "programme", label: "Programme" },
-  { value: "compte_rendu", label: "Compte rendu" },
-  { value: "sequencage", label: "Séquençage" },
-  { value: "livret_annexes", label: "Livret et ses annexes" },
-  { value: "contrat", label: "Contrat" },
-  { value: "questionnaire_preparation", label: "Questionnaire de préparation" },
-  { value: "questionnaire_positionnement", label: "Questionnaire de positionnement" },
-  { value: "questionnaire_satisfaction", label: "Questionnaire de satisfaction" },
   { value: "bilan_formation", label: "Bilan de formation" },
-  { value: "synthese_evaluations", label: "Synthèse des évaluations" },
-  { value: "feuille_presence", label: "Feuille de présence" },
+  { value: "bonnes_pratiques", label: "Bonnes pratiques (Prestataire)" },
+  { value: "cahier_charges", label: "Cahier des charges (Prestataire)" },
+  { value: "compte_rendu", label: "Compte rendu" },
+  { value: "consignes_formateurs", label: "Consignes formateurs (Salarié)" },
+  { value: "contrat", label: "Contrat" },
   { value: "facture", label: "Facture" },
+  { value: "feuille_presence", label: "Feuille de présence" },
+  { value: "livret_annexes", label: "Livret et ses annexes" },
+  { value: "programme", label: "Programme" },
+  { value: "questionnaire_positionnement", label: "Questionnaire de positionnement" },
+  { value: "questionnaire_preparation", label: "Questionnaire de préparation" },
+  { value: "questionnaire_satisfaction", label: "Questionnaire de satisfaction" },
+  { value: "sequencage", label: "Séquençage" },
+  { value: "synthese_evaluations", label: "Synthèse des évaluations" },
   { value: "autre", label: "Autre" },
 ];
 
@@ -507,7 +505,7 @@ export default function DocumentTemplates() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="_global_" className="focus:bg-violet-200">Global</SelectItem>
-                  {clients?.map((client: { id: number; name: string }) => (
+                  {clients?.slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((client: { id: number; name: string }) => (
                     <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                       {client.name}
                     </SelectItem>
@@ -652,7 +650,7 @@ export default function DocumentTemplates() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="_global_" className="focus:bg-violet-200">Global</SelectItem>
-                  {clients?.map((client: { id: number; name: string }) => (
+                  {clients?.slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((client: { id: number; name: string }) => (
                     <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
                       {client.name}
                     </SelectItem>

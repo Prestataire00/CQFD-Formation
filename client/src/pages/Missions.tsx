@@ -57,12 +57,12 @@ import {
   Users,
   Copy,
 } from "lucide-react";
-import { useMissions, useClients, useTrainers, useParticipants, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
+import { useMissions, useClients, useTrainers, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/use-auth";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, MissionStatus, LocationType, Participant } from "@shared/schema";
+import type { Mission, MissionStatus, LocationType } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -109,7 +109,6 @@ export default function Missions() {
   const { data: missions, isLoading } = useMissions();
   const { data: clients } = useClients();
   const { data: trainers } = useTrainers();
-  const { data: participants } = useParticipants();
   const { data: allSessions } = useAllSessions();
   const createMission = useCreateMission();
   const updateMissionStatus = useUpdateMissionStatus();
@@ -137,10 +136,6 @@ export default function Missions() {
   const [missionToDelete, setMissionToDelete] = useState<number | null>(null);
 
   // Combobox states
-  const [trainerOpen, setTrainerOpen] = useState(false);
-  const [trainerSearch, setTrainerSearch] = useState("");
-  const [participantOpen, setParticipantOpen] = useState(false);
-  const [participantSearch, setParticipantSearch] = useState("");
   const [clientOpen, setClientOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
 
@@ -148,13 +143,14 @@ export default function Missions() {
     title: string;
     clientIds: string[];
     trainerId: string;
+    trainersList: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
     endDate: string;
     locationType: LocationType;
     location: string;
     typology: string;
     reminderDays: number | null;
-    participantIds: number[];
+    participantsList: string;
     expectedParticipants: string;
     hasDisability: boolean;
     disabilityDetails: string;
@@ -164,13 +160,14 @@ export default function Missions() {
     title: "",
     clientIds: [],
     trainerId: "",
+    trainersList: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
     endDate: "",
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
     reminderDays: 7,
-    participantIds: [],
+    participantsList: "",
     expectedParticipants: "",
     hasDisability: false,
     disabilityDetails: "",
@@ -178,40 +175,18 @@ export default function Missions() {
     financialTerms: "",
   });
 
-  // Filter trainers based on search
-  const filteredTrainers = useMemo(() => {
-    if (!trainers) return [];
-    if (!trainerSearch) return trainers;
-    const search = trainerSearch.toLowerCase();
-    return trainers.filter((t: any) =>
-      `${t.firstName} ${t.lastName}`.toLowerCase().includes(search) ||
-      t.email?.toLowerCase().includes(search)
-    );
-  }, [trainers, trainerSearch]);
-
   // Filter clients based on search
   const filteredClients = useMemo(() => {
     if (!clients) return [];
-    if (!clientSearch) return clients;
+    const sorted = [...clients].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr"));
+    if (!clientSearch) return sorted;
     const search = clientSearch.toLowerCase();
-    return clients.filter((c: any) =>
+    return sorted.filter((c: any) =>
       c.name?.toLowerCase().includes(search) ||
       c.contactEmail?.toLowerCase().includes(search) ||
       c.city?.toLowerCase().includes(search)
     );
   }, [clients, clientSearch]);
-
-  // Filter participants based on search
-  const filteredParticipants = useMemo(() => {
-    if (!participants) return [];
-    if (!participantSearch) return participants;
-    const search = participantSearch.toLowerCase();
-    return participants.filter((p: Participant) =>
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(search) ||
-      p.email?.toLowerCase().includes(search) ||
-      p.company?.toLowerCase().includes(search)
-    );
-  }, [participants, participantSearch]);
 
   const isAdmin = user?.role === "admin";
 
@@ -288,13 +263,15 @@ export default function Missions() {
       const missionData = {
         title: newMission.title,
         clientId: parseInt(newMission.clientIds[0]),
-        trainerId: newMission.trainerId || null,
+        trainerId: null,
+        trainersList: newMission.trainersList || null,
         startDate: globalStartDate,
         endDate: newMission.endDate || null,
         locationType: newMission.locationType,
         location: newMission.location || null,
         typology: newMission.typology,
         expectedParticipants: newMission.expectedParticipants ? parseInt(newMission.expectedParticipants) : null,
+        participantsList: newMission.participantsList || null,
         hasDisability: newMission.hasDisability,
         disabilityDetails: newMission.disabilityDetails || null,
         rateBase: newMission.rateBase || null,
@@ -325,17 +302,6 @@ export default function Missions() {
         }
       }
 
-      // Ajouter les participants a la mission
-      for (const participantId of newMission.participantIds) {
-        try {
-          await apiRequest("POST", `/api/missions/${createdMission.id}/participants`, {
-            participantId
-          });
-        } catch (err) {
-          console.error("Erreur lors de l'ajout du participant:", err);
-        }
-      }
-
       // Créer le rappel avec le J-X choisi
       if (newMission.reminderDays !== null && newMission.reminderDays > 0) {
         try {
@@ -352,23 +318,23 @@ export default function Missions() {
         title: "",
         clientIds: [],
         trainerId: "",
+        trainersList: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
         endDate: "",
         locationType: "presentiel",
         location: "",
         typology: "Intra",
         reminderDays: 7,
-        participantIds: [],
+        participantsList: "",
         expectedParticipants: "",
         hasDisability: false,
         disabilityDetails: "",
         rateBase: "",
         financialTerms: "",
       });
-      const participantCount = newMission.participantIds.length;
       toast({
         title: "Mission creee",
-        description: `La mission a ete creee avec ${validDays.length} jour(s) de formation${participantCount > 0 ? ` et ${participantCount} participant(s)` : ""}.${newMission.reminderDays ? ` Rappel J-${newMission.reminderDays} programme.` : ""}`,
+        description: `La mission a ete creee avec ${validDays.length} jour(s) de formation.${newMission.reminderDays ? ` Rappel J-${newMission.reminderDays} programme.` : ""}`,
       });
     } catch (error) {
       console.error("Failed to create mission:", error);
@@ -544,77 +510,17 @@ export default function Missions() {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="trainer">Formateur</Label>
-                        <Popover open={trainerOpen} onOpenChange={setTrainerOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={trainerOpen}
-                              className="w-full justify-between font-normal"
-                            >
-                              {newMission.trainerId ? (
-                                (() => {
-                                  const trainer = trainers?.find((t: any) => t.id === newMission.trainerId);
-                                  return trainer ? `${trainer.firstName} ${trainer.lastName}` : "Selectionner...";
-                                })()
-                              ) : (
-                                <span className="text-muted-foreground">Taper pour rechercher...</span>
-                              )}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[300px] p-0" align="start">
-                            <Command shouldFilter={false}>
-                              <CommandInput
-                                placeholder="Rechercher un formateur..."
-                                value={trainerSearch}
-                                onValueChange={setTrainerSearch}
-                              />
-                              <CommandList>
-                                <CommandEmpty>Aucun formateur trouve</CommandEmpty>
-                                <CommandGroup>
-                                  {filteredTrainers.map((trainer: any) => (
-                                    <CommandItem
-                                      key={trainer.id}
-                                      value={trainer.id}
-                                      onSelect={() => {
-                                        setNewMission({ ...newMission, trainerId: trainer.id });
-                                        setTrainerOpen(false);
-                                        setTrainerSearch("");
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          newMission.trainerId === trainer.id ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      <div className="flex flex-col">
-                                        <span>{trainer.firstName} {trainer.lastName}</span>
-                                        {trainer.email && (
-                                          <span className="text-xs text-muted-foreground">{trainer.email}</span>
-                                        )}
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
-                        {newMission.trainerId && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-muted-foreground"
-                            onClick={() => setNewMission({ ...newMission, trainerId: "" })}
-                          >
-                            <X className="w-3 h-3 mr-1" />
-                            Retirer le formateur
-                          </Button>
-                        )}
+                        <Label htmlFor="trainersList">Formateur(s)</Label>
+                        <Textarea
+                          id="trainersList"
+                          placeholder="Saisir le(s) nom(s) des formateurs (un par ligne ou separes par des virgules)..."
+                          value={newMission.trainersList}
+                          onChange={(e) => setNewMission({ ...newMission, trainersList: e.target.value })}
+                          rows={3}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Liste libre des formateurs pour cette mission
+                        </p>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -671,93 +577,14 @@ export default function Missions() {
                     </div>
                     <div className="space-y-2">
                       <Label>Participants</Label>
-                      <Popover open={participantOpen} onOpenChange={setParticipantOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={participantOpen}
-                            className="w-full justify-between font-normal"
-                          >
-                            <span className="text-muted-foreground flex items-center gap-2">
-                              <Users className="w-4 h-4" />
-                              Taper pour ajouter des participants...
-                            </span>
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0" align="start">
-                          <Command shouldFilter={false}>
-                            <CommandInput
-                              placeholder="Rechercher un participant (nom, email, entreprise)..."
-                              value={participantSearch}
-                              onValueChange={setParticipantSearch}
-                            />
-                            <CommandList>
-                              <CommandEmpty>Aucun participant trouve</CommandEmpty>
-                              <CommandGroup>
-                                {filteredParticipants
-                                  .filter((p: Participant) => !newMission.participantIds.includes(p.id))
-                                  .slice(0, 10)
-                                  .map((participant: Participant) => (
-                                    <CommandItem
-                                      key={participant.id}
-                                      value={participant.id.toString()}
-                                      onSelect={() => {
-                                        setNewMission({
-                                          ...newMission,
-                                          participantIds: [...newMission.participantIds, participant.id]
-                                        });
-                                        setParticipantSearch("");
-                                      }}
-                                    >
-                                      <div className="flex flex-col flex-1">
-                                        <span className="font-medium">
-                                          {participant.firstName} {participant.lastName}
-                                        </span>
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                          {participant.email && <span>{participant.email}</span>}
-                                          {participant.company && (
-                                            <>
-                                              <span>•</span>
-                                              <span>{participant.company}</span>
-                                            </>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <Plus className="w-4 h-4 text-muted-foreground" />
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {newMission.participantIds.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {newMission.participantIds.map((id) => {
-                            const participant = participants?.find((p: Participant) => p.id === id);
-                            if (!participant) return null;
-                            return (
-                              <Badge key={id} variant="secondary" className="flex items-center gap-1 py-1">
-                                <span>{participant.firstName} {participant.lastName}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => setNewMission({
-                                    ...newMission,
-                                    participantIds: newMission.participantIds.filter(pid => pid !== id)
-                                  })}
-                                  className="ml-1 hover:text-destructive"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      )}
+                      <Textarea
+                        placeholder="Saisir la liste des participants (un par ligne ou separes par des virgules)..."
+                        value={newMission.participantsList}
+                        onChange={(e) => setNewMission({ ...newMission, participantsList: e.target.value })}
+                        rows={4}
+                      />
                       <p className="text-xs text-muted-foreground">
-                        {newMission.participantIds.length} participant(s) selectionne(s)
+                        Liste libre des participants pour cette mission
                       </p>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
@@ -771,10 +598,10 @@ export default function Missions() {
                             <SelectValue placeholder="Selectionner" />
                           </SelectTrigger>
                           <SelectContent className="bg-violet-100 border-violet-300">
-                            <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
-                            <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
-                            <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
                             <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
+                            <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                            <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                            <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -788,9 +615,9 @@ export default function Missions() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-violet-100 border-violet-300">
-                            <SelectItem value="presentiel" className="focus:bg-violet-200">Presentiel</SelectItem>
                             <SelectItem value="distanciel" className="focus:bg-violet-200">Distanciel</SelectItem>
                             <SelectItem value="hybride" className="focus:bg-violet-200">Hybride</SelectItem>
+                            <SelectItem value="presentiel" className="focus:bg-violet-200">Presentiel</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -949,11 +776,11 @@ export default function Missions() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
+                  <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
                   <SelectItem value="draft" className="focus:bg-violet-200">Brouillon</SelectItem>
                   <SelectItem value="confirmed" className="focus:bg-violet-200">Confirmee</SelectItem>
                   <SelectItem value="in_progress" className="focus:bg-violet-200">En cours</SelectItem>
                   <SelectItem value="completed" className="focus:bg-violet-200">Terminee</SelectItem>
-                  <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -965,10 +792,10 @@ export default function Missions() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Toutes typologies</SelectItem>
-                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
-                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
-                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
                   <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
+                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                  <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
+                  <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1016,13 +843,13 @@ export default function Missions() {
                     <SelectValue placeholder="Trier par" />
                   </SelectTrigger>
                   <SelectContent className="bg-violet-100 border-violet-300">
-                    <SelectItem value="date_desc" className="focus:bg-violet-200">Date (plus recentes)</SelectItem>
-                    <SelectItem value="date_asc" className="focus:bg-violet-200">Date (plus anciennes)</SelectItem>
                     <SelectItem value="client" className="focus:bg-violet-200">Client (A-Z)</SelectItem>
+                    <SelectItem value="date_asc" className="focus:bg-violet-200">Date (plus anciennes)</SelectItem>
+                    <SelectItem value="date_desc" className="focus:bg-violet-200">Date (plus recentes)</SelectItem>
                     <SelectItem value="trainer" className="focus:bg-violet-200">Formateur (A-Z)</SelectItem>
+                    <SelectItem value="status" className="focus:bg-violet-200">Statut</SelectItem>
                     <SelectItem value="title" className="focus:bg-violet-200">Titre (A-Z)</SelectItem>
                     <SelectItem value="typology" className="focus:bg-violet-200">Typologie</SelectItem>
-                    <SelectItem value="status" className="focus:bg-violet-200">Statut</SelectItem>
                   </SelectContent>
                 </Select>
 

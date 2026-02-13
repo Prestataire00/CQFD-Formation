@@ -332,9 +332,9 @@ export default function ReminderSettings() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-violet-100 border-violet-300">
+                        <SelectItem value="task_deadline" className="focus:bg-violet-200">Deadline de tache</SelectItem>
                         <SelectItem value="mission_start" className="focus:bg-violet-200">Debut de formation</SelectItem>
                         <SelectItem value="mission_end" className="focus:bg-violet-200">Fin de formation</SelectItem>
-                        <SelectItem value="task_deadline" className="focus:bg-violet-200">Deadline de tache</SelectItem>
                         <SelectItem value="admin_summary" className="focus:bg-violet-200">Resume admin</SelectItem>
                       </SelectContent>
                     </Select>

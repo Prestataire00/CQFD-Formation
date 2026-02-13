@@ -716,7 +716,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                     </SelectTrigger>
                     <SelectContent className="bg-violet-100 border-violet-300">
                       <SelectItem value="unassigned" className="focus:bg-violet-200">Non assigne</SelectItem>
-                      {assignableUsers?.map((u: any) => (
+                      {assignableUsers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((u: any) => (
                         <SelectItem key={u.id} value={u.id} className="focus:bg-violet-200">
                           {u.firstName} {u.lastName}
                         </SelectItem>
@@ -931,8 +931,6 @@ export default function MissionDetail() {
   const [isAddStepOpen, setIsAddStepOpen] = useState(false);
   const [isAddingStep, setIsAddingStep] = useState(false);
   const [isAddDocumentOpen, setIsAddDocumentOpen] = useState(false);
-  const [trainerComboOpen, setTrainerComboOpen] = useState(false);
-  const [trainerSearchTerm, setTrainerSearchTerm] = useState("");
   const [clientComboOpen, setClientComboOpen] = useState(false);
   const [clientSearchTerm, setClientSearchTerm] = useState("");
   const [newStepTitle, setNewStepTitle] = useState("");
@@ -1021,6 +1019,7 @@ export default function MissionDetail() {
         totalHours: mission.totalHours || "",
         clientId: mission.clientId?.toString() || "",
         trainerId: mission.trainerId || "",
+        trainersList: (mission as any).trainersList || "",
         programId: mission.programId?.toString() || "",
         programTitle: mission.programTitle || "",
         expectedParticipants: mission.expectedParticipants || "",
@@ -1049,6 +1048,7 @@ export default function MissionDetail() {
       totalHours: mission.totalHours || "",
       clientId: mission.clientId?.toString() || "",
       trainerId: mission.trainerId || "",
+      trainersList: (mission as any).trainersList || "",
       programId: mission.programId?.toString() || "",
       programTitle: mission.programTitle || "",
       expectedParticipants: mission.expectedParticipants || "",
@@ -1061,7 +1061,7 @@ export default function MissionDetail() {
     if (!isEditingInfo && !isEditingDescription) return false;
     if (isEditingInfo) {
       // Check info fields (all except description)
-      const infoKeys = ["title", "startDate", "endDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
+      const infoKeys = ["title", "startDate", "endDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "trainersList", "programId", "programTitle", "expectedParticipants", "participantsList"];
       for (const key of infoKeys) {
         if (String(editForm[key] ?? "") !== String(originalForm[key] ?? "")) return true;
       }
@@ -1245,6 +1245,7 @@ export default function MissionDetail() {
           totalHours: editForm.totalHours ? Number(editForm.totalHours) : undefined,
           clientId: editForm.clientId ? Number(editForm.clientId) : undefined,
           trainerId: editForm.trainerId || undefined,
+          trainersList: editForm.trainersList || undefined,
           programId: editForm.programId ? Number(editForm.programId) : undefined,
           programTitle: editForm.programTitle || undefined,
           expectedParticipants: editForm.expectedParticipants ? Number(editForm.expectedParticipants) : undefined,
@@ -2382,7 +2383,7 @@ export default function MissionDetail() {
                             c.contactEmail?.toLowerCase().includes(search) ||
                             c.city?.toLowerCase().includes(search)
                           );
-                        }).map((c: any) => (
+                        }).sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((c: any) => (
                           <CommandItem
                             key={c.id}
                             value={c.id.toString()}
@@ -2423,79 +2424,25 @@ export default function MissionDetail() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <User className="w-4 h-4" />
-              Formateur
+              Formateur(s)
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isEditingInfo ? (
-              <Popover open={trainerComboOpen} onOpenChange={setTrainerComboOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={trainerComboOpen}
-                    className="w-full justify-between font-normal"
-                  >
-                    {editForm.trainerId ? (
-                      (() => {
-                        const t = trainers?.find((t: any) => t.id === editForm.trainerId);
-                        return t ? `${t.firstName} ${t.lastName}` : "Selectionner...";
-                      })()
-                    ) : (
-                      <span className="text-muted-foreground">Taper pour rechercher...</span>
-                    )}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[300px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Rechercher un formateur..."
-                      value={trainerSearchTerm}
-                      onValueChange={setTrainerSearchTerm}
-                    />
-                    <CommandList>
-                      <CommandEmpty>Aucun formateur trouve</CommandEmpty>
-                      <CommandGroup>
-                        {trainers?.filter((t: any) => {
-                          if (!trainerSearchTerm) return true;
-                          const search = trainerSearchTerm.toLowerCase();
-                          return (
-                            `${t.firstName} ${t.lastName}`.toLowerCase().includes(search) ||
-                            t.email?.toLowerCase().includes(search)
-                          );
-                        }).map((t: any) => (
-                          <CommandItem
-                            key={t.id}
-                            value={t.id}
-                            onSelect={() => {
-                              setEditForm({ ...editForm, trainerId: t.id });
-                              setTrainerComboOpen(false);
-                              setTrainerSearchTerm("");
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                editForm.trainerId === t.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex flex-col">
-                              <span>{t.firstName} {t.lastName}</span>
-                              {t.email && (
-                                <span className="text-xs text-muted-foreground">{t.email}</span>
-                              )}
-                            </div>
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <div className="space-y-2">
+                <Textarea
+                  placeholder="Saisir le(s) nom(s) des formateurs (un par ligne ou separes par des virgules)..."
+                  value={editForm.trainersList}
+                  onChange={(e) => setEditForm({ ...editForm, trainersList: e.target.value })}
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Liste libre des formateurs pour cette mission
+                </p>
+              </div>
             ) : (
               <p className="font-medium">
-                {trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigne"}
+                {(mission as any)?.trainersList || "Non defini"}
               </p>
             )}
           </CardContent>
@@ -2572,7 +2519,6 @@ export default function MissionDetail() {
                       <CommandGroup>
                         {(allParticipants || [])
                           .filter((p: any) => {
-                            // Exclude already added participants
                             const alreadyAdded = missionParticipants?.some((mp: any) => mp.participantId === p.id);
                             if (alreadyAdded) return false;
                             if (!participantSearch) return true;
@@ -2583,6 +2529,7 @@ export default function MissionDetail() {
                               p.company?.toLowerCase().includes(search)
                             );
                           })
+                          .sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr"))
                           .slice(0, 10)
                           .map((p: any) => (
                             <CommandItem
@@ -3518,6 +3465,7 @@ export default function MissionDetail() {
                       <CommandGroup>
                         {availableTrainersForDuplication
                           .filter((t: any) => !selectedTrainerIds.includes(t.id))
+                          .sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr"))
                           .map((t: any) => (
                             <CommandItem
                               key={t.id}

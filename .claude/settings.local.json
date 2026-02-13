@@ -55,7 +55,9 @@
       "Bash(printenv:*)",
       "Bash(PGPASSWORD=password psql:*)",
       "Bash(git -C /home/runner/workspace diff --stat)",
-      "Bash(pgrep:*)"
+      "Bash(pgrep:*)",
+      "Bash(printf:*)",
+      "Bash(source:*)"
     ]
   }
 }

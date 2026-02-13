@@ -91,6 +91,21 @@ export async function ensureSchemaSync() {
       }
     }
 
+    // Sync missions table
+    const missionCols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'missions' AND table_schema = 'public'`
+    );
+    const missionColNames = missionCols.rows.map((r: any) => r.column_name);
+    const missionColumns: Record<string, string> = {
+      trainers_list: 'TEXT',
+    };
+    for (const [col, type] of Object.entries(missionColumns)) {
+      if (!missionColNames.includes(col)) {
+        await pool.query(`ALTER TABLE missions ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        console.log(`[db] Added missing column ${col} to missions`);
+      }
+    }
+
     // Sync document_templates table
     const dtCols = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'document_templates' AND table_schema = 'public'`

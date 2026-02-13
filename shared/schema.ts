@@ -115,6 +115,7 @@ export const missions = pgTable("missions", {
   totalHours: integer("total_hours"), // Nombre total d'heures de formation
   location: text("location"),
   trainerId: varchar("trainer_id").references(() => users.id),
+  trainersList: text("trainers_list"), // Liste des formateurs (texte libre)
   clientId: integer("client_id").references(() => clients.id),
   programId: integer("program_id").references(() => trainingPrograms.id),
   programTitle: text("program_title"), // Titre du programme en texte libre

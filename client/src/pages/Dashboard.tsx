@@ -157,14 +157,7 @@ export default function Dashboard() {
               icon={CheckCircle2}
               href="/missions"
             />
-            {isAdmin ? (
-              <StatCard
-                label="Participants"
-                value={stats?.totalParticipants || 0}
-                icon={Users}
-                href="/participants"
-              />
-            ) : (
+            {!isAdmin && (
               <StatCard
                 label="Note Moyenne"
                 value={stats?.averageRating ? `${stats.averageRating}/5` : "N/A"}
@@ -469,12 +462,6 @@ export default function Dashboard() {
                     <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
                       <Users className="w-5 h-5 text-primary" />
                       <span className="text-xs">Nouveau Client</span>
-                    </Button>
-                  </Link>
-                  <Link href="/participants">
-                    <Button variant="outline" className="w-full h-auto py-4 flex flex-col items-center gap-2">
-                      <Users className="w-5 h-5 text-primary" />
-                      <span className="text-xs">Participants</span>
                     </Button>
                   </Link>
                 </div>

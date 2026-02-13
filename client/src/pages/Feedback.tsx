@@ -1008,10 +1008,10 @@ export default function Feedback() {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent className="bg-violet-100 border-violet-300">
-                                    <SelectItem value="rating" className="focus:bg-violet-200">Note (1-5)</SelectItem>
-                                    <SelectItem value="text" className="focus:bg-violet-200">Texte libre</SelectItem>
-                                    <SelectItem value="yes_no" className="focus:bg-violet-200">Oui/Non</SelectItem>
                                     <SelectItem value="multiple_choice" className="focus:bg-violet-200">Choix multiple</SelectItem>
+                                    <SelectItem value="rating" className="focus:bg-violet-200">Note (1-5)</SelectItem>
+                                    <SelectItem value="yes_no" className="focus:bg-violet-200">Oui/Non</SelectItem>
+                                    <SelectItem value="text" className="focus:bg-violet-200">Texte libre</SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>

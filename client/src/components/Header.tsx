@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, Bell, Menu, FileText, CheckCheck, Clock, AlertTriangle, Briefcase } from "lucide-react";
+import { Search, Bell, Menu, FileText, CheckCheck, Clock, AlertTriangle, Briefcase, ListTodo } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -41,6 +41,43 @@ function getNotificationIcon(type: string) {
     default:
       return <FileText className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />;
   }
+}
+
+function NotificationItem({ notification, onClick }: { notification: InAppNotification; onClick: () => void }) {
+  return (
+    <div
+      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+      onClick={onClick}
+    >
+      <div className="mt-0.5">
+        {getNotificationIcon(notification.type)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium">{notification.title}</p>
+          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">Nouveau</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">{notification.message}</p>
+        {notification.metadata && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {notification.metadata.location && (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                {notification.metadata.location}
+              </span>
+            )}
+            {notification.metadata.trainerName && (
+              <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                {notification.metadata.trainerName}
+              </span>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground mt-2">
+          {notification.createdAt && format(new Date(notification.createdAt), "PPP a HH:mm", { locale: fr })}
+        </p>
+      </div>
+    </div>
+  );
 }
 
 export function Header({ title }: { title: string }) {
@@ -115,7 +152,7 @@ export function Header({ title }: { title: string }) {
                 <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-primary">
                   <Bell className="h-5 w-5" />
                   {totalUnreadCount > 0 && (
-                    <span className="absolute top-2 right-2 flex items-center justify-center min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-background px-1">
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-background px-1">
                       {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                     </span>
                   )}
@@ -150,86 +187,132 @@ export function Header({ title }: { title: string }) {
                       <p>Aucune notification</p>
                     </div>
                   ) : (
-                    <div className="divide-y">
-                      {/* In-App Notifications (reminders, alerts, etc.) */}
-                      {inAppNotifications?.map((notification: InAppNotification) => (
-                        <div
-                          key={`in-app-${notification.id}`}
-                          className="flex flex-col items-start gap-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => handleMarkInAppAsRead(notification)}
-                        >
-                          <div className="flex items-start gap-3 w-full">
-                            <div className="mt-0.5">
-                              {getNotificationIcon(notification.type)}
+                    <div>
+                      {/* Group: Admin alerts (urgent) */}
+                      {(() => {
+                        const alerts = inAppNotifications?.filter((n: InAppNotification) => n.type === 'admin_alert') || [];
+                        if (alerts.length === 0) return null;
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border-b sticky top-0">
+                              <AlertTriangle className="w-4 h-4 text-red-500" />
+                              <span className="text-xs font-semibold text-red-700 uppercase tracking-wide">Alertes urgentes</span>
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 ml-auto">{alerts.length}</Badge>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-medium">
-                                  {notification.title}
-                                </p>
-                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                                  Nouveau
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {notification.message}
-                              </p>
-                              {notification.metadata && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                  {notification.metadata.location && (
-                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                      {notification.metadata.location}
-                                    </span>
-                                  )}
-                                  {notification.metadata.trainerName && (
-                                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                                      {notification.metadata.trainerName}
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {notification.createdAt && format(new Date(notification.createdAt), "PPP à HH:mm", {
-                                  locale: fr,
-                                })}
-                              </p>
+                            <div className="divide-y">
+                              {alerts.map((notification: InAppNotification) => (
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                              ))}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })()}
 
-                      {/* Template Notifications */}
-                      {templateNotifications?.filter((n: any) => !n.isRead).map((notification: any) => (
-                        <div
-                          key={`template-${notification.id}`}
-                          className="flex flex-col items-start gap-1 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => handleMarkTemplateAsRead(notification.id)}
-                        >
-                          <div className="flex items-start gap-3 w-full">
-                            <div className="mt-0.5">
-                              <FileText className="w-4 h-4 text-primary" />
+                      {/* Group: Mission reminders */}
+                      {(() => {
+                        const reminders = inAppNotifications?.filter((n: InAppNotification) => n.type === 'reminder') || [];
+                        if (reminders.length === 0) return null;
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border-b sticky top-0">
+                              <Clock className="w-4 h-4 text-orange-500" />
+                              <span className="text-xs font-semibold text-orange-700 uppercase tracking-wide">Rappels missions</span>
+                              <Badge className="text-[10px] px-1.5 py-0 ml-auto bg-orange-500 text-white">{reminders.length}</Badge>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <p className="text-sm font-medium">
-                                  Mise à jour du template
-                                </p>
-                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">
-                                  Nouveau
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Un template de document a été mis à jour
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-2">
-                                {format(new Date(notification.createdAt), "PPP à HH:mm", {
-                                  locale: fr,
-                                })}
-                              </p>
+                            <div className="divide-y">
+                              {reminders.map((notification: InAppNotification) => (
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                              ))}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })()}
+
+                      {/* Group: Mission assignments */}
+                      {(() => {
+                        const assignments = inAppNotifications?.filter((n: InAppNotification) => n.type === 'mission_assignment') || [];
+                        if (assignments.length === 0) return null;
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b sticky top-0">
+                              <Briefcase className="w-4 h-4 text-blue-500" />
+                              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Missions assignees</span>
+                              <Badge className="text-[10px] px-1.5 py-0 ml-auto bg-blue-500 text-white">{assignments.length}</Badge>
+                            </div>
+                            <div className="divide-y">
+                              {assignments.map((notification: InAppNotification) => (
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Group: Mission updates */}
+                      {(() => {
+                        const updates = inAppNotifications?.filter((n: InAppNotification) => n.type === 'mission_update') || [];
+                        if (updates.length === 0) return null;
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border-b sticky top-0">
+                              <ListTodo className="w-4 h-4 text-green-500" />
+                              <span className="text-xs font-semibold text-green-700 uppercase tracking-wide">Mises a jour missions</span>
+                              <Badge className="text-[10px] px-1.5 py-0 ml-auto bg-green-500 text-white">{updates.length}</Badge>
+                            </div>
+                            <div className="divide-y">
+                              {updates.map((notification: InAppNotification) => (
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Group: Template updates */}
+                      {(() => {
+                        const templateUpdates = [
+                          ...(inAppNotifications?.filter((n: InAppNotification) => n.type === 'template_update') || []).map((n: InAppNotification) => ({ kind: 'inapp' as const, data: n })),
+                          ...(templateNotifications?.filter((n: any) => !n.isRead) || []).map((n: any) => ({ kind: 'template' as const, data: n })),
+                        ];
+                        if (templateUpdates.length === 0) return null;
+                        return (
+                          <div>
+                            <div className="flex items-center gap-2 px-4 py-2 bg-violet-50 border-b sticky top-0">
+                              <FileText className="w-4 h-4 text-violet-500" />
+                              <span className="text-xs font-semibold text-violet-700 uppercase tracking-wide">Documents & templates</span>
+                              <Badge className="text-[10px] px-1.5 py-0 ml-auto bg-violet-500 text-white">{templateUpdates.length}</Badge>
+                            </div>
+                            <div className="divide-y">
+                              {templateUpdates.map((item) => {
+                                if (item.kind === 'inapp') {
+                                  const notification = item.data as InAppNotification;
+                                  return <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />;
+                                }
+                                const notification = item.data;
+                                return (
+                                  <div
+                                    key={`template-${notification.id}`}
+                                    className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                                    onClick={() => handleMarkTemplateAsRead(notification.id)}
+                                  >
+                                    <FileText className="w-4 h-4 mt-0.5 text-violet-500 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <p className="text-sm font-medium">Mise a jour du template</p>
+                                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0 flex-shrink-0">Nouveau</Badge>
+                                      </div>
+                                      <p className="text-sm text-muted-foreground mt-1">Un template de document a ete mis a jour</p>
+                                      <p className="text-xs text-muted-foreground mt-2">
+                                        {format(new Date(notification.createdAt), "PPP a HH:mm", { locale: fr })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </ScrollArea>

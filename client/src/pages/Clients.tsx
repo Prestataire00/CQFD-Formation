@@ -128,9 +128,9 @@ function ClientForm({
               <SelectValue placeholder="Sélectionner un type" />
             </SelectTrigger>
             <SelectContent className="bg-violet-100 border-violet-300">
+              <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
               <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
               <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
-              <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -418,9 +418,9 @@ function ClientDetailDialog({
                     <Select value={editedClient.type || ""} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
                       <SelectTrigger><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
                       <SelectContent className="bg-violet-100 border-violet-300">
+                        <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
                         <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
                         <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
-                        <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -730,9 +730,9 @@ export default function Clients() {
                 <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les types</SelectItem>
+                  <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
                   <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
                   <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
-                  <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
                 </SelectContent>
               </Select>
             </div>
