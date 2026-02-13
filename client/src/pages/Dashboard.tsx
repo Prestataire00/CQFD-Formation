@@ -402,7 +402,7 @@ export default function Dashboard() {
                       <Badge variant="destructive" className="text-[10px] flex-shrink-0">J+{task.daysOverdue}</Badge>
                     </div>
                   ))}
-                  {priorityTasks.map((task: TaskAlertItem) => (
+                  {adminPriorityTasks.map((task: TaskAlertItem) => (
                     <div
                       key={`priority-${task.stepId}`}
                       className="flex items-center gap-3 p-2 rounded-md bg-orange-50 dark:bg-orange-950/30 cursor-pointer hover-elevate"
