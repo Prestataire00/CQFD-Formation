@@ -13,12 +13,10 @@ import Missions from "@/pages/Missions";
 import MissionDetail from "@/pages/MissionDetail";
 import Clients from "@/pages/Clients";
 import Participants from "@/pages/Participants";
-import Feedback from "@/pages/Feedback";
 import QuestionnaireResponse from "@/pages/QuestionnaireResponse";
 import Users from "@/pages/Users";
 import DocumentTemplates from "@/pages/DocumentTemplates";
 import Calendar from "@/pages/Calendar";
-import TrainerSpace from "@/pages/TrainerSpace";
 import Settings from "@/pages/Settings";
 import MyNotes from "@/pages/MyNotes";
 import Exports from "@/pages/exports";
@@ -115,11 +113,8 @@ function Router() {
       <Route path="/clients">
         <ProtectedRoute component={Clients} />
       </Route>
-      <Route path="/participants">
+      <Route path="/equipe">
         <ProtectedRoute component={Participants} />
-      </Route>
-      <Route path="/feedback">
-        <ProtectedRoute component={Feedback} adminOnly />
       </Route>
       {/* Admin only routes */}
       <Route path="/users">
@@ -130,11 +125,6 @@ function Router() {
       </Route>
       <Route path="/calendar">
         <ProtectedRoute component={Calendar} adminOnly />
-      </Route>
-
-      {/* Trainer/Prestataire only routes */}
-      <Route path="/my-space">
-        <ProtectedRoute component={TrainerSpace} trainerOnly />
       </Route>
 
       {/* Personal notes - accessible to all authenticated users */}

@@ -158,7 +158,7 @@ const STEPS = [
 // Status badge helper
 function getStatusBadge(status: MissionStatus) {
   const styles: Record<MissionStatus, { label: string; className: string }> = {
-    draft: { label: "Brouillon", className: "bg-slate-100 text-slate-700" },
+    draft: { label: "En option", className: "bg-slate-100 text-slate-700" },
     confirmed: { label: "Confirmee", className: "bg-blue-100 text-blue-700" },
     in_progress: { label: "En cours", className: "bg-amber-100 text-amber-700" },
     completed: { label: "Terminee", className: "bg-green-100 text-green-700" },
@@ -1019,7 +1019,6 @@ export default function MissionDetail() {
         totalHours: mission.totalHours || "",
         clientId: mission.clientId?.toString() || "",
         trainerId: mission.trainerId || "",
-        trainersList: (mission as any).trainersList || "",
         programId: mission.programId?.toString() || "",
         programTitle: mission.programTitle || "",
         expectedParticipants: mission.expectedParticipants || "",
@@ -1048,7 +1047,6 @@ export default function MissionDetail() {
       totalHours: mission.totalHours || "",
       clientId: mission.clientId?.toString() || "",
       trainerId: mission.trainerId || "",
-      trainersList: (mission as any).trainersList || "",
       programId: mission.programId?.toString() || "",
       programTitle: mission.programTitle || "",
       expectedParticipants: mission.expectedParticipants || "",
@@ -1061,7 +1059,7 @@ export default function MissionDetail() {
     if (!isEditingInfo && !isEditingDescription) return false;
     if (isEditingInfo) {
       // Check info fields (all except description)
-      const infoKeys = ["title", "startDate", "endDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "trainersList", "programId", "programTitle", "expectedParticipants", "participantsList"];
+      const infoKeys = ["title", "startDate", "endDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
       for (const key of infoKeys) {
         if (String(editForm[key] ?? "") !== String(originalForm[key] ?? "")) return true;
       }
@@ -1245,7 +1243,6 @@ export default function MissionDetail() {
           totalHours: editForm.totalHours ? Number(editForm.totalHours) : undefined,
           clientId: editForm.clientId ? Number(editForm.clientId) : undefined,
           trainerId: editForm.trainerId || undefined,
-          trainersList: editForm.trainersList || undefined,
           programId: editForm.programId ? Number(editForm.programId) : undefined,
           programTitle: editForm.programTitle || undefined,
           expectedParticipants: editForm.expectedParticipants ? Number(editForm.expectedParticipants) : undefined,
@@ -1276,8 +1273,7 @@ export default function MissionDetail() {
         else if (typology === "Conférence" && trainerRole === "formateur") taskList = CONFERENCE_SALARIE_TASKS;
 
         if (taskList) {
-          const adminUser = allUsers?.find((u: any) => u.role === "admin");
-          const adminId = adminUser?.id || null;
+          const adminId = user?.id || null;
           const formateurId = editForm.trainerId || null;
           const endDateRef = newEndDate ? new Date(newEndDate) : null;
 
@@ -1482,8 +1478,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllIntraPrestaTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1522,8 +1517,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllInterPrestaTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1562,8 +1556,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllIntraSalarieTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1602,8 +1595,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllInterSalarieTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1642,8 +1634,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllConseilPrestaTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1682,8 +1673,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllConseilSalarieTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1722,8 +1712,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllConferencePrestaTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -1762,8 +1751,7 @@ export default function MissionDetail() {
   };
 
   const handleAddAllConferenceSalarieTasks = async () => {
-    const adminUser = allUsers?.find((u: any) => u.role === "admin");
-    const adminId = adminUser?.id || null;
+    const adminId = user?.id || null;
     const formateurId = mission?.trainerId || null;
 
     try {
@@ -2424,25 +2412,32 @@ export default function MissionDetail() {
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <User className="w-4 h-4" />
-              Formateur(s)
+              Formateur
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isEditingInfo ? (
-              <div className="space-y-2">
-                <Textarea
-                  placeholder="Saisir le(s) nom(s) des formateurs (un par ligne ou separes par des virgules)..."
-                  value={editForm.trainersList}
-                  onChange={(e) => setEditForm({ ...editForm, trainersList: e.target.value })}
-                  rows={3}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Liste libre des formateurs pour cette mission
-                </p>
-              </div>
+              <Select
+                value={editForm.trainerId || "_none_"}
+                onValueChange={(value) => setEditForm({ ...editForm, trainerId: value === "_none_" ? "" : value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selectionner un formateur" />
+                </SelectTrigger>
+                <SelectContent className="bg-violet-100 border-violet-300">
+                  <SelectItem value="_none_" className="focus:bg-violet-200">Aucun formateur</SelectItem>
+                  {trainers?.slice().sort((a: any, b: any) =>
+                    `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")
+                  ).map((t: any) => (
+                    <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">
+                      {t.firstName} {t.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
               <p className="font-medium">
-                {(mission as any)?.trainersList || "Non defini"}
+                {trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigne"}
               </p>
             )}
           </CardContent>
@@ -2473,216 +2468,45 @@ export default function MissionDetail() {
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4" />
               Participants
-              {missionParticipants && missionParticipants.length > 0 && (
-                <Badge variant="secondary" className="ml-2">{missionParticipants.length} inscrit(s)</Badge>
-              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {isEditingInfo && (
-              <div>
-                <Label>Nombre de participants prevus</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  value={editForm.expectedParticipants}
-                  onChange={(e) => setEditForm({ ...editForm, expectedParticipants: e.target.value })}
-                  placeholder="Ex: 12"
-                />
-              </div>
-            )}
-            {!isEditingInfo && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground font-medium">Nombre prevu :</span>
-                <span className="font-medium">{mission.expectedParticipants ?? "Non defini"}</span>
-              </div>
-            )}
-
-            {/* Add existing participant */}
-            <div className="space-y-2">
-              <Popover open={participantSearchOpen} onOpenChange={setParticipantSearchOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                    <UserPlus className="w-4 h-4" />
-                    Ajouter un participant existant
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
-                  <Command shouldFilter={false}>
-                    <CommandInput
-                      placeholder="Rechercher par nom, email..."
-                      value={participantSearch}
-                      onValueChange={setParticipantSearch}
-                    />
-                    <CommandList>
-                      <CommandEmpty>Aucun participant trouve</CommandEmpty>
-                      <CommandGroup>
-                        {(allParticipants || [])
-                          .filter((p: any) => {
-                            const alreadyAdded = missionParticipants?.some((mp: any) => mp.participantId === p.id);
-                            if (alreadyAdded) return false;
-                            if (!participantSearch) return true;
-                            const search = participantSearch.toLowerCase();
-                            return (
-                              `${p.firstName} ${p.lastName}`.toLowerCase().includes(search) ||
-                              p.email?.toLowerCase().includes(search) ||
-                              p.company?.toLowerCase().includes(search)
-                            );
-                          })
-                          .sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr"))
-                          .slice(0, 10)
-                          .map((p: any) => (
-                            <CommandItem
-                              key={p.id}
-                              value={p.id.toString()}
-                              onSelect={async () => {
-                                try {
-                                  await addParticipantToMission.mutateAsync({ missionId, participantId: p.id });
-                                  toast({ title: `${p.firstName} ${p.lastName} ajoute` });
-                                  setParticipantSearchOpen(false);
-                                  setParticipantSearch("");
-                                } catch {
-                                  toast({ title: "Erreur", variant: "destructive" });
-                                }
-                              }}
-                            >
-                              <div className="flex flex-col flex-1">
-                                <span className="font-medium">{p.firstName} {p.lastName}</span>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                  {p.email && <span>{p.email}</span>}
-                                  {p.address && <><span>·</span><span>{p.address}</span></>}
-                                </div>
-                              </div>
-                              <Plus className="w-4 h-4 text-muted-foreground" />
-                            </CommandItem>
-                          ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-
-              {/* Create new participant inline */}
-              {!showNewParticipantForm ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start gap-2 text-muted-foreground"
-                  onClick={() => setShowNewParticipantForm(true)}
-                >
-                  <Plus className="w-4 h-4" />
-                  Creer un nouveau participant
-                </Button>
-              ) : (
-                <div className="border rounded-lg p-3 space-y-3 bg-muted/20">
-                  <p className="text-sm font-medium">Nouveau participant</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="Prenom *"
-                      value={newParticipant.firstName}
-                      onChange={(e) => setNewParticipant({ ...newParticipant, firstName: e.target.value })}
-                    />
-                    <Input
-                      placeholder="Nom *"
-                      value={newParticipant.lastName}
-                      onChange={(e) => setNewParticipant({ ...newParticipant, lastName: e.target.value })}
-                    />
-                  </div>
+            {isEditingInfo ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Nombre de participants prevus</Label>
                   <Input
-                    placeholder="Email *"
-                    type="email"
-                    value={newParticipant.email}
-                    onChange={(e) => setNewParticipant({ ...newParticipant, email: e.target.value })}
+                    type="number"
+                    min="0"
+                    value={editForm.expectedParticipants}
+                    onChange={(e) => setEditForm({ ...editForm, expectedParticipants: e.target.value })}
+                    placeholder="Ex: 12"
                   />
-                  <Input
-                    placeholder="Adresse"
-                    value={newParticipant.address}
-                    onChange={(e) => setNewParticipant({ ...newParticipant, address: e.target.value })}
+                </div>
+                <div className="space-y-2">
+                  <Label>Liste des participants</Label>
+                  <Textarea
+                    placeholder="Saisir la liste des participants (un par ligne ou separes par des virgules)..."
+                    value={editForm.participantsList}
+                    onChange={(e) => setEditForm({ ...editForm, participantsList: e.target.value })}
+                    rows={5}
                   />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      disabled={!newParticipant.firstName || !newParticipant.lastName || !newParticipant.email}
-                      onClick={async () => {
-                        try {
-                          const created: any = await createParticipant.mutateAsync({
-                            firstName: newParticipant.firstName,
-                            lastName: newParticipant.lastName,
-                            email: newParticipant.email,
-                            address: newParticipant.address || undefined,
-                          } as any);
-                          await addParticipantToMission.mutateAsync({ missionId, participantId: created.id });
-                          toast({ title: `${newParticipant.firstName} ${newParticipant.lastName} cree et ajoute` });
-                          setNewParticipant({ firstName: "", lastName: "", email: "", address: "" });
-                          setShowNewParticipantForm(false);
-                        } catch {
-                          toast({ title: "Erreur", variant: "destructive" });
-                        }
-                      }}
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      Creer et ajouter
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setShowNewParticipantForm(false);
-                        setNewParticipant({ firstName: "", lastName: "", email: "", address: "" });
-                      }}
-                    >
-                      Annuler
-                    </Button>
-                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Liste libre des participants pour cette mission
+                  </p>
                 </div>
-              )}
-            </div>
-
-            {/* List of participants */}
-            {missionParticipants && missionParticipants.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground font-medium">Participants rattaches :</p>
-                <div className="space-y-1">
-                  {missionParticipants.map((mp: any) => (
-                    <div key={mp.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 border text-sm">
-                      <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium">
-                          {mp.participant?.firstName} {mp.participant?.lastName}
-                        </span>
-                        {mp.participant?.email && (
-                          <span className="text-muted-foreground ml-2">- {mp.participant.email}</span>
-                        )}
-                        {mp.participant?.address && (
-                          <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                            <MapPin className="w-3 h-3" />
-                            {mp.participant.address}
-                          </div>
-                        )}
-                      </div>
-                      <Badge variant="outline" className="text-xs capitalize flex-shrink-0">
-                        {mp.status || "inscrit"}
-                      </Badge>
-                      <button
-                        onClick={async () => {
-                          try {
-                            await removeParticipantFromMission.mutateAsync({ missionId, participantId: mp.participantId });
-                            toast({ title: "Participant retire" });
-                          } catch {
-                            toast({ title: "Erreur", variant: "destructive" });
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-destructive flex-shrink-0"
-                        title="Retirer de la mission"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground">Aucun participant rattache a cette mission</p>
+              <>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground font-medium">Nombre prevu :</span>
+                  <span className="font-medium">{mission.expectedParticipants ?? "Non defini"}</span>
+                </div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground font-medium">Liste :</span>
+                  <p className="font-medium whitespace-pre-line mt-1">{mission.participantsList || "Non defini"}</p>
+                </div>
+              </>
             )}
 
             {mission.hasDisability && (
@@ -2913,8 +2737,7 @@ export default function MissionDetail() {
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-1">
                       {taskList.map((task, idx) => {
-                        const adminUser = allUsers?.find((u: any) => u.role === "admin");
-                        const assigneeId = task.assigneeType === "admin" ? (adminUser?.id || null) : (mission?.trainerId || null);
+                        const assigneeId = task.assigneeType === "admin" ? (user?.id || null) : (mission?.trainerId || null);
                         const deadlineLabel = task.priorityDaysBefore >= 0
                           ? `J-${task.priorityDaysBefore}`
                           : `J+${Math.abs(task.priorityDaysBefore)}`;
@@ -3299,7 +3122,7 @@ export default function MissionDetail() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => handleStatusChange("draft")}>
-                    Brouillon
+                    En option
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleStatusChange("confirmed")}>
                     Confirmee

@@ -79,7 +79,7 @@ import {
 
 function getStatusBadge(status: MissionStatus) {
   const styles: Record<MissionStatus, { label: string; className: string }> = {
-    draft: { label: "Brouillon", className: "bg-slate-100 text-slate-600 border border-slate-300" },
+    draft: { label: "En option", className: "bg-slate-100 text-slate-600 border border-slate-300" },
     confirmed: { label: "Confirmée", className: "bg-blue-100 text-blue-700 border border-blue-300" },
     in_progress: { label: "En cours", className: "bg-orange-100 text-orange-700 border border-orange-300" },
     completed: { label: "Terminée", className: "bg-green-100 text-green-700 border border-green-300" },
@@ -143,7 +143,6 @@ export default function Missions() {
     title: string;
     clientIds: string[];
     trainerId: string;
-    trainersList: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
     endDate: string;
     locationType: LocationType;
@@ -160,7 +159,6 @@ export default function Missions() {
     title: "",
     clientIds: [],
     trainerId: "",
-    trainersList: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
     endDate: "",
     locationType: "presentiel" as LocationType,
@@ -263,8 +261,7 @@ export default function Missions() {
       const missionData = {
         title: newMission.title,
         clientId: parseInt(newMission.clientIds[0]),
-        trainerId: null,
-        trainersList: newMission.trainersList || null,
+        trainerId: newMission.trainerId || null,
         startDate: globalStartDate,
         endDate: newMission.endDate || null,
         locationType: newMission.locationType,
@@ -318,7 +315,6 @@ export default function Missions() {
         title: "",
         clientIds: [],
         trainerId: "",
-        trainersList: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
         endDate: "",
         locationType: "presentiel",
@@ -510,17 +506,25 @@ export default function Missions() {
                         )}
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="trainersList">Formateur(s)</Label>
-                        <Textarea
-                          id="trainersList"
-                          placeholder="Saisir le(s) nom(s) des formateurs (un par ligne ou separes par des virgules)..."
-                          value={newMission.trainersList}
-                          onChange={(e) => setNewMission({ ...newMission, trainersList: e.target.value })}
-                          rows={3}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Liste libre des formateurs pour cette mission
-                        </p>
+                        <Label htmlFor="trainer">Formateur</Label>
+                        <Select
+                          value={newMission.trainerId || "_none_"}
+                          onValueChange={(value) => setNewMission({ ...newMission, trainerId: value === "_none_" ? "" : value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selectionner un formateur" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-violet-100 border-violet-300">
+                            <SelectItem value="_none_" className="focus:bg-violet-200">Aucun formateur</SelectItem>
+                            {trainers?.slice().sort((a: any, b: any) =>
+                              `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")
+                            ).map((trainer: any) => (
+                              <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
+                                {trainer.firstName} {trainer.lastName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -777,7 +781,7 @@ export default function Missions() {
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
                   <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
-                  <SelectItem value="draft" className="focus:bg-violet-200">Brouillon</SelectItem>
+                  <SelectItem value="draft" className="focus:bg-violet-200">En option</SelectItem>
                   <SelectItem value="confirmed" className="focus:bg-violet-200">Confirmee</SelectItem>
                   <SelectItem value="in_progress" className="focus:bg-violet-200">En cours</SelectItem>
                   <SelectItem value="completed" className="focus:bg-violet-200">Terminee</SelectItem>

@@ -1,18 +1,17 @@
 import { Link, useLocation } from "wouter";
+import cqfdLogo from "@assets/logo_CQFD+Puzzle_1770974961922.jpg";
 import {
   LayoutDashboard,
   Briefcase,
   Building2,
   GraduationCap,
   Users,
-  MessageSquareText,
   UserCog,
   FileText,
   FileSpreadsheet,
   Settings,
   LogOut,
   Calendar,
-  UserCircle,
   StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,12 +48,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin"],
   },
   {
-    icon: UserCircle,
-    label: "Mon Espace",
-    href: "/my-space",
-    roles: ["formateur", "prestataire"],
-  },
-  {
     icon: StickyNote,
     label: "Mes notes",
     href: "/my-notes",
@@ -68,14 +61,8 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     icon: Users,
-    label: "Participants",
-    href: "/participants",
-    roles: ["admin"],
-  },
-  {
-    icon: MessageSquareText,
-    label: "Feedback",
-    href: "/feedback",
+    label: "Equipe",
+    href: "/equipe",
     roles: ["admin"],
   },
   {
@@ -86,7 +73,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     icon: FileText,
-    label: "Templates",
+    label: "Documents",
     href: "/document-templates",
     roles: ["admin"],
   },
@@ -147,24 +134,8 @@ export function Sidebar() {
       {/* Logo */}
       <div className="h-20 flex items-center px-6 border-b border-slate-700">
         <div className="flex items-center gap-3">
-          {/* CQFD Formation Logo - 4 Petal Flower with CQFD in center */}
-          <div className="relative w-12 h-12 flex-shrink-0">
-            <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-sm">
-              {/* Top Left Petal - Dark Blue */}
-              <rect x="8" y="8" width="38" height="38" rx="10" fill="#0055a4" transform="rotate(-8 27 27)" />
-              {/* Top Right Petal - Cyan */}
-              <rect x="54" y="8" width="38" height="38" rx="10" fill="#22d3ee" transform="rotate(8 73 27)" />
-              {/* Bottom Left Petal - Green */}
-              <rect x="8" y="54" width="38" height="38" rx="10" fill="#10b981" transform="rotate(8 27 73)" />
-              {/* Bottom Right Petal - Teal */}
-              <rect x="54" y="54" width="38" height="38" rx="10" fill="#14b8a6" transform="rotate(-8 73 73)" />
-              {/* Center Text "CQFD" in white */}
-              <text x="50" y="52" fontFamily="Arial" fontSize="15" fontWeight="900" fill="white" textAnchor="middle" dominantBaseline="middle">CQFD</text>
-            </svg>
-          </div>
-          
+          <img src={cqfdLogo} alt="CQFD Formation" className="w-14 h-14 object-contain flex-shrink-0" />
           <div className="flex flex-col leading-tight">
-            <span className="text-2xl font-extrabold tracking-tight text-white">CQFD</span>
             <span className="text-[11px] font-semibold tracking-[0.15em] text-cyan-400 uppercase">Formation</span>
           </div>
         </div>

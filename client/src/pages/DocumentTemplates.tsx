@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -46,8 +46,10 @@ import {
   History,
   Upload,
   Download,
+  Eye,
   CheckCircle,
   XCircle,
+  X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -86,6 +88,67 @@ export default function DocumentTemplates() {
   const [showVersionDialog, setShowVersionDialog] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<"pdf" | "docx" | "image" | "unsupported">("unsupported");
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const docxContainerRef = useRef<HTMLDivElement>(null);
+
+  const openPreview = useCallback(async (url: string, title: string) => {
+    setPreviewTitle(title);
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewBlobUrl(null);
+
+    const ext = url.split('.').pop()?.toLowerCase() || "";
+
+    try {
+      const response = await fetch(url, { credentials: "include" });
+      if (!response.ok) throw new Error("Erreur de téléchargement");
+      const blob = await response.blob();
+
+      if (ext === "pdf") {
+        setPreviewType("pdf");
+        const blobUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(blobUrl);
+      } else if (ext === "docx") {
+        setPreviewType("docx");
+        // Render after dialog is visible
+        setTimeout(async () => {
+          if (docxContainerRef.current) {
+            docxContainerRef.current.innerHTML = "";
+            const { renderAsync } = await import("docx-preview");
+            await renderAsync(blob, docxContainerRef.current, undefined, {
+              className: "docx-preview-wrapper",
+              inWrapper: true,
+              ignoreWidth: false,
+              ignoreHeight: false,
+            });
+          }
+        }, 100);
+      } else if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) {
+        setPreviewType("image");
+        const blobUrl = URL.createObjectURL(blob);
+        setPreviewBlobUrl(blobUrl);
+      } else {
+        setPreviewType("unsupported");
+      }
+    } catch (error) {
+      console.error("Preview error:", error);
+      setPreviewType("unsupported");
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
+
+  const closePreview = useCallback(() => {
+    if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl);
+    setPreviewOpen(false);
+    setPreviewBlobUrl(null);
+    setPreviewTitle("");
+    setPreviewType("unsupported");
+  }, [previewBlobUrl]);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -150,14 +213,14 @@ export default function DocumentTemplates() {
       await createTemplate.mutateAsync(data);
       toast({
         title: "Succès",
-        description: "Template créé avec succès",
+        description: "Document cree avec succes",
       });
       setShowCreateDialog(false);
       resetForm();
     } catch (error) {
       toast({
         title: "Erreur",
-        description: "Erreur lors de la création du template",
+        description: "Erreur lors de la creation du document",
         variant: "destructive",
       });
     }
@@ -183,7 +246,7 @@ export default function DocumentTemplates() {
       await updateTemplate.mutateAsync({ id: selectedTemplate.id, data });
       toast({
         title: "Succès",
-        description: "Template mis à jour avec succès",
+        description: "Document mis a jour avec succes",
       });
       setShowEditDialog(false);
       setSelectedTemplate(null);
@@ -191,25 +254,25 @@ export default function DocumentTemplates() {
     } catch (error) {
       toast({
         title: "Erreur",
-        description: "Erreur lors de la mise à jour du template",
+        description: "Erreur lors de la mise a jour du document",
         variant: "destructive",
       });
     }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce template ?")) return;
+    if (!confirm("Etes-vous sur de vouloir supprimer ce document ?")) return;
 
     try {
       await deleteTemplate.mutateAsync(id);
       toast({
         title: "Succès",
-        description: "Template supprimé avec succès",
+        description: "Document supprime avec succes",
       });
     } catch (error) {
       toast({
         title: "Erreur",
-        description: "Erreur lors de la suppression du template",
+        description: "Erreur lors de la suppression du document",
         variant: "destructive",
       });
     }
@@ -246,7 +309,7 @@ export default function DocumentTemplates() {
       await updateTemplate.mutateAsync({ id: template.id, data });
       toast({
         title: "Succès",
-        description: `Template ${template.isActive ? "désactivé" : "activé"}`,
+        description: `Document ${template.isActive ? "desactive" : "active"}`,
       });
     } catch (error) {
       toast({
@@ -261,19 +324,19 @@ export default function DocumentTemplates() {
     <div className="min-h-screen bg-background flex">
       <Sidebar />
       <main className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        <Header title="Templates de documents" />
+        <Header title="Documents" />
 
         <div className="flex-1 p-8 space-y-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold">Templates de documents</h1>
+              <h1 className="text-3xl font-bold">Documents</h1>
               <p className="text-muted-foreground mt-1">
-                Gérez les templates de documents pour les formateurs et prestataires
+                Gérez les documents pour les formateurs et prestataires
               </p>
             </div>
             <Button onClick={() => setShowCreateDialog(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              Nouveau template
+              Nouveau document
             </Button>
           </div>
 
@@ -359,13 +422,24 @@ export default function DocumentTemplates() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           {template.url && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => window.open(template.url, "_blank")}
-                            >
-                              <Download className="w-4 h-4" />
-                            </Button>
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Visualiser"
+                                onClick={() => openPreview(template.url, template.title)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                title="Telecharger"
+                                onClick={() => window.open(template.url, "_blank")}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </>
                           )}
                           <Button
                             variant="ghost"
@@ -401,15 +475,15 @@ export default function DocumentTemplates() {
 
       {/* Create Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Créer un nouveau template</DialogTitle>
+            <DialogTitle>Nouveau document</DialogTitle>
             <DialogDescription>
-              Créez un template de document pour les formateurs ou prestataires
+              Ajoutez un document pour les formateurs ou prestataires
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
             <div className="space-y-2">
               <Label htmlFor="title">Titre *</Label>
               <Input
@@ -520,7 +594,7 @@ export default function DocumentTemplates() {
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Description du template"
+                placeholder="Description du document"
               />
             </div>
 
@@ -547,15 +621,15 @@ export default function DocumentTemplates() {
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Modifier le template</DialogTitle>
+            <DialogTitle>Modifier le document</DialogTitle>
             <DialogDescription>
-              Modifiez les informations du template. Si vous modifiez le fichier, une nouvelle version sera créée.
+              Modifiez les informations du document. Si vous modifiez le fichier, une nouvelle version sera creee.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="flex-1 overflow-y-auto space-y-4 py-4 pr-2">
             <div className="space-y-2">
               <Label htmlFor="edit-title">Titre</Label>
               <Input
@@ -714,6 +788,77 @@ export default function DocumentTemplates() {
           onOpenChange={setShowVersionDialog}
         />
       )}
+
+      {/* Document Preview Dialog - Landscape */}
+      <Dialog open={previewOpen} onOpenChange={(open) => { if (!open) closePreview(); }}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] p-0 overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-3 border-b bg-muted/30">
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-primary" />
+              <h3 className="font-semibold text-lg">{previewTitle}</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const tpl = templates?.find(t => t.title === previewTitle);
+                  if (tpl?.url) window.open(tpl.url, "_blank");
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Telecharger
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closePreview}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto" style={{ height: "calc(90vh - 60px)" }}>
+            {previewLoading && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-3">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground">Chargement du document...</p>
+                </div>
+              </div>
+            )}
+            {!previewLoading && previewType === "pdf" && previewBlobUrl && (
+              <iframe
+                src={previewBlobUrl}
+                className="w-full h-full border-0"
+                title={previewTitle}
+                style={{ minHeight: "100%" }}
+              />
+            )}
+            {!previewLoading && previewType === "docx" && (
+              <div
+                ref={docxContainerRef}
+                className="w-full h-full overflow-auto bg-white p-4"
+                style={{ minHeight: "100%" }}
+              />
+            )}
+            {!previewLoading && previewType === "image" && previewBlobUrl && (
+              <div className="flex items-center justify-center h-full bg-gray-50 p-4">
+                <img src={previewBlobUrl} alt={previewTitle} className="max-w-full max-h-full object-contain" />
+              </div>
+            )}
+            {!previewLoading && previewType === "unsupported" && (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4">
+                  <FileText className="w-16 h-16 text-muted-foreground mx-auto" />
+                  <p className="text-lg font-medium">Apercu non disponible pour ce format</p>
+                  <p className="text-muted-foreground">Téléchargez le fichier pour le consulter</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -735,7 +880,7 @@ function VersionHistoryDialog({
         <DialogHeader>
           <DialogTitle>Historique des versions</DialogTitle>
           <DialogDescription>
-            Consultez l'historique des versions de ce template
+            Consultez l'historique des versions de ce document
           </DialogDescription>
         </DialogHeader>
 

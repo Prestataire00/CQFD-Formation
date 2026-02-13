@@ -175,87 +175,93 @@ function ClientForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Adresse</Label>
-        <Input
-          value={client.address}
-          onChange={(e) => onChange({ ...client, address: e.target.value })}
-          placeholder="12 rue des Fleurs"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Adresse client</p>
         <div className="space-y-2">
-          <Label>Code Postal</Label>
+          <Label>Adresse</Label>
           <Input
-            value={client.postalCode}
-            onChange={(e) => onChange({ ...client, postalCode: e.target.value })}
-            placeholder="75001"
+            value={client.address}
+            onChange={(e) => onChange({ ...client, address: e.target.value })}
+            placeholder="12 rue des Fleurs"
           />
         </div>
-        <div className="space-y-2">
-          <Label>Ville</Label>
-          <Input
-            value={client.city}
-            onChange={(e) => onChange({ ...client, city: e.target.value })}
-            placeholder="Paris"
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Adresse de facturation</Label>
-        <Input
-          value={client.billingAddress}
-          onChange={(e) => onChange({ ...client, billingAddress: e.target.value })}
-          placeholder="Adresse de facturation (si différente)"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Code Postal (facturation)</Label>
-          <Input
-            value={client.billingPostalCode}
-            onChange={(e) => onChange({ ...client, billingPostalCode: e.target.value })}
-            placeholder="75001"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label>Ville (facturation)</Label>
-          <Input
-            value={client.billingCity}
-            onChange={(e) => onChange({ ...client, billingCity: e.target.value })}
-            placeholder="Paris"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Code Postal</Label>
+            <Input
+              value={client.postalCode}
+              onChange={(e) => onChange({ ...client, postalCode: e.target.value })}
+              placeholder="75001"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Ville</Label>
+            <Input
+              value={client.city}
+              onChange={(e) => onChange({ ...client, city: e.target.value })}
+              placeholder="Paris"
+            />
+          </div>
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Adresse de formation</Label>
-        <Input
-          value={client.trainingAddress}
-          onChange={(e) => onChange({ ...client, trainingAddress: e.target.value })}
-          placeholder="Adresse du lieu de formation (si différente)"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="border rounded-lg p-4 space-y-3 bg-blue-50/50">
+        <p className="text-sm font-semibold text-blue-700 uppercase tracking-wide">Lieu de formation</p>
         <div className="space-y-2">
-          <Label>Code Postal (formation)</Label>
+          <Label>Adresse</Label>
           <Input
-            value={client.trainingPostalCode}
-            onChange={(e) => onChange({ ...client, trainingPostalCode: e.target.value })}
-            placeholder="75001"
+            value={client.trainingAddress}
+            onChange={(e) => onChange({ ...client, trainingAddress: e.target.value })}
+            placeholder="Adresse du lieu de formation"
           />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Code Postal</Label>
+            <Input
+              value={client.trainingPostalCode}
+              onChange={(e) => onChange({ ...client, trainingPostalCode: e.target.value })}
+              placeholder="75001"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Ville</Label>
+            <Input
+              value={client.trainingCity}
+              onChange={(e) => onChange({ ...client, trainingCity: e.target.value })}
+              placeholder="Paris"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="border rounded-lg p-4 space-y-3 bg-amber-50/50">
+        <p className="text-sm font-semibold text-amber-700 uppercase tracking-wide">Lieu de facturation</p>
         <div className="space-y-2">
-          <Label>Ville (formation)</Label>
+          <Label>Adresse</Label>
           <Input
-            value={client.trainingCity}
-            onChange={(e) => onChange({ ...client, trainingCity: e.target.value })}
-            placeholder="Paris"
+            value={client.billingAddress}
+            onChange={(e) => onChange({ ...client, billingAddress: e.target.value })}
+            placeholder="Adresse de facturation"
           />
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Code Postal</Label>
+            <Input
+              value={client.billingPostalCode}
+              onChange={(e) => onChange({ ...client, billingPostalCode: e.target.value })}
+              placeholder="75001"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Ville</Label>
+            <Input
+              value={client.billingCity}
+              onChange={(e) => onChange({ ...client, billingCity: e.target.value })}
+              placeholder="Paris"
+            />
+          </div>
         </div>
       </div>
 
@@ -464,37 +470,32 @@ function ClientDetailDialog({
                     <div className="text-muted-foreground">{client.contactPhone || "-"}</div>
                   </div>
                 </div>
-                <div className="flex items-start gap-3 border-t pt-3">
-                  <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
-                  <div>
-                    <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse du client</div>
-                    {client.address || "-"}
-                    <br />
-                    {client.postalCode} {client.city}
+                <div className="border-t pt-3 space-y-3">
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                    <MapPin className="w-4 h-4 text-muted-foreground mt-1 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide">Adresse client</div>
+                      <div>{client.address || "-"}</div>
+                      <div className="text-muted-foreground">{client.postalCode} {client.city}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50">
+                    <MapPin className="w-4 h-4 text-blue-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-blue-700 mb-1 uppercase tracking-wide">Lieu de formation</div>
+                      <div>{(client as any).trainingAddress || "-"}</div>
+                      <div className="text-muted-foreground">{(client as any).trainingPostalCode} {(client as any).trainingCity}</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-50">
+                    <MapPin className="w-4 h-4 text-amber-600 mt-1 flex-shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-amber-700 mb-1 uppercase tracking-wide">Lieu de facturation</div>
+                      <div>{(client as any).billingAddress || "-"}</div>
+                      <div className="text-muted-foreground">{(client as any).billingPostalCode} {(client as any).billingCity}</div>
+                    </div>
                   </div>
                 </div>
-                {((client as any).billingAddress || (client as any).billingCity) && (
-                  <div className="flex items-start gap-3 border-t pt-3">
-                    <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
-                    <div>
-                      <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse de facturation</div>
-                      {(client as any).billingAddress || "-"}
-                      <br />
-                      {(client as any).billingPostalCode} {(client as any).billingCity}
-                    </div>
-                  </div>
-                )}
-                {((client as any).trainingAddress || (client as any).trainingCity) && (
-                  <div className="flex items-start gap-3 border-t pt-3">
-                    <MapPin className="w-4 h-4 text-muted-foreground mt-1" />
-                    <div>
-                      <div className="text-xs font-semibold text-muted-foreground mb-1">Adresse de formation</div>
-                      {(client as any).trainingAddress || "-"}
-                      <br />
-                      {(client as any).trainingPostalCode} {(client as any).trainingCity}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 

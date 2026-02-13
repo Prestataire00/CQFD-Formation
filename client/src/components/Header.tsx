@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { Search, Bell, Menu, FileText, CheckCheck, Clock, AlertTriangle, Briefcase, ListTodo } from "lucide-react";
+import { Search, Bell, Menu, FileText, CheckCheck, Clock, AlertTriangle, Briefcase, ListTodo, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -43,12 +43,16 @@ function getNotificationIcon(type: string) {
   }
 }
 
-function NotificationItem({ notification, onClick }: { notification: InAppNotification; onClick: () => void }) {
+function NotificationItem({ notification, onMarkRead }: { notification: InAppNotification; onMarkRead: () => void }) {
   return (
-    <div
-      className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-      onClick={onClick}
-    >
+    <div className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors">
+      <button
+        onClick={(e) => { e.stopPropagation(); onMarkRead(); }}
+        className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 border-muted-foreground/40 hover:border-primary hover:bg-primary/10 flex items-center justify-center transition-colors"
+        title="Marquer comme lu"
+      >
+        <Check className="w-3 h-3 text-transparent hover:text-primary" />
+      </button>
       <div className="mt-0.5">
         {getNotificationIcon(notification.type)}
       </div>
@@ -201,7 +205,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {alerts.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
                               ))}
                             </div>
                           </div>
@@ -221,7 +225,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {reminders.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
                               ))}
                             </div>
                           </div>
@@ -241,7 +245,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {assignments.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
                               ))}
                             </div>
                           </div>
@@ -261,7 +265,7 @@ export function Header({ title }: { title: string }) {
                             </div>
                             <div className="divide-y">
                               {updates.map((notification: InAppNotification) => (
-                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />
+                                <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />
                               ))}
                             </div>
                           </div>
@@ -286,15 +290,21 @@ export function Header({ title }: { title: string }) {
                               {templateUpdates.map((item) => {
                                 if (item.kind === 'inapp') {
                                   const notification = item.data as InAppNotification;
-                                  return <NotificationItem key={`in-app-${notification.id}`} notification={notification} onClick={() => handleMarkInAppAsRead(notification)} />;
+                                  return <NotificationItem key={`in-app-${notification.id}`} notification={notification} onMarkRead={() => handleMarkInAppAsRead(notification)} />;
                                 }
                                 const notification = item.data;
                                 return (
                                   <div
                                     key={`template-${notification.id}`}
-                                    className="flex items-start gap-3 p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                                    onClick={() => handleMarkTemplateAsRead(notification.id)}
+                                    className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors"
                                   >
+                                    <button
+                                      onClick={() => handleMarkTemplateAsRead(notification.id)}
+                                      className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 border-muted-foreground/40 hover:border-primary hover:bg-primary/10 flex items-center justify-center transition-colors"
+                                      title="Marquer comme lu"
+                                    >
+                                      <Check className="w-3 h-3 text-transparent hover:text-primary" />
+                                    </button>
                                     <FileText className="w-4 h-4 mt-0.5 text-violet-500 flex-shrink-0" />
                                     <div className="flex-1 min-w-0">
                                       <div className="flex items-start justify-between gap-2">

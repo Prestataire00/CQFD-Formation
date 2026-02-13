@@ -53,7 +53,7 @@ const statusColors: Record<MissionStatus, string> = {
 };
 
 const statusLabels: Record<MissionStatus, string> = {
-  draft: "Brouillon",
+  draft: "En option",
   confirmed: "Confirmee",
   in_progress: "En cours",
   completed: "Terminee",
@@ -115,7 +115,7 @@ function MissionItem({ mission, compact = false }: { mission: Mission; compact?:
       <div className="font-medium text-sm">{mission.title}</div>
       <div className="flex items-center gap-2 mt-2">
         <Badge variant="outline" className="text-xs">
-          {statusLabels[status] || "Brouillon"}
+          {statusLabels[status] || "En option"}
         </Badge>
         {mission.startDate && (
           <span className="text-xs opacity-75">

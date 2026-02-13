@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import cqfdLogo from "@assets/logo_CQFD+Puzzle_1770974961922.jpg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,10 +34,13 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <img src={cqfdLogo} alt="CQFD Formation" className="w-32 h-32 object-contain" />
+          </div>
           <CardTitle className="text-2xl font-bold">CQFD Formation</CardTitle>
           <CardDescription>
-            Connectez-vous pour accéder à votre espace
+            Connectez-vous pour acceder a votre espace
           </CardDescription>
         </CardHeader>
         <CardContent>
