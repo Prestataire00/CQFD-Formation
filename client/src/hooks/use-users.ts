@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 
+const TRAINER_QUERY_KEY = [api.users.trainers.path];
+
 interface User {
   id: string;
   email: string | null;
@@ -71,6 +73,7 @@ export function useCreateUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      queryClient.invalidateQueries({ queryKey: TRAINER_QUERY_KEY });
     },
   });
 }
@@ -107,6 +110,7 @@ export function useUpdateUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      queryClient.invalidateQueries({ queryKey: TRAINER_QUERY_KEY });
     },
   });
 }
@@ -129,6 +133,7 @@ export function useDeleteUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [api.users.list.path] });
+      queryClient.invalidateQueries({ queryKey: TRAINER_QUERY_KEY });
     },
   });
 }

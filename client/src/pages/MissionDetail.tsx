@@ -1151,9 +1151,9 @@ export default function MissionDetail() {
 
   // Handlers
   // Recalculate all task deadlines based on a reference end date
-  const recalculateTaskDeadlines = async (endDateStr: string) => {
+  const recalculateTaskDeadlines = async (startDateStr: string) => {
     if (!steps || steps.length === 0) return 0;
-    const referenceDate = new Date(endDateStr);
+    const referenceDate = new Date(startDateStr);
     // Build lookup from INTRA_PRESTA_TASKS and INTER_PRESTA_TASKS
     const intraPrestaMap = new Map<string, { priorityDaysBefore: number; lateDaysBefore: number }>();
     for (const t of INTRA_PRESTA_TASKS) {
@@ -1226,7 +1226,7 @@ export default function MissionDetail() {
 
   const handleSaveInfo = async () => {
     try {
-      const newEndDate = editForm.endDate || null;
+      const newStartDate = editForm.startDate || null;
       const typologyChanged = originalForm && editForm.typology !== originalForm.typology;
       const trainerChanged = originalForm && editForm.trainerId !== originalForm.trainerId;
 
@@ -1275,7 +1275,7 @@ export default function MissionDetail() {
         if (taskList) {
           const adminId = user?.id || null;
           const formateurId = editForm.trainerId || null;
-          const endDateRef = newEndDate ? new Date(newEndDate) : null;
+          const startDateRef = newStartDate ? new Date(newStartDate) : null;
 
           let order = 0;
           for (const task of taskList) {
@@ -1283,11 +1283,11 @@ export default function MissionDetail() {
             const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
             let dueDate: string | undefined;
             let lateDate: string | undefined;
-            if (endDateRef) {
-              const d = new Date(endDateRef);
+            if (startDateRef) {
+              const d = new Date(startDateRef);
               d.setDate(d.getDate() - task.priorityDaysBefore);
               dueDate = d.toISOString();
-              const ld = new Date(endDateRef);
+              const ld = new Date(startDateRef);
               ld.setDate(ld.getDate() - task.lateDaysBefore);
               lateDate = ld.toISOString();
             }
@@ -1309,9 +1309,9 @@ export default function MissionDetail() {
           toast({ title: "Taches supprimees (aucun template correspondant)" });
         }
       } else {
-        // Recalculate all task deadlines based on new endDate (only if tasks weren't replaced)
-        if (newEndDate && steps && steps.length > 0) {
-          const updatedCount = await recalculateTaskDeadlines(newEndDate);
+        // Recalculate all task deadlines based on new startDate (only if tasks weren't replaced)
+        if (newStartDate && steps && steps.length > 0) {
+          const updatedCount = await recalculateTaskDeadlines(newStartDate);
           if (updatedCount > 0) {
             toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
           }
@@ -1338,12 +1338,12 @@ export default function MissionDetail() {
     }
   };
 
-  // Compute due date based on mission end date and deadline defaults
+  // Compute due date based on mission start date and deadline defaults
   const computeDueDate = (taskTitle: string): string | null => {
     const daysBefore = deadlineDefaults[taskTitle];
-    if (daysBefore === undefined || !mission?.endDate) return null;
+    if (daysBefore === undefined || !mission?.startDate) return null;
 
-    const referenceDate = new Date(mission.endDate);
+    const referenceDate = new Date(mission.startDate);
 
     // daysBefore > 0 means before end date, < 0 means after, 0 means same day
     const dueDate = new Date(referenceDate);
@@ -1419,8 +1419,8 @@ export default function MissionDetail() {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
       let dueDate: string | null = null;
       let lateDate: string | null = null;
-      if (overrideDaysBefore !== undefined && mission?.endDate) {
-        const referenceDate = new Date(mission.endDate);
+      if (overrideDaysBefore !== undefined && mission?.startDate) {
+        const referenceDate = new Date(mission.startDate);
         const d = new Date(referenceDate);
         d.setDate(d.getDate() - overrideDaysBefore);
         dueDate = d.toISOString();
@@ -1488,8 +1488,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1527,8 +1527,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1566,8 +1566,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1605,8 +1605,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1644,8 +1644,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1683,8 +1683,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1722,8 +1722,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1761,8 +1761,8 @@ export default function MissionDetail() {
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.endDate) {
-          const referenceDate = new Date(mission.endDate);
+        if (mission?.startDate) {
+          const referenceDate = new Date(mission.startDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -2446,26 +2446,6 @@ export default function MissionDetail() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <BookOpen className="w-4 h-4" />
-              Programme de formation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEditingInfo ? (
-              <Input
-                value={editForm.programTitle}
-                onChange={(e) => setEditForm({ ...editForm, programTitle: e.target.value })}
-                placeholder="Ex: Formation Excel avancee, Management d'equipe..."
-              />
-            ) : (
-              <p className="font-medium">{mission?.programTitle || "Non defini"}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4" />
               Participants
             </CardTitle>
@@ -2631,13 +2611,13 @@ export default function MissionDetail() {
             </p>
           </div>
           <div className="flex gap-2">
-            {isAdmin && mission?.endDate && steps && steps.length > 0 && (
+            {isAdmin && mission?.startDate && steps && steps.length > 0 && (
               <Button
                 variant="outline"
                 onClick={async () => {
                   try {
-                    const endDateStr = format(new Date(mission.endDate), "yyyy-MM-dd");
-                    const count = await recalculateTaskDeadlines(endDateStr);
+                    const startDateStr = format(new Date(mission.startDate), "yyyy-MM-dd");
+                    const count = await recalculateTaskDeadlines(startDateStr);
                     toast({ title: count > 0 ? `${count} deadline(s) recalculee(s)` : "Aucune tache a recalculer" });
                   } catch {
                     toast({ title: "Erreur", variant: "destructive" });
