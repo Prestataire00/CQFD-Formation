@@ -1399,7 +1399,10 @@ export class DatabaseStorage implements IStorage {
   async attachTemplateDocumentsToMission(missionId: number, trainerId: string): Promise<void> {
     // Get trainer to determine their role
     const trainer = await this.getUser(trainerId);
-    if (!trainer) return;
+    if (!trainer) {
+      console.log(`[attachTemplates] Trainer ${trainerId} not found, skipping`);
+      return;
+    }
 
     // Get the mission to check for client-specific templates
     const mission = await this.getMission(missionId);
@@ -1407,7 +1410,9 @@ export class DatabaseStorage implements IStorage {
 
     // Get appropriate templates based on trainer role, client, and mission typology
     const typology = mission?.typology || undefined;
+    console.log(`[attachTemplates] Mission ${missionId}: role=${trainer.role}, clientId=${clientId}, typology=${typology}`);
     const templates = await this.getActiveDocumentTemplatesByRole(trainer.role, clientId || undefined, typology);
+    console.log(`[attachTemplates] Found ${templates.length} templates for role=${trainer.role}, typology=${typology}`);
 
     // Get existing template documents for this trainer+mission to avoid duplicates
     const existingDocs = await this.getDocumentsByMission(missionId);
@@ -1419,7 +1424,11 @@ export class DatabaseStorage implements IStorage {
 
     // Attach each template document to the mission (skip if already present)
     for (const template of templates) {
-      if (existingTemplateIds.has(template.id)) continue;
+      if (existingTemplateIds.has(template.id)) {
+        console.log(`[attachTemplates] Skipping template ${template.id} (${template.title}) - already attached`);
+        continue;
+      }
+      console.log(`[attachTemplates] Attaching template ${template.id} (${template.title}) to mission ${missionId}`);
       await db.insert(documents).values({
         title: template.title,
         type: template.type,
@@ -1452,11 +1461,7 @@ export class DatabaseStorage implements IStorage {
         await this.deleteDocument(doc.id);
         removed++;
       }
-      // If template no longer exists, also remove the stale document
-      if (!template) {
-        await this.deleteDocument(doc.id);
-        removed++;
-      }
+      // If template no longer exists, keep the document (don't delete orphaned docs)
     }
 
     // Re-attach the correct template documents (deduplication handled inside)

@@ -979,7 +979,7 @@ export default function MissionDetail() {
   const { data: trainers } = useTrainers();
   const { data: programs } = usePrograms();
   const { data: steps } = useMissionSteps(missionId);
-  const { data: documents } = useMissionDocuments(missionId);
+  const { data: documents, isLoading: isLoadingDocuments } = useMissionDocuments(missionId);
   const { data: missionTrainers } = useMissionTrainers(missionId);
   const { data: allUsers } = useUsers();
   const { data: missionSessions } = useMissionSessions(missionId);
@@ -2946,7 +2946,14 @@ export default function MissionDetail() {
           </Button>
         </div>
 
-        {documents && documents.length > 0 ? (
+        {isLoadingDocuments ? (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <Loader2 className="w-8 h-8 mx-auto mb-3 text-muted-foreground animate-spin" />
+              <p className="text-muted-foreground">Chargement des documents...</p>
+            </CardContent>
+          </Card>
+        ) : documents && documents.length > 0 ? (
           <div className="space-y-2">
             {documents.map((doc: any) => (
               <Card key={doc.id}>

@@ -462,11 +462,14 @@ export async function registerRoutes(
         return;
       }
 
+      console.log(`[reattach-documents] Mission ${missionId}, typology=${mission.typology}, trainerId=${mission.trainerId}`);
+
       const results: { trainerId: string; removed: number; added: number }[] = [];
 
       // Reattach for the primary trainer
       if (mission.trainerId) {
         const result = await storage.reattachTemplateDocumentsForMission(missionId, mission.trainerId);
+        console.log(`[reattach-documents] Primary trainer ${mission.trainerId}: removed=${result.removed}, added=${result.added}`);
         results.push({ trainerId: mission.trainerId, ...result });
       }
 
@@ -476,6 +479,7 @@ export async function registerRoutes(
         // Skip the primary trainer (already handled above)
         if (mt.trainerId === mission.trainerId) continue;
         const result = await storage.reattachTemplateDocumentsForMission(missionId, mt.trainerId);
+        console.log(`[reattach-documents] Additional trainer ${mt.trainerId}: removed=${result.removed}, added=${result.added}`);
         results.push({ trainerId: mt.trainerId, ...result });
       }
 
