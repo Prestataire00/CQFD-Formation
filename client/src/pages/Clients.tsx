@@ -175,6 +175,26 @@ function ClientForm({
         </div>
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Email entreprise</Label>
+          <Input
+            type="email"
+            value={client.email}
+            onChange={(e) => onChange({ ...client, email: e.target.value })}
+            placeholder="contact@entreprise.com"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>Téléphone entreprise</Label>
+          <Input
+            value={client.phone}
+            onChange={(e) => onChange({ ...client, phone: e.target.value })}
+            placeholder="01 23 45 67 89"
+          />
+        </div>
+      </div>
+
       <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
         <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Adresse client</p>
         <div className="space-y-2">
@@ -324,48 +344,33 @@ function ClientDetailDialog({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedClient, setEditedClient] = useState({
-    name: client.name,
-    type: client.type,
-    siret: client.siret || "",
-    address: client.address || "",
-    city: client.city || "",
-    postalCode: client.postalCode || "",
-    contactName: client.contactName || "",
-    contactEmail: client.contactEmail || "",
-    contactPhone: client.contactPhone || "",
-    billingAddress: (client as any).billingAddress || "",
-    billingPostalCode: (client as any).billingPostalCode || "",
-    billingCity: (client as any).billingCity || "",
-    trainingAddress: (client as any).trainingAddress || "",
-    trainingPostalCode: (client as any).trainingPostalCode || "",
-    trainingCity: (client as any).trainingCity || "",
-    origine: (client as any).origine || "",
-    socialMedia: (client as any).socialMedia || "",
-    demand: client.demand || "",
+  const buildEditState = (c: Client) => ({
+    name: c.name,
+    type: c.type,
+    siret: c.siret || "",
+    email: (c as any).email || "",
+    phone: (c as any).phone || "",
+    address: c.address || "",
+    city: c.city || "",
+    postalCode: c.postalCode || "",
+    contactName: c.contactName || "",
+    contactEmail: c.contactEmail || "",
+    contactPhone: c.contactPhone || "",
+    billingAddress: (c as any).billingAddress || "",
+    billingPostalCode: (c as any).billingPostalCode || "",
+    billingCity: (c as any).billingCity || "",
+    trainingAddress: (c as any).trainingAddress || "",
+    trainingPostalCode: (c as any).trainingPostalCode || "",
+    trainingCity: (c as any).trainingCity || "",
+    origine: (c as any).origine || "",
+    socialMedia: (c as any).socialMedia || "",
+    demand: c.demand || "",
   });
 
+  const [editedClient, setEditedClient] = useState(buildEditState(client));
+
   useEffect(() => {
-    setEditedClient({
-      name: client.name,
-      type: client.type,
-      siret: client.siret || "",
-      address: client.address || "",
-      city: client.city || "",
-      postalCode: client.postalCode || "",
-      contactName: client.contactName || "",
-      contactEmail: client.contactEmail || "",
-      contactPhone: client.contactPhone || "",
-      billingAddress: (client as any).billingAddress || "",
-      billingPostalCode: (client as any).billingPostalCode || "",
-      billingCity: (client as any).billingCity || "",
-      trainingAddress: (client as any).trainingAddress || "",
-      trainingPostalCode: (client as any).trainingPostalCode || "",
-      trainingCity: (client as any).trainingCity || "",
-      origine: (client as any).origine || "",
-      socialMedia: (client as any).socialMedia || "",
-      demand: client.demand || "",
-    });
+    setEditedClient(buildEditState(client));
     setIsEditing(false);
   }, [client]);
 
@@ -410,43 +415,38 @@ function ClientDetailDialog({
           </div>
         </DialogHeader>
 
+        {isEditing ? (
+          <ClientForm
+            client={editedClient}
+            onChange={setEditedClient}
+            onSubmit={handleSave}
+            onCancel={() => { setEditedClient(buildEditState(client)); setIsEditing(false); }}
+            isSubmitting={isSaving}
+            submitLabel="Enregistrer"
+          />
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
           <div className="md:col-span-2 space-y-6">
             <div className="grid grid-cols-2 gap-6 p-4 bg-muted/30 rounded-xl border">
-              {isEditing ? (
-                <div className="col-span-2 grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">NOM</Label>
-                    <Input value={editedClient.name} onChange={(e) => setEditedClient({ ...editedClient, name: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">TYPE</Label>
-                    <Select value={editedClient.type || ""} onValueChange={(v) => setEditedClient({ ...editedClient, type: v as any })}>
-                      <SelectTrigger><SelectValue placeholder="Sélectionner un type" /></SelectTrigger>
-                      <SelectContent className="bg-violet-100 border-violet-300">
-                        <SelectItem value="particulier" className="focus:bg-violet-200">Particulier</SelectItem>
-                        <SelectItem value="privé" className="focus:bg-violet-200">Privé</SelectItem>
-                        <SelectItem value="public" className="focus:bg-violet-200">Public</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Type</span>
+                <div>{getTypeBadge(client.type || "")}</div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">SIRET</span>
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-muted-foreground" />
+                  <span>{client.siret || "-"}</span>
                 </div>
-              ) : (
-                <>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Type</span>
-                    <div>{getTypeBadge(client.type || "")}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">SIRET</span>
-                    <div className="flex items-center gap-2">
-                      <Fingerprint className="w-4 h-4 text-muted-foreground" />
-                      <span>{client.siret || "-"}</span>
-                    </div>
-                  </div>
-                </>
-              )}
-
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Email entreprise</span>
+                <div>{(client as any).email || "-"}</div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Téléphone entreprise</span>
+                <div>{(client as any).phone || "-"}</div>
+              </div>
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground uppercase font-semibold">Origine</span>
                 <div>{client.origine || "-"}</div>
@@ -499,6 +499,13 @@ function ClientDetailDialog({
               </div>
             </div>
 
+            {client.demand && (
+              <div className="p-4 bg-muted/30 rounded-xl border">
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Demande spécifique</span>
+                <div className="mt-1">{client.demand}</div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <ClipboardCheck className="w-5 h-5" /> Statistiques
@@ -538,6 +545,7 @@ function ClientDetailDialog({
 
           </div>
         </div>
+        )}
         <DialogFooter className="mt-6 flex justify-between">
           <Button
             variant="destructive"
@@ -574,6 +582,8 @@ export default function Clients() {
     name: "",
     type: "" as any,
     siret: "",
+    email: "",
+    phone: "",
     address: "",
     city: "",
     postalCode: "",
@@ -689,6 +699,8 @@ export default function Clients() {
       name: "",
       type: "",
       siret: "",
+      email: "",
+      phone: "",
       address: "",
       city: "",
       postalCode: "",
