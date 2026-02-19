@@ -58,7 +58,19 @@
       "Bash(pgrep:*)",
       "Bash(printf:*)",
       "Bash(source:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(git config:*)",
+      "Bash(pg_dump:*)",
+      "Bash(PGPASSWORD=npg_TbQF3qeYkZ5D psql:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_06CeZUsiqXkn@ep-weathered-sky-aeopacyn-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require\" npx drizzle-kit push:*)",
+      "Bash(NEW_DB=\"postgresql://neondb_owner:npg_06CeZUsiqXkn@ep-weathered-sky-aeopacyn-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require\":*)",
+      "Bash(__NEW_LINE_d0c1883903ea801d__ psql \"$NEW_DB\" -c \":*)",
+      "Bash(__NEW_LINE_d0c1883903ea801d__ echo \"NOT NULL constraints relaxed\")",
+      "Bash(__NEW_LINE_44185788051292a5__ psql \"$NEW_DB\" -c \":*)",
+      "Bash(__NEW_LINE_44185788051292a5__ echo \"Done relaxing constraints\")",
+      "Bash(replit secrets --help:*)",
+      "Bash(replit --help:*)",
+      "Bash(# Check if we can update secrets via the Replit env file or cache ls /home/runner/.config/replit/ cat /home/runner/.cache/replit/env/latest.json)"
     ]
   }
 }
