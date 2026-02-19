@@ -70,7 +70,12 @@
       "Bash(__NEW_LINE_44185788051292a5__ echo \"Done relaxing constraints\")",
       "Bash(replit secrets --help:*)",
       "Bash(replit --help:*)",
-      "Bash(# Check if we can update secrets via the Replit env file or cache ls /home/runner/.config/replit/ cat /home/runner/.cache/replit/env/latest.json)"
+      "Bash(# Check if we can update secrets via the Replit env file or cache ls /home/runner/.config/replit/ cat /home/runner/.cache/replit/env/latest.json)",
+      "Bash(nix-env -iA:*)",
+      "Bash(nix-env:*)",
+      "Bash(PGPASSWORD='@Anissapresta89' psql \"postgresql://postgres@db.vfnlheqmktmlylpqfrpf.supabase.co:5432/postgres\" -c \"SELECT version\\(\\);\")",
+      "Bash(PGPASSWORD='@Anissapresta89' psql \"postgresql://postgres.vfnlheqmktmlylpqfrpf@aws-0-eu-west-2.pooler.supabase.com:6543/postgres\" -c \"SELECT version\\(\\);\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres.vfnlheqmktmlylpqfrpf:%40Anissapresta89@aws-1-eu-west-1.pooler.supabase.com:6543/postgres\" npx drizzle-kit push:*)"
     ]
   }
 }

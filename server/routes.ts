@@ -181,7 +181,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "L'administrateur principal ne peut pas être supprimé" });
       }
 
-      const success = await storage.softDeleteUser(req.params.id);
+      const success = await storage.hardDeleteUser(req.params.id);
       if (!success) {
         res.status(404).json({ message: "Utilisateur non trouvé" });
         return;

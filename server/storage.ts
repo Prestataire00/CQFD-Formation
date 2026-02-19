@@ -40,7 +40,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(userData: Partial<User>, password: string): Promise<User>;
   updateUserWithPassword(id: string, data: Partial<User>, password?: string): Promise<User | undefined>;
-  softDeleteUser(id: string): Promise<boolean>;
+  hardDeleteUser(id: string): Promise<boolean>;
   getUsers(): Promise<User[]>;
   getTrainers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
@@ -443,12 +443,25 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async softDeleteUser(id: string): Promise<boolean> {
-    const [updated] = await db.update(users)
-      .set({ status: 'SUPPRIME', updatedAt: new Date() })
+  async hardDeleteUser(id: string): Promise<boolean> {
+    // Clean up all FK references before deleting
+    await db.update(missions).set({ trainerId: null }).where(eq(missions.trainerId, id));
+    await db.update(missionSteps).set({ assigneeId: null }).where(eq(missionSteps.assigneeId, id));
+    await db.update(missionSteps).set({ commentAuthorId: null }).where(eq(missionSteps.commentAuthorId, id));
+    await db.update(missionSteps).set({ trainerCommentAuthorId: null }).where(eq(missionSteps.trainerCommentAuthorId, id));
+    await db.delete(documents).where(eq(documents.userId, id));
+    await db.delete(templateNotifications).where(eq(templateNotifications.userId, id));
+    await db.delete(inAppNotifications).where(eq(inAppNotifications.userId, id));
+    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.userId, id));
+    await db.delete(personalNotes).where(eq(personalNotes.userId, id));
+    await db.delete(xpTransactions).where(eq(xpTransactions.userId, id));
+    await db.delete(userBadges).where(eq(userBadges.userId, id));
+    await db.delete(auditLogs).where(eq(auditLogs.userId, id));
+
+    const [deleted] = await db.delete(users)
       .where(eq(users.id, id))
       .returning();
-    return !!updated;
+    return !!deleted;
   }
 
   async updateUserStreak(userId: string, streakDays: number, lastActivityDate: Date): Promise<User | undefined> {
