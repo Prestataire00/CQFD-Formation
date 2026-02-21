@@ -195,3 +195,22 @@ export function getTaskExplanation(taskTitle: string): string | null {
   }
   return null;
 }
+
+export function getTaskExplanationWithOverrides(
+  taskTitle: string,
+  dbExplanations: Array<{ taskName: string; explanation: string }>
+): string | null {
+  if (!taskTitle) return null;
+  const normalizedTitle = normalize(taskTitle);
+
+  // Priority: search in DB overrides
+  for (const item of dbExplanations) {
+    const normalizedName = normalize(item.taskName);
+    if (normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle)) {
+      return item.explanation;
+    }
+  }
+
+  // Fallback: hardcoded values
+  return getTaskExplanation(taskTitle);
+}

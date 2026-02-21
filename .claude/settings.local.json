@@ -75,7 +75,8 @@
       "Bash(nix-env:*)",
       "Bash(PGPASSWORD='@Anissapresta89' psql \"postgresql://postgres@db.vfnlheqmktmlylpqfrpf.supabase.co:5432/postgres\" -c \"SELECT version\\(\\);\")",
       "Bash(PGPASSWORD='@Anissapresta89' psql \"postgresql://postgres.vfnlheqmktmlylpqfrpf@aws-0-eu-west-2.pooler.supabase.com:6543/postgres\" -c \"SELECT version\\(\\);\")",
-      "Bash(DATABASE_URL=\"postgresql://postgres.vfnlheqmktmlylpqfrpf:%40Anissapresta89@aws-1-eu-west-1.pooler.supabase.com:6543/postgres\" npx drizzle-kit push:*)"
+      "Bash(DATABASE_URL=\"postgresql://postgres.vfnlheqmktmlylpqfrpf:%40Anissapresta89@aws-1-eu-west-1.pooler.supabase.com:6543/postgres\" npx drizzle-kit push:*)",
+      "Bash(test:*)"
     ]
   }
 }

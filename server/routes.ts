@@ -2680,6 +2680,49 @@ export async function registerRoutes(
     res.json({ success: true });
   });
 
+  // ==================== TASK EXPLANATIONS (Consignes) ====================
+  app.get(api.taskExplanations.list.path, isAuthenticated, async (req, res) => {
+    const explanations = await storage.getTaskExplanations();
+    res.json(explanations);
+  });
+
+  app.post(api.taskExplanations.create.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const input = api.taskExplanations.create.input.parse(req.body);
+      const created = await storage.createTaskExplanation(input);
+      res.status(201).json(created);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.put(api.taskExplanations.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const input = api.taskExplanations.update.input.parse(req.body);
+      const updated = await storage.updateTaskExplanation(Number(req.params.id), input);
+      if (!updated) {
+        res.status(404).json({ message: "Consigne non trouvee" });
+        return;
+      }
+      res.json(updated);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+        return;
+      }
+      throw err;
+    }
+  });
+
+  app.delete(api.taskExplanations.delete.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    await storage.deleteTaskExplanation(Number(req.params.id));
+    res.json({ success: true });
+  });
+
   // ==================== GAMIFICATION ====================
   // Get gamification profile for current user
   app.get('/api/gamification/profile', isAuthenticated, async (req, res) => {

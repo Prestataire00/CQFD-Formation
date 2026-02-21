@@ -573,6 +573,15 @@ export const taskDeadlineDefaults = pgTable("task_deadline_defaults", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// --- TASK EXPLANATIONS (editable consignes) ---
+export const taskExplanations = pgTable("task_explanations", {
+  id: serial("id").primaryKey(),
+  taskName: text("task_name").notNull().unique(),
+  explanation: text("explanation").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // --- PERSONAL NOTES ---
 export const personalNotes = pgTable("personal_notes", {
   id: serial("id").primaryKey(),
@@ -622,6 +631,7 @@ export const insertCompanySettingsSchema = createInsertSchema(companySettings).o
 export const insertClientContractSchema = createInsertSchema(clientContracts).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertClientInvoiceSchema = createInsertSchema(clientInvoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertTaskDeadlineDefaultSchema = createInsertSchema(taskDeadlineDefaults).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTaskExplanationSchema = createInsertSchema(taskExplanations).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertPersonalNoteSchema = createInsertSchema(personalNotes).omit({ id: true, createdAt: true, updatedAt: true });
 
 // --- TYPES ---
@@ -699,5 +709,7 @@ export type InsertClientContract = z.infer<typeof insertClientContractSchema>;
 export type InsertClientInvoice = z.infer<typeof insertClientInvoiceSchema>;
 export type TaskDeadlineDefault = typeof taskDeadlineDefaults.$inferSelect;
 export type InsertTaskDeadlineDefault = z.infer<typeof insertTaskDeadlineDefaultSchema>;
+export type TaskExplanation = typeof taskExplanations.$inferSelect;
+export type InsertTaskExplanation = z.infer<typeof insertTaskExplanationSchema>;
 export type PersonalNote = typeof personalNotes.$inferSelect;
 export type InsertPersonalNote = z.infer<typeof insertPersonalNoteSchema>;

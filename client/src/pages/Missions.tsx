@@ -602,7 +602,7 @@ export default function Missions() {
                             <SelectValue placeholder="Selectionner" />
                           </SelectTrigger>
                           <SelectContent className="bg-violet-100 border-violet-300">
-                            <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
+                            <SelectItem value="Conférence" className="focus:bg-violet-200">Conférence</SelectItem>
                             <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
                             <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
                             <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
@@ -796,7 +796,7 @@ export default function Missions() {
                 </SelectTrigger>
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="all" className="focus:bg-violet-200">Toutes typologies</SelectItem>
-                  <SelectItem value="Conference" className="focus:bg-violet-200">Conference</SelectItem>
+                  <SelectItem value="Conférence" className="focus:bg-violet-200">Conférence</SelectItem>
                   <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
                   <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
                   <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>

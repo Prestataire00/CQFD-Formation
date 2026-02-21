@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { MissionCalendar, type CalendarView } from "@/components/MissionCalendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { useMissions, useClients, useAllSessions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import { useUnreadInAppNotifications, useMarkInAppNotificationRead } from "@/hooks/use-notifications";
@@ -464,6 +465,11 @@ export default function TrainerSpace() {
                             : mission.startDate ? new Date(mission.startDate) : null;
                           const daysUntil = nextSessionDate ? differenceInDays(nextSessionDate, new Date()) : 0;
 
+                          const missionSteps = allSteps?.filter((s: MissionStep & { mission: Mission }) => s.missionId === mission.id) || [];
+                          const doneSteps = missionSteps.filter((s: MissionStep) => s.status === "done" || s.isCompleted).length;
+                          const totalMissionSteps = missionSteps.length;
+                          const missionProgress = totalMissionSteps > 0 ? Math.round((doneSteps / totalMissionSteps) * 100) : 0;
+
                           return (
                             <div
                               key={mission.id}
@@ -506,6 +512,15 @@ export default function TrainerSpace() {
                                     </span>
                                   )}
                                 </div>
+                                {totalMissionSteps > 0 && (
+                                  <div className="mt-2">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-[10px] text-muted-foreground">Avancement</span>
+                                      <span className="text-[10px] font-medium">{doneSteps}/{totalMissionSteps} ({missionProgress}%)</span>
+                                    </div>
+                                    <Progress value={missionProgress} className="h-1.5" />
+                                  </div>
+                                )}
                               </div>
                               <Badge
                                 variant="outline"

@@ -18,6 +18,7 @@ import {
   insertReminderSettingSchema,
   insertReminderSchema,
   taskDeadlineDefaults,
+  taskExplanations,
   clients,
   trainingPrograms,
   missions,
@@ -988,6 +989,48 @@ export const api = {
     delete: {
       method: 'DELETE' as const,
       path: '/api/task-deadline-defaults/:id',
+      responses: {
+        200: z.object({ success: z.boolean() }),
+      },
+    },
+  },
+
+  // ==================== TASK EXPLANATIONS (Consignes) ====================
+  taskExplanations: {
+    list: {
+      method: 'GET' as const,
+      path: '/api/task-explanations',
+      responses: {
+        200: z.array(z.custom<typeof taskExplanations.$inferSelect>()),
+      },
+    },
+    create: {
+      method: 'POST' as const,
+      path: '/api/task-explanations',
+      input: z.object({
+        taskName: z.string().min(1),
+        explanation: z.string().min(1),
+      }),
+      responses: {
+        201: z.custom<typeof taskExplanations.$inferSelect>(),
+        400: errorSchemas.validation,
+      },
+    },
+    update: {
+      method: 'PUT' as const,
+      path: '/api/task-explanations/:id',
+      input: z.object({
+        taskName: z.string().optional(),
+        explanation: z.string().optional(),
+      }),
+      responses: {
+        200: z.custom<typeof taskExplanations.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
+    delete: {
+      method: 'DELETE' as const,
+      path: '/api/task-explanations/:id',
       responses: {
         200: z.object({ success: z.boolean() }),
       },

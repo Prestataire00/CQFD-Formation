@@ -31,7 +31,9 @@ import {
   BellRing,
   Check,
   X,
+  MessageSquare,
 } from "lucide-react";
+import { TASK_EXPLANATIONS } from "@/lib/task-explanations";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -109,6 +111,15 @@ export default function Settings() {
     notifyClient: false,
   });
 
+  // Task explanations (consignes) state (admin only)
+  const [taskExplanationsDb, setTaskExplanationsDb] = useState<any[]>([]);
+  const [isLoadingExplanations, setIsLoadingExplanations] = useState(false);
+  const [isSavingExplanation, setIsSavingExplanation] = useState(false);
+  const [editingExplanationId, setEditingExplanationId] = useState<number | null>(null);
+  const [editingExplanationText, setEditingExplanationText] = useState("");
+  const [isAddingExplanation, setIsAddingExplanation] = useState(false);
+  const [newExplanation, setNewExplanation] = useState({ taskName: "", explanation: "" });
+
   // Load deadline defaults and reminder settings
   useEffect(() => {
     if (isAdmin) {
@@ -125,6 +136,13 @@ export default function Settings() {
         .then((data) => setReminderSettings(data))
         .catch(() => {})
         .finally(() => setIsLoadingReminders(false));
+
+      setIsLoadingExplanations(true);
+      fetch("/api/task-explanations", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => setTaskExplanationsDb(data))
+        .catch(() => {})
+        .finally(() => setIsLoadingExplanations(false));
     }
   }, [isAdmin]);
 
@@ -321,6 +339,69 @@ export default function Settings() {
     return `J+${Math.abs(days)}`;
   };
 
+  // Task explanations (consignes) handlers
+  const handleAddExplanation = async () => {
+    if (!newExplanation.taskName.trim() || !newExplanation.explanation.trim()) return;
+    setIsSavingExplanation(true);
+    try {
+      const response = await fetch("/api/task-explanations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(newExplanation),
+      });
+      if (!response.ok) throw new Error();
+      const created = await response.json();
+      setTaskExplanationsDb((prev) => [...prev, created]);
+      setNewExplanation({ taskName: "", explanation: "" });
+      setIsAddingExplanation(false);
+      toast({ title: "Consigne ajoutee" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setIsSavingExplanation(false);
+    }
+  };
+
+  const handleUpdateExplanation = async (id: number, explanation: string) => {
+    try {
+      const response = await fetch(`/api/task-explanations/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ explanation }),
+      });
+      if (!response.ok) throw new Error();
+      const updated = await response.json();
+      setTaskExplanationsDb((prev) =>
+        prev.map((d) => (d.id === id ? updated : d))
+      );
+      setEditingExplanationId(null);
+      setEditingExplanationText("");
+      toast({ title: "Consigne mise a jour" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteExplanation = async (id: number) => {
+    try {
+      await fetch(`/api/task-explanations/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      setTaskExplanationsDb((prev) => prev.filter((d) => d.id !== id));
+      toast({ title: "Consigne supprimee (retour au texte par defaut)" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleCustomizeExplanation = (taskName: string, explanation: string) => {
+    setNewExplanation({ taskName, explanation });
+    setIsAddingExplanation(true);
+  };
+
   // Reminder settings handlers
   const handleCreateReminder = async () => {
     if (!newReminder.name.trim()) return;
@@ -396,7 +477,7 @@ export default function Settings() {
 
         <div className="flex-1 p-6">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-6' : 'grid-cols-3'}`}>
+            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-7' : 'grid-cols-3'}`}>
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profil</span>
@@ -425,6 +506,12 @@ export default function Settings() {
                 <TabsTrigger value="reminders" className="flex items-center gap-2">
                   <BellRing className="w-4 h-4" />
                   <span className="hidden sm:inline">Rappels</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <TabsTrigger value="consignes" className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden sm:inline">Consignes</span>
                 </TabsTrigger>
               )}
             </TabsList>
@@ -1432,6 +1519,168 @@ export default function Settings() {
                               Aucun rappel configure. Cliquez sur "Ajouter un rappel" pour commencer.
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+            {/* Consignes Tab (Admin only) */}
+            {isAdmin && (
+              <TabsContent value="consignes">
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Consignes des taches</CardTitle>
+                        <CardDescription>
+                          Personnalisez les textes d'aide affiches dans les popups "consignes" (icone info) de chaque tache de mission.
+                          Les taches sans personnalisation utilisent le texte par defaut.
+                        </CardDescription>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => setIsAddingExplanation(true)}
+                        disabled={isAddingExplanation}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Ajouter
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingExplanations ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* Add new explanation form */}
+                        {isAddingExplanation && (
+                          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                            <div className="space-y-3">
+                              <div className="space-y-1">
+                                <Label>Nom de la tache</Label>
+                                <Input
+                                  value={newExplanation.taskName}
+                                  onChange={(e) => setNewExplanation({ ...newExplanation, taskName: e.target.value })}
+                                  placeholder="Ex: Envoi compte-rendu entretien cadrage"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label>Consigne</Label>
+                                <Textarea
+                                  value={newExplanation.explanation}
+                                  onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
+                                  placeholder="Texte de la consigne..."
+                                  rows={6}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
+                                Annuler
+                              </Button>
+                              <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
+                                {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Ajouter
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Existing DB overrides */}
+                        {taskExplanationsDb.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                              Consignes personnalisees
+                            </h3>
+                            <div className="space-y-3">
+                              {taskExplanationsDb.map((item: any) => (
+                                <div key={item.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-sm font-medium mb-2">{item.taskName}</h4>
+                                      {editingExplanationId === item.id ? (
+                                        <div className="space-y-2">
+                                          <Textarea
+                                            value={editingExplanationText}
+                                            onChange={(e) => setEditingExplanationText(e.target.value)}
+                                            rows={6}
+                                            autoFocus
+                                          />
+                                          <div className="flex gap-2 justify-end">
+                                            <Button variant="outline" size="sm" onClick={() => { setEditingExplanationId(null); setEditingExplanationText(""); }}>
+                                              Annuler
+                                            </Button>
+                                            <Button size="sm" onClick={() => handleUpdateExplanation(item.id, editingExplanationText)}>
+                                              Sauvegarder
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-3">
+                                          {item.explanation}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {editingExplanationId !== item.id && (
+                                      <div className="flex gap-1 flex-shrink-0">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => { setEditingExplanationId(item.id); setEditingExplanationText(item.explanation); }}
+                                        >
+                                          <Edit className="w-4 h-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-destructive hover:text-destructive"
+                                          onClick={() => handleDeleteExplanation(item.id)}
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Default explanations (not yet overridden) */}
+                        <div>
+                          <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
+                            Consignes par defaut
+                          </h3>
+                          <div className="space-y-3">
+                            {TASK_EXPLANATIONS
+                              .filter((defaultItem) => !taskExplanationsDb.some((dbItem: any) => dbItem.taskName === defaultItem.taskName))
+                              .map((item) => (
+                                <div key={item.taskName} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-sm font-medium mb-2">{item.taskName}</h4>
+                                      <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-3">
+                                        {item.explanation}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="flex-shrink-0"
+                                      onClick={() => handleCustomizeExplanation(item.taskName, item.explanation)}
+                                    >
+                                      <Edit className="w-4 h-4 mr-1" />
+                                      Personnaliser
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
                         </div>
                       </div>
                     )}

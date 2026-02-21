@@ -564,6 +564,8 @@ export default function DocumentTemplates() {
                   <SelectItem value="_all_" className="focus:bg-violet-200">Toutes</SelectItem>
                   <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
                   <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                  <SelectItem value="Conférence" className="focus:bg-violet-200">Conférence</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -709,6 +711,8 @@ export default function DocumentTemplates() {
                   <SelectItem value="_all_" className="focus:bg-violet-200">Toutes</SelectItem>
                   <SelectItem value="Inter" className="focus:bg-violet-200">Inter</SelectItem>
                   <SelectItem value="Intra" className="focus:bg-violet-200">Intra</SelectItem>
+                  <SelectItem value="Conseil" className="focus:bg-violet-200">Conseil</SelectItem>
+                  <SelectItem value="Conférence" className="focus:bg-violet-200">Conférence</SelectItem>
                 </SelectContent>
               </Select>
             </div>

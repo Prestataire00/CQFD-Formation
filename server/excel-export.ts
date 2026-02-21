@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { db } from './db';
-import { missions, users, clients, missionSessions, missionSteps, documents, invoices } from '@shared/schema';
+import { missions, users, clients, missionSessions, missionSteps, stepTasks, documents, invoices } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -40,14 +40,78 @@ function translateStatus(status: string): string {
   return statusMap[status] || status;
 }
 
-function getStepStatus(steps: any[], title: string): string {
-  const step = steps.find(s => s.title?.toLowerCase().includes(title.toLowerCase()));
-  if (!step) return '';
+function getStepStatusText(step: any): string {
   if (step.isCompleted) return 'Fait';
   if (step.status === 'late') return 'En retard';
   if (step.status === 'priority') return 'Prioritaire';
   if (step.status === 'na') return 'N/A';
   return 'A faire';
+}
+
+function getStepStatus(steps: any[], title: string): string {
+  const step = steps.find(s => s.title?.toLowerCase().includes(title.toLowerCase()));
+  if (!step) return '';
+  const status = getStepStatusText(step);
+  const comments: string[] = [];
+  if (step.comment) comments.push(stripHtml(step.comment));
+  if (step.trainerComment) comments.push(`[Formateur] ${stripHtml(step.trainerComment)}`);
+  if (comments.length > 0) {
+    return `${status}\n---\n${comments.join('\n')}`;
+  }
+  return status;
+}
+
+function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<\/div>/gi, '\n')
+    .replace(/<li>/gi, '- ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function buildCommentsColumn(steps: any[], subTasks: any[], usersMap: Map<string, any>): string {
+  const lines: string[] = [];
+  for (const step of steps) {
+    const stepLines: string[] = [];
+
+    // Commentaire admin de la tâche
+    if (step.comment) {
+      const text = stripHtml(step.comment);
+      const author = step.commentAuthorId ? usersMap.get(step.commentAuthorId) : null;
+      const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() : '';
+      stepLines.push(authorName ? `${authorName}: ${text}` : text);
+    }
+    // Commentaire formateur de la tâche
+    if (step.trainerComment) {
+      const text = stripHtml(step.trainerComment);
+      const author = step.trainerCommentAuthorId ? usersMap.get(step.trainerCommentAuthorId) : null;
+      const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() : '';
+      stepLines.push(authorName ? `[Formateur] ${authorName}: ${text}` : `[Formateur] ${text}`);
+    }
+
+    // Commentaires des sous-tâches
+    const children = subTasks.filter(st => st.stepId === step.id);
+    for (const child of children) {
+      if (child.comment) {
+        stepLines.push(`  └ ${child.title}: ${stripHtml(child.comment)}`);
+      }
+    }
+
+    if (stepLines.length > 0) {
+      lines.push(`• ${step.title}\n${stepLines.join('\n')}`);
+    }
+  }
+  return lines.join('\n\n');
 }
 
 function getDocByType(docs: any[], type: string): string {
@@ -84,6 +148,7 @@ export async function generateMissionsExcel(): Promise<string> {
   const allClients = await db.select().from(clients);
   const allSessions = await db.select().from(missionSessions);
   const allSteps = await db.select().from(missionSteps);
+  const allStepTasks = await db.select().from(stepTasks);
   const allDocuments = await db.select().from(documents);
 
   let allInvoices: any[] = [];
@@ -145,6 +210,7 @@ export async function generateMissionsExcel(): Promise<string> {
     { header: 'Envoi par courrier\ndes originaux', key: 'envoiOriginaux', width: 14 },
     { header: 'Fiche de paie,\nattestation et STC', key: 'fichePaie', width: 14 },
     { header: 'Facture(s) prestataires', key: 'facturePrestataires', width: 14 },
+    { header: 'Commentaires tâches', key: 'commentairesTaches', width: 40 },
   ];
 
   sheet.columns = columns;
@@ -165,6 +231,8 @@ export async function generateMissionsExcel(): Promise<string> {
     const client = mission.clientId ? clientsMap.get(mission.clientId) : null;
     const missionSess = allSessions.filter(s => s.missionId === mission.id);
     const missionStepsList = allSteps.filter(s => s.missionId === mission.id);
+    const missionStepIds = new Set(missionStepsList.map(s => s.id));
+    const missionSubTasks = allStepTasks.filter(st => missionStepIds.has(st.stepId));
     const missionDocs = allDocuments.filter(d => d.missionId === mission.id);
     const missionInvoices = allInvoices.filter((inv: any) => inv.missionId === mission.id);
 
@@ -240,6 +308,7 @@ export async function generateMissionsExcel(): Promise<string> {
       envoiOriginaux: getStepStatus(missionStepsList, 'originaux') || getStepStatus(missionStepsList, 'courrier'),
       fichePaie: '',
       facturePrestataires: hasInvoice,
+      commentairesTaches: buildCommentsColumn(missionStepsList, missionSubTasks, usersMap),
     });
   }
 
@@ -266,7 +335,7 @@ export async function generateMissionsExcel(): Promise<string> {
       statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
     }
 
-    for (let c = 21; c <= 48; c++) {
+    for (let c = 21; c <= 49; c++) {
       const cell = row.getCell(c);
       const val = cell.value as string;
       if (val === 'Fait') {

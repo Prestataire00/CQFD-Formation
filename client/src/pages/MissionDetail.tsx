@@ -146,7 +146,7 @@ import { fr } from "date-fns/locale";
 import type { MissionStatus } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getTaskExplanation } from "@/lib/task-explanations";
+import { getTaskExplanationWithOverrides } from "@/lib/task-explanations";
 
 // Step configuration
 const STEPS = [
@@ -584,6 +584,7 @@ interface TaskItemProps {
   users: any[];
   assignableUsers: any[];
   currentUserId: string;
+  dbExplanations: Array<{ taskName: string; explanation: string }>;
   onUpdate: (taskId: number, data: any) => void;
   onDelete: (taskId: number) => void;
   onMoveUp?: () => void;
@@ -592,7 +593,7 @@ interface TaskItemProps {
   isLast?: boolean;
 }
 
-function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
+function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, dbExplanations, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
   const { toast } = useToast();
   const sendStepLink = useSendStepLink();
   const [isEditingComment, setIsEditingComment] = useState(false);
@@ -691,7 +692,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 {task.title}
               </h4>
               {(() => {
-                const explanation = getTaskExplanation(task.title);
+                const explanation = getTaskExplanationWithOverrides(task.title, dbExplanations);
                 if (!explanation) return null;
                 return (
                   <Popover>
@@ -973,6 +974,15 @@ export default function MissionDetail() {
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [newSession, setNewSession] = useState({ date: "", startTime: "09:00", endTime: "17:00" });
 
+  // Task explanations from DB (editable consignes)
+  const [dbExplanations, setDbExplanations] = useState<Array<{ taskName: string; explanation: string }>>([]);
+  useEffect(() => {
+    fetch("/api/task-explanations", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setDbExplanations(data))
+      .catch(() => {});
+  }, []);
+
   // Data queries
   const { data: mission, isLoading } = useMission(missionId);
   const { data: clients } = useClients();
@@ -1183,7 +1193,6 @@ export default function MissionDetail() {
   const program = programs?.find((p: any) => p.id === mission?.programId);
 
   // Handlers
-  // Recalculate all task deadlines based on a reference end date
   const recalculateTaskDeadlines = async (startDateStr: string) => {
     if (!steps || steps.length === 0) return 0;
     const referenceDate = new Date(startDateStr);
@@ -2898,6 +2907,7 @@ export default function MissionDetail() {
                         users={availableUsers}
                         assignableUsers={assignableUsers}
                         currentUserId={user?.id || ""}
+                        dbExplanations={dbExplanations}
                         onUpdate={handleUpdateTask}
                         onDelete={handleDeleteStep}
                         onMoveUp={() => handleMoveTask(task.id, 'up')}
