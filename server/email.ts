@@ -1,10 +1,9 @@
 import nodemailer from 'nodemailer';
 import type { User, Mission, Document, Client, Reminder, ReminderSetting, Message } from '@shared/schema';
+import { getGmailTransport } from './google';
 
-// Configuration du transporteur email
-// Utilise les variables d'environnement pour la configuration SMTP
-const createTransporter = () => {
-  // Si pas de configuration SMTP, utiliser un mode développement (log uniquement)
+// Configuration du transporteur email SMTP (fallback)
+const createSmtpTransporter = () => {
   if (!process.env.SMTP_HOST) {
     console.log('[Email] Mode développement: les emails seront loggés mais non envoyés');
     return null;
@@ -21,7 +20,7 @@ const createTransporter = () => {
   });
 };
 
-const transporter = createTransporter();
+const smtpTransporter = createSmtpTransporter();
 
 interface EmailAttachment {
   filename: string;
@@ -39,34 +38,53 @@ interface EmailOptions {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const fromEmail = process.env.SMTP_FROM || 'noreply@formation.local';
 
-  if (!transporter) {
-    // Mode développement: log l'email
-    console.log('[Email] Envoi simulé:');
-    console.log(`  De: ${fromEmail}`);
-    console.log(`  À: ${options.to}`);
-    console.log(`  Sujet: ${options.subject}`);
-    console.log(`  Contenu HTML: ${options.html.substring(0, 200)}...`);
-    if (options.attachments?.length) {
-      console.log(`  Pièces jointes: ${options.attachments.map(a => a.filename).join(', ')}`);
+  // Priority 1: SMTP (adresse dédiée cqfd.formation@gmail.com)
+  if (smtpTransporter) {
+    try {
+      await smtpTransporter.sendMail({
+        from: fromEmail,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments,
+      });
+      console.log(`[Email] Email envoyé via SMTP à ${options.to}`);
+      return true;
+    } catch (smtpError) {
+      console.error('[Email] SMTP échoué, tentative Gmail API fallback:', smtpError);
     }
-    return true;
   }
 
+  // Priority 2: Gmail API fallback (si SMTP non configuré ou échoué)
   try {
-    await transporter.sendMail({
-      from: fromEmail,
-      to: options.to,
-      subject: options.subject,
-      html: options.html,
-      text: options.text,
-      attachments: options.attachments,
-    });
-    console.log(`[Email] Email envoyé avec succès à ${options.to}`);
-    return true;
-  } catch (error) {
-    console.error('[Email] Erreur lors de l\'envoi:', error);
-    return false;
+    const gmailTransport = await getGmailTransport();
+    if (gmailTransport) {
+      await gmailTransport.sendMail({
+        from: fromEmail,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+        attachments: options.attachments,
+      });
+      console.log(`[Email] Email envoyé via Gmail API à ${options.to}`);
+      return true;
+    }
+  } catch (gmailError) {
+    console.error('[Email] Gmail API fallback échoué:', gmailError);
   }
+
+  // Mode développement: log l'email si aucun transport disponible
+  console.log('[Email] Envoi simulé (aucun transport disponible):');
+  console.log(`  De: ${fromEmail}`);
+  console.log(`  À: ${options.to}`);
+  console.log(`  Sujet: ${options.subject}`);
+  console.log(`  Contenu HTML: ${options.html.substring(0, 200)}...`);
+  if (options.attachments?.length) {
+    console.log(`  Pièces jointes: ${options.attachments.map(a => a.filename).join(', ')}`);
+  }
+  return true;
 }
 
 // ==================== EXPORT QUOTIDIEN PAR EMAIL ====================

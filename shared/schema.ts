@@ -32,6 +32,9 @@ export const users = pgTable("users", {
   totalXP: integer("total_xp").default(0),
   streakDays: integer("streak_days").default(0),
   lastActivityDate: timestamp("last_activity_date"),
+  googleId: varchar("google_id").unique(),
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -128,6 +131,7 @@ export const missions = pgTable("missions", {
   // Multi-trainer duplication fields
   parentMissionId: integer("parent_mission_id"), // Reference to original mission if this is a copy
   isOriginal: boolean("is_original").default(true).notNull(), // true = original, false = copy
+  googleCalendarEventId: text("google_calendar_event_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

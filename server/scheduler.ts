@@ -476,6 +476,24 @@ export function startReminderScheduler(): void {
   setTimeout(async () => {
     log('[Scheduler] Exécution initiale après démarrage', 'scheduler');
     await runReminderTask();
+
+    // Vérifier si l'export quotidien a déjà été envoyé aujourd'hui, sinon le lancer
+    try {
+      const today = new Date().toISOString().slice(0, 10); // "2026-02-21"
+      const exportsDir = path.join(process.cwd(), 'exports');
+      const fs = await import('fs');
+      const existingExports = fs.existsSync(exportsDir)
+        ? fs.readdirSync(exportsDir).filter(f => f.includes(today) && f.endsWith('.xlsx'))
+        : [];
+      if (existingExports.length === 0) {
+        log('[Scheduler] Aucun export trouvé pour aujourd\'hui, lancement de l\'export quotidien', 'scheduler');
+        await runDailyExportTask();
+      } else {
+        log(`[Scheduler] Export déjà existant pour aujourd'hui (${existingExports[0]}), pas de nouvel envoi`, 'scheduler');
+      }
+    } catch (err) {
+      log(`[Scheduler] Erreur vérification export quotidien: ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
+    }
   }, 30000);
 
   log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00', 'scheduler');

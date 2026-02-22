@@ -5,10 +5,11 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import type { User } from "@shared/schema";
 import { z } from "zod";
-import { setupLocalAuth, setupAuthRoutes, isAuthenticated } from "./auth";
+import { setupLocalAuth, setupAuthRoutes, isAuthenticated, setupGoogleAuth, setupGoogleAuthRoutes } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
 import { sendMissionAssignmentEmail, sendTaskAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
+import { syncMissionToCalendar, deleteMissionFromCalendar, getGoogleAdminUserId } from "./google";
 import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
 import { seedDefaultTemplates } from "./seed-templates";
@@ -52,6 +53,10 @@ export async function registerRoutes(
   setupLocalAuth(app);
   setupAuthRoutes(app);
 
+  // Setup Google OAuth
+  setupGoogleAuth(app);
+  setupGoogleAuthRoutes(app);
+
   // Serve uploaded files statically
   app.use('/uploads', (req, res, next) => {
     if (!req.isAuthenticated || !req.isAuthenticated()) {
@@ -73,10 +78,10 @@ export async function registerRoutes(
     }
   });
 
-  // Helper to strip passwordHash from user objects
+  // Helper to strip sensitive fields from user objects
   const stripPassword = (user: any) => {
-    const { passwordHash, ...userWithoutPassword } = user;
-    return userWithoutPassword;
+    const { passwordHash, googleAccessToken, googleRefreshToken, ...safeUser } = user;
+    return safeUser;
   };
 
   // ==================== USERS ====================
@@ -359,6 +364,18 @@ export async function registerRoutes(
         }
       }
 
+      // Sync to Google Calendar (non-blocking)
+      try {
+        const adminId = await getGoogleAdminUserId();
+        if (adminId) {
+          syncMissionToCalendar(mission.id, adminId).catch((e) =>
+            console.error('[Calendar] Sync after create failed:', e)
+          );
+        }
+      } catch (calErr) {
+        console.error('[Calendar] Calendar sync error:', calErr);
+      }
+
       res.status(201).json(mission);
     } catch (err) {
       console.error('Mission creation error:', err);
@@ -439,6 +456,18 @@ export async function registerRoutes(
       } catch (emailErr) {
         console.error('[Notification] Erreur notification mission update:', emailErr);
         // Ne pas bloquer la réponse si la notification échoue
+      }
+
+      // Sync to Google Calendar (non-blocking)
+      try {
+        const adminId = await getGoogleAdminUserId();
+        if (adminId) {
+          syncMissionToCalendar(mission.id, adminId).catch((e) =>
+            console.error('[Calendar] Sync after update failed:', e)
+          );
+        }
+      } catch (calErr) {
+        console.error('[Calendar] Calendar sync error:', calErr);
       }
 
       res.json(mission);
@@ -583,6 +612,24 @@ export async function registerRoutes(
         console.error('[Notification] Erreur notification changement statut:', notifErr);
       }
 
+      // Sync to Google Calendar (non-blocking)
+      try {
+        const adminId = await getGoogleAdminUserId();
+        if (adminId) {
+          if (input.status === 'cancelled') {
+            deleteMissionFromCalendar(mission.id, adminId).catch((e) =>
+              console.error('[Calendar] Delete after cancel failed:', e)
+            );
+          } else {
+            syncMissionToCalendar(mission.id, adminId).catch((e) =>
+              console.error('[Calendar] Sync after status update failed:', e)
+            );
+          }
+        }
+      } catch (calErr) {
+        console.error('[Calendar] Calendar sync error:', calErr);
+      }
+
       // Award XP for completing a mission
       if (input.status === 'completed') {
         const user = req.user!;
@@ -611,7 +658,19 @@ export async function registerRoutes(
 
   app.delete(api.missions.delete.path, isAuthenticated, requirePermission('missions:delete'), async (req, res) => {
     try {
-      const success = await storage.deleteMission(Number(req.params.id));
+      const missionId = Number(req.params.id);
+
+      // Delete from Google Calendar before deleting mission (non-blocking)
+      try {
+        const adminId = await getGoogleAdminUserId();
+        if (adminId) {
+          await deleteMissionFromCalendar(missionId, adminId);
+        }
+      } catch (calErr) {
+        console.error('[Calendar] Calendar delete error:', calErr);
+      }
+
+      const success = await storage.deleteMission(missionId);
       if (!success) {
         res.status(404).json({ message: "Mission non trouvée" });
         return;
@@ -3087,6 +3146,89 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[Export] Error deleting all exports:', error);
       res.status(500).json({ message: 'Erreur lors de la suppression' });
+    }
+  });
+
+  // ==================== GOOGLE INTEGRATION ====================
+
+  // Manual sync a single mission to Google Calendar
+  app.post('/api/missions/:id/sync-calendar', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const adminId = await getGoogleAdminUserId();
+      if (!adminId) {
+        return res.status(400).json({ message: 'Aucun compte Google connecté' });
+      }
+      const eventId = await syncMissionToCalendar(missionId, adminId);
+      if (eventId) {
+        res.json({ success: true, eventId });
+      } else {
+        res.status(500).json({ message: 'Échec de la synchronisation' });
+      }
+    } catch (error) {
+      console.error('Calendar sync error:', error);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Sync all active missions to Google Calendar
+  app.post('/api/calendar/sync-all', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const adminId = await getGoogleAdminUserId();
+      if (!adminId) {
+        return res.status(400).json({ message: 'Aucun compte Google connecté' });
+      }
+      const missions = await storage.getMissions();
+      const activeMissions = missions.filter(m => m.status !== 'cancelled');
+      let synced = 0;
+      let failed = 0;
+      for (const mission of activeMissions) {
+        try {
+          const eventId = await syncMissionToCalendar(mission.id, adminId);
+          if (eventId) synced++;
+          else failed++;
+        } catch {
+          failed++;
+        }
+      }
+      res.json({ success: true, synced, failed, total: activeMissions.length });
+    } catch (error) {
+      console.error('Calendar sync-all error:', error);
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Google connection status
+  app.get('/api/google/status', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const allUsers = await storage.getUsers();
+      const adminWithGoogle = allUsers.find(u => u.role === 'admin' && u.googleRefreshToken);
+      if (adminWithGoogle) {
+        res.json({
+          connected: true,
+          email: adminWithGoogle.email,
+          userId: adminWithGoogle.id,
+        });
+      } else {
+        res.json({ connected: false });
+      }
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur serveur' });
+    }
+  });
+
+  // Disconnect Google account
+  app.post('/api/google/disconnect', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const user = req.user!;
+      await storage.updateUser(user.id, {
+        googleId: null,
+        googleAccessToken: null,
+        googleRefreshToken: null,
+      } as any);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: 'Erreur serveur' });
     }
   });
 

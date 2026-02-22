@@ -106,6 +106,29 @@ export async function ensureSchemaSync() {
       }
     }
 
+    // Sync users table (Google OAuth fields)
+    const userCols = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND table_schema = 'public'`
+    );
+    const userColNames = userCols.rows.map((r: any) => r.column_name);
+    const userGoogleColumns: Record<string, string> = {
+      google_id: 'VARCHAR UNIQUE',
+      google_access_token: 'TEXT',
+      google_refresh_token: 'TEXT',
+    };
+    for (const [col, type] of Object.entries(userGoogleColumns)) {
+      if (!userColNames.includes(col)) {
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ${col} ${type}`);
+        console.log(`[db] Added missing column ${col} to users`);
+      }
+    }
+
+    // Sync missions table (Google Calendar field)
+    if (!missionColNames.includes('google_calendar_event_id')) {
+      await pool.query(`ALTER TABLE missions ADD COLUMN IF NOT EXISTS google_calendar_event_id TEXT`);
+      console.log(`[db] Added missing column google_calendar_event_id to missions`);
+    }
+
     // Sync document_templates table
     const dtCols = await pool.query(
       `SELECT column_name FROM information_schema.columns WHERE table_name = 'document_templates' AND table_schema = 'public'`

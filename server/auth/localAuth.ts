@@ -151,8 +151,8 @@ export function setupAuthRoutes(app: Express) {
         // Get full user data (without passwordHash)
         storage.getUser(user.id).then((fullUser) => {
           if (fullUser) {
-            const { passwordHash, ...userWithoutPassword } = fullUser as User & { passwordHash?: string };
-            return res.json({ user: userWithoutPassword });
+            const { passwordHash, googleAccessToken, googleRefreshToken, ...userWithoutSensitive } = fullUser as any;
+            return res.json({ user: userWithoutSensitive });
           }
           return res.json({ user });
         });
@@ -183,8 +183,8 @@ export function setupAuthRoutes(app: Express) {
       if (!user) {
         return res.status(404).json({ message: 'Utilisateur non trouvé' });
       }
-      const { passwordHash, ...userWithoutPassword } = user as User & { passwordHash?: string };
-      return res.json(userWithoutPassword);
+      const { passwordHash, googleAccessToken, googleRefreshToken, ...userWithoutSensitive } = user as any;
+      return res.json(userWithoutSensitive);
     } catch (error) {
       return res.status(500).json({ message: 'Erreur serveur' });
     }

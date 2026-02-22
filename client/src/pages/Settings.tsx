@@ -514,6 +514,12 @@ export default function Settings() {
                   <span className="hidden sm:inline">Consignes</span>
                 </TabsTrigger>
               )}
+              {isAdmin && (
+                <TabsTrigger value="google" className="flex items-center gap-2">
+                  <Globe className="w-4 h-4" />
+                  <span className="hidden sm:inline">Google</span>
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* Profile Tab */}
@@ -1688,9 +1694,191 @@ export default function Settings() {
                 </Card>
               </TabsContent>
             )}
+            {/* Google Integration Tab */}
+            {isAdmin && (
+              <TabsContent value="google">
+                <GoogleIntegrationTab />
+              </TabsContent>
+            )}
           </Tabs>
         </div>
       </main>
+    </div>
+  );
+}
+
+// Google Integration Tab Component
+function GoogleIntegrationTab() {
+  const { toast } = useToast();
+  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/google/status", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setGoogleStatus(data))
+      .catch(() => setGoogleStatus({ connected: false }))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const handleDisconnect = async () => {
+    setIsDisconnecting(true);
+    try {
+      const res = await fetch("/api/google/disconnect", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setGoogleStatus({ connected: false });
+        toast({ title: "Compte Google deconnecte" });
+      }
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch("/api/calendar/sync-all", {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          title: "Synchronisation terminee",
+          description: `${data.synced} missions synchronisees, ${data.failed} echouees sur ${data.total} au total.`,
+        });
+      } else {
+        toast({ title: "Erreur", description: data.message, variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erreur de synchronisation", variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="flex items-center justify-center py-10">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Google Account Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            Compte Google
+          </CardTitle>
+          <CardDescription>
+            Connectez votre compte Google pour activer l'envoi d'emails via Gmail API et la synchronisation Google Calendar.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {googleStatus?.connected ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                <Check className="w-5 h-5 text-green-600" />
+                <div>
+                  <p className="font-medium text-green-800 dark:text-green-200">Compte connecte</p>
+                  <p className="text-sm text-green-600 dark:text-green-400">{googleStatus.email}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                className="text-red-600 border-red-300 hover:bg-red-50"
+              >
+                {isDisconnecting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <X className="mr-2 h-4 w-4" />
+                )}
+                Deconnecter le compte Google
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <X className="w-5 h-5 text-gray-400" />
+                <div>
+                  <p className="font-medium text-gray-600 dark:text-gray-400">Aucun compte connecte</p>
+                  <p className="text-sm text-gray-500">Connectez votre compte Google pour activer les integrations.</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => { window.location.href = "/api/auth/google"; }}
+              >
+                <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                </svg>
+                Connecter avec Google
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Calendar Sync Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            Google Calendar
+          </CardTitle>
+          <CardDescription>
+            Synchronisez vos missions avec Google Calendar. Les missions sont automatiquement ajoutees, mises a jour et supprimees.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                La synchronisation automatique est active lorsqu'un compte Google est connecte. Les missions sont synchronisees lors de leur creation, modification et suppression.
+              </p>
+            </div>
+            <Button
+              onClick={handleSyncAll}
+              disabled={isSyncing || !googleStatus?.connected}
+              variant="outline"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Synchronisation en cours...
+                </>
+              ) : (
+                <>
+                  <Clock className="mr-2 h-4 w-4" />
+                  Synchroniser toutes les missions
+                </>
+              )}
+            </Button>
+            {!googleStatus?.connected && (
+              <p className="text-sm text-muted-foreground">
+                Connectez un compte Google pour activer la synchronisation calendrier.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
