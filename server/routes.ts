@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated, setupGoogleAuth, setupGoogleAuthRoutes } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendTaskAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail } from "./email";
+import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { syncMissionToCalendar, deleteMissionFromCalendar, getGoogleAdminUserId } from "./google";
 import { registerFeedbackRoutes } from "./feedback";
@@ -247,7 +247,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete('/api/clients/:id', isAuthenticated, requirePermission('clients:create'), async (req, res) => {
+  app.delete('/api/clients/:id', isAuthenticated, requirePermission('clients:delete'), async (req, res) => {
     try {
       const id = Number(req.params.id);
       await storage.updateClient(id, { isActive: false } as any);
@@ -357,9 +357,13 @@ export async function registerRoutes(
 
           // 2. Email (si configuré)
           if (trainer.email) {
-            const documents = await storage.getDocumentsByMission(mission.id);
-            const trainerDocuments = documents.filter(doc => doc.userId === mission.trainerId);
-            await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+            try {
+              const documents = await storage.getDocumentsByMission(mission.id);
+              const trainerDocuments = documents.filter(doc => doc.userId === mission.trainerId);
+              await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+            } catch (emailErr) {
+              console.error('[Email] Erreur envoi email assignation mission:', emailErr);
+            }
           }
         }
       }
@@ -612,6 +616,20 @@ export async function registerRoutes(
         console.error('[Notification] Erreur notification changement statut:', notifErr);
       }
 
+      // Annuler les rappels en attente si la mission est annulée ou terminée
+      if (input.status === 'cancelled' || input.status === 'completed') {
+        try {
+          const pendingReminders = await storage.getRemindersByMission(mission.id);
+          for (const reminder of pendingReminders) {
+            if (reminder.status === 'pending') {
+              await storage.updateReminder(reminder.id, { status: 'cancelled' });
+            }
+          }
+        } catch (cancelErr) {
+          console.error('[Reminders] Erreur annulation rappels:', cancelErr);
+        }
+      }
+
       // Sync to Google Calendar (non-blocking)
       try {
         const adminId = await getGoogleAdminUserId();
@@ -659,6 +677,18 @@ export async function registerRoutes(
   app.delete(api.missions.delete.path, isAuthenticated, requirePermission('missions:delete'), async (req, res) => {
     try {
       const missionId = Number(req.params.id);
+
+      // Annuler tous les rappels en attente pour cette mission
+      try {
+        const pendingReminders = await storage.getRemindersByMission(missionId);
+        for (const reminder of pendingReminders) {
+          if (reminder.status === 'pending') {
+            await storage.updateReminder(reminder.id, { status: 'cancelled' });
+          }
+        }
+      } catch (cancelErr) {
+        console.error('[Reminders] Erreur annulation rappels avant suppression:', cancelErr);
+      }
 
       // Delete from Google Calendar before deleting mission (non-blocking)
       try {
@@ -766,10 +796,13 @@ export async function registerRoutes(
 
         // 2. Email (si configuré)
         if (trainer.email) {
-          const documents = await storage.getDocumentsByMission(missionId);
-          // Filtrer les documents appartenant à ce formateur
-          const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
-          await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+          try {
+            const documents = await storage.getDocumentsByMission(missionId);
+            const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+            await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+          } catch (emailErr) {
+            console.error('[Email] Erreur envoi email assignation formateur:', emailErr);
+          }
         }
       }
 
@@ -827,9 +860,13 @@ export async function registerRoutes(
 
             // 2. Email (si configuré)
             if (trainer.email) {
-              const documents = await storage.getDocumentsByMission(missionId);
-              const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
-              await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+              try {
+                const documents = await storage.getDocumentsByMission(missionId);
+                const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+                await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+              } catch (emailErr) {
+                console.error('[Email] Erreur envoi email assignation bulk:', emailErr);
+              }
             }
           }
 
@@ -903,9 +940,6 @@ export async function registerRoutes(
               message: `La tache "${step.title}" vous a ete assignee sur la mission : ${mission.title}`,
               missionId: mission.id,
             });
-            if (assignee.email) {
-              await sendTaskAssignmentEmail(assignee, mission, step.title, step.dueDate);
-            }
           }
         } catch (notifErr) {
           console.error('[Step Create] Error sending assignment notification:', notifErr);
@@ -976,10 +1010,6 @@ export async function registerRoutes(
               missionId: mission.id,
             });
 
-            // Email notification
-            if (assignee.email) {
-              await sendTaskAssignmentEmail(assignee, mission, step.title, step.dueDate);
-            }
           }
         } catch (notifErr) {
           console.error('[Step Update] Error sending assignment notification:', notifErr);

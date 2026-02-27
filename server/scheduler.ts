@@ -272,7 +272,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
           let customSubject = setting?.emailSubject || undefined;
           if (setting?.reminderType === 'task_deadline' && reminder.taskId) {
             let steps: any[] = [];
-            try { steps = await storage.getMissionSteps(mission.id); } catch {}
+            try { steps = await storage.getMissionSteps(mission.id); } catch (e) { log(`[Scheduler] Erreur getMissionSteps (reminder) mission ${mission.id}: ${e instanceof Error ? e.message : 'Unknown'}`, 'scheduler'); }
             const step = steps.find((s: any) => s.id === reminder.taskId);
             if (step && !customSubject) {
               customSubject = `Rappel: Tache "${step.title}" - ${mission.title}`;
@@ -370,7 +370,7 @@ async function markLateStepsServerSide(): Promise<number> {
 
   for (const mission of activeMissions) {
     let steps: any[] = [];
-    try { steps = await storage.getMissionSteps(mission.id); } catch { continue; }
+    try { steps = await storage.getMissionSteps(mission.id); } catch (e) { log(`[Scheduler] Erreur getMissionSteps (late check) mission ${mission.id}: ${e instanceof Error ? e.message : 'Unknown'}`, 'scheduler'); continue; }
     for (const step of steps) {
       if (
         step.dueDate &&
@@ -472,31 +472,7 @@ export function startReminderScheduler(): void {
     await runDailyExportTask();
   });
 
-  // Exécuter immédiatement au démarrage (après un délai de 30 secondes pour laisser le serveur démarrer)
-  setTimeout(async () => {
-    log('[Scheduler] Exécution initiale après démarrage', 'scheduler');
-    await runReminderTask();
-
-    // Vérifier si l'export quotidien a déjà été envoyé aujourd'hui, sinon le lancer
-    try {
-      const today = new Date().toISOString().slice(0, 10); // "2026-02-21"
-      const exportsDir = path.join(process.cwd(), 'exports');
-      const fs = await import('fs');
-      const existingExports = fs.existsSync(exportsDir)
-        ? fs.readdirSync(exportsDir).filter(f => f.includes(today) && f.endsWith('.xlsx'))
-        : [];
-      if (existingExports.length === 0) {
-        log('[Scheduler] Aucun export trouvé pour aujourd\'hui, lancement de l\'export quotidien', 'scheduler');
-        await runDailyExportTask();
-      } else {
-        log(`[Scheduler] Export déjà existant pour aujourd'hui (${existingExports[0]}), pas de nouvel envoi`, 'scheduler');
-      }
-    } catch (err) {
-      log(`[Scheduler] Erreur vérification export quotidien: ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
-    }
-  }, 30000);
-
-  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00', 'scheduler');
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 (pas d\'exécution au démarrage)', 'scheduler');
 }
 
 /**
