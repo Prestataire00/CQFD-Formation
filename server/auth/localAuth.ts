@@ -6,6 +6,7 @@ import connectPg from 'connect-pg-simple';
 import { storage } from '../storage';
 import { verifyPassword } from './passwordUtils';
 import type { User } from '@shared/schema';
+import { supabaseAdmin } from '../supabaseAdmin';
 
 declare global {
   namespace Express {
@@ -258,6 +259,23 @@ export function setupAuthRoutes(app: Express) {
       const passwordHash = await bcrypt.hash(password, 10);
 
       await storage.updateUser(resetToken.userId, { passwordHash } as any);
+
+      // Sync with Supabase Auth
+      if (supabaseAdmin) {
+        try {
+          const user = await storage.getUser(resetToken.userId);
+          if (user?.email) {
+            const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+            const authUser = authUsers?.users?.find((u) => u.email === user.email);
+            if (authUser) {
+              await supabaseAdmin.auth.admin.updateUserById(authUser.id, { password });
+              console.log(`[supabase-auth] Mot de passe réinitialisé dans Supabase Auth pour: ${user.email}`);
+            }
+          }
+        } catch (err) {
+          console.error(`[supabase-auth] Erreur synchro reset password:`, err);
+        }
+      }
 
       // Mark token as used
       await storage.markTokenAsUsed(token);

@@ -493,6 +493,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async hardDeleteUser(id: string): Promise<boolean> {
+    // Get user email before deletion for Supabase Auth sync
+    const userToDelete = await this.getUser(id);
+
     // Clean up all FK references before deleting
     await db.update(missions).set({ trainerId: null }).where(eq(missions.trainerId, id));
     await db.update(missionSteps).set({ assigneeId: null }).where(eq(missionSteps.assigneeId, id));
@@ -510,6 +513,21 @@ export class DatabaseStorage implements IStorage {
     const [deleted] = await db.delete(users)
       .where(eq(users.id, id))
       .returning();
+
+    // Sync deletion with Supabase Auth
+    if (supabaseAdmin && deleted && userToDelete?.email) {
+      try {
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const authUser = authUsers?.users?.find((u) => u.email === userToDelete.email);
+        if (authUser) {
+          await supabaseAdmin.auth.admin.deleteUser(authUser.id);
+          console.log(`[supabase-auth] Utilisateur supprimé de Supabase Auth: ${userToDelete.email}`);
+        }
+      } catch (err) {
+        console.error(`[supabase-auth] Erreur suppression utilisateur Supabase Auth:`, err);
+      }
+    }
+
     return !!deleted;
   }
 

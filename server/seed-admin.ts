@@ -3,6 +3,7 @@ import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
+import { supabaseAdmin } from './supabaseAdmin';
 
 export async function seedDefaultAdmin() {
   try {
@@ -28,13 +29,32 @@ export async function seedDefaultAdmin() {
         streakDays: 0,
       });
       
+      // Sync with Supabase Auth
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin.auth.admin.createUser({
+            email: defaultEmail,
+            password: defaultPassword,
+            email_confirm: true,
+            user_metadata: {
+              firstName: 'Admin',
+              lastName: 'CQFD',
+              role: 'admin',
+            },
+          });
+          console.log('[seed-admin] Admin créé dans Supabase Auth');
+        } catch (err) {
+          console.error('[seed-admin] Erreur création admin dans Supabase Auth:', err);
+        }
+      }
+
       console.log('[seed-admin] Admin par défaut créé avec succès');
       console.log(`[seed-admin] Email: ${defaultEmail}`);
-      
+
       if (process.env.NODE_ENV !== 'production') {
         console.log(`[seed-admin] Mot de passe: ${defaultPassword}`);
       }
-      
+
       console.log('[seed-admin] IMPORTANT: Changez ce mot de passe immédiatement après la première connexion!');
     } else {
       console.log('[seed-admin] Un admin existe déjà, pas de création nécessaire');

@@ -45,4 +45,6 @@ integrations = ["javascript_log_in_with_replit:2.0.0"]
 
 [userenv.shared]
 SMTP_HOST = "smtp.gmail.com"
+SUPABASE_URL = "https://vfnlheqmktmlylpqfrpf.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmbmxoZXFta3RtbHlscHFmcnBmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk2MTYwNTMsImV4cCI6MjA4NTE5MjA1M30.zqeL-F7CL_crGqku8lm6FxaMWQ7lo3znV2FQZAq9cmE"
 # Using Replit's built-in PostgreSQL database
