@@ -32,6 +32,7 @@ import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { supabaseAdmin } from "./supabaseAdmin";
 
 export interface IStorage {
   // Users
@@ -440,6 +441,26 @@ export class DatabaseStorage implements IStorage {
       status: userData.status || 'ACTIF',
       passwordHash,
     } as any).returning();
+
+    // Sync with Supabase Auth
+    if (supabaseAdmin && newUser.email) {
+      try {
+        await supabaseAdmin.auth.admin.createUser({
+          email: newUser.email,
+          password,
+          email_confirm: true,
+          user_metadata: {
+            firstName: newUser.firstName,
+            lastName: newUser.lastName,
+            role: newUser.role,
+          },
+        });
+        console.log(`[supabase-auth] Utilisateur créé dans Supabase Auth: ${newUser.email}`);
+      } catch (err) {
+        console.error(`[supabase-auth] Erreur création utilisateur Supabase Auth:`, err);
+      }
+    }
+
     return newUser;
   }
 
@@ -453,6 +474,21 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(eq(users.id, id))
       .returning();
+
+    // Sync password change with Supabase Auth
+    if (supabaseAdmin && password && updated?.email) {
+      try {
+        const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+        const authUser = authUsers?.users?.find((u) => u.email === updated.email);
+        if (authUser) {
+          await supabaseAdmin.auth.admin.updateUserById(authUser.id, { password });
+          console.log(`[supabase-auth] Mot de passe synchronisé pour: ${updated.email}`);
+        }
+      } catch (err) {
+        console.error(`[supabase-auth] Erreur synchro mot de passe:`, err);
+      }
+    }
+
     return updated;
   }
 
