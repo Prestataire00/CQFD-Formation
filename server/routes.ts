@@ -14,7 +14,6 @@ import { registerFeedbackRoutes } from "./feedback";
 import documentsRouter from "./documents";
 import { seedDefaultTemplates } from "./seed-templates";
 import { generateMissionsExcel, listExports, getLatestExport } from "./excel-export";
-import { seedTestData, clearTestData, getTestDataStatus } from "./seed-test-data";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -3260,37 +3259,6 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ message: 'Erreur serveur' });
-    }
-  });
-
-  // ==================== ADMIN TEST DATA ====================
-  app.get('/api/admin/test-data/status', isAuthenticated, requireRole(['admin']), async (req, res) => {
-    try {
-      const status = await getTestDataStatus();
-      res.json(status);
-    } catch (error) {
-      console.error('Test data status error:', error);
-      res.status(500).json({ message: 'Erreur serveur' });
-    }
-  });
-
-  app.post('/api/admin/test-data/seed', isAuthenticated, requireRole(['admin']), async (req, res) => {
-    try {
-      const results = await seedTestData();
-      res.json({ success: true, results });
-    } catch (error) {
-      console.error('Seed test data error:', error);
-      res.status(500).json({ message: 'Erreur lors de la création des données de test' });
-    }
-  });
-
-  app.post('/api/admin/test-data/clear', isAuthenticated, requireRole(['admin']), async (req, res) => {
-    try {
-      await clearTestData();
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Clear test data error:', error);
-      res.status(500).json({ message: 'Erreur lors de la suppression des données de test' });
     }
   });
 

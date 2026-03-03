@@ -13,7 +13,6 @@ import {
   LogOut,
   Calendar,
   StickyNote,
-  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
@@ -82,12 +81,6 @@ const NAV_ITEMS: NavItem[] = [
     icon: FileSpreadsheet,
     label: "Exports Excel",
     href: "/exports",
-    roles: ["admin"],
-  },
-  {
-    icon: FlaskConical,
-    label: "Espace de test",
-    href: "/admin-test",
     roles: ["admin"],
   },
   {
