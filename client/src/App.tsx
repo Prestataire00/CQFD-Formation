@@ -21,6 +21,7 @@ import Settings from "@/pages/Settings";
 import MyNotes from "@/pages/MyNotes";
 import Exports from "@/pages/exports";
 import ReminderSettings from "@/pages/ReminderSettings";
+import AdminTestSpace from "@/pages/AdminTestSpace";
 import { Sidebar } from "@/components/Sidebar";
 import { Loader2 } from "lucide-react";
 
@@ -156,6 +157,9 @@ function Router() {
       </Route>
       <Route path="/reminder-settings">
         <ProtectedRoute component={ReminderSettings} adminOnly />
+      </Route>
+      <Route path="/admin-test">
+        <ProtectedRoute component={AdminTestSpace} adminOnly />
       </Route>
       <Route path="/help">
         <ProtectedRoute component={() => <PlaceholderPage title="Aide" />} />
