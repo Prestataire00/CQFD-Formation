@@ -78,7 +78,8 @@
       "Bash(DATABASE_URL=\"postgresql://postgres.vfnlheqmktmlylpqfrpf:%40Anissapresta89@aws-1-eu-west-1.pooler.supabase.com:6543/postgres\" npx drizzle-kit push:*)",
       "Bash(test:*)",
       "Bash(git add:*)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(kill:*)"
     ]
   }
 }

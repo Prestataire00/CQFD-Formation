@@ -428,25 +428,42 @@ async function runDailyExportTask(): Promise<void> {
     log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
 
     // Envoyer par email à tous les admins actifs
-    const admins = (await storage.getUsers()).filter(u => u.role === 'admin' && u.status === 'ACTIF');
+    const allUsers = await storage.getUsers();
+    const admins = allUsers.filter(u => u.role === 'admin' && u.status === 'ACTIF');
     const filename = path.basename(filepath);
 
+    if (admins.length === 0) {
+      log(`[Scheduler] ATTENTION: aucun admin actif trouvé (${allUsers.filter(u => u.role === 'admin').length} admins au total, aucun avec status ACTIF). Export non envoyé.`, 'scheduler');
+    }
+
+    let sentCount = 0;
+    let failCount = 0;
     for (const admin of admins) {
       if (admin.email) {
         const adminName = `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin';
-        const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
-        if (sent) {
-          log(`[Scheduler] Export envoyé par email à ${admin.email}`, 'scheduler');
-        } else {
-          log(`[Scheduler] Échec envoi export à ${admin.email}`, 'scheduler');
+        try {
+          const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
+          if (sent) {
+            sentCount++;
+            log(`[Scheduler] Export envoyé par email à ${admin.email}`, 'scheduler');
+          } else {
+            failCount++;
+            log(`[Scheduler] Échec envoi export à ${admin.email} (sendEmail a retourné false)`, 'scheduler');
+          }
+        } catch (emailError) {
+          failCount++;
+          log(`[Scheduler] Erreur envoi export à ${admin.email}: ${emailError instanceof Error ? emailError.message : 'Unknown'}`, 'scheduler');
         }
+      } else {
+        log(`[Scheduler] Admin ${admin.firstName} ${admin.lastName} (id=${admin.id}) n'a pas d'email configuré`, 'scheduler');
       }
     }
+    log(`[Scheduler] Export quotidien terminé: ${sentCount} envoyé(s), ${failCount} échoué(s)`, 'scheduler');
 
     await cleanOldExports(7);
     log('[Scheduler] Nettoyage des anciens exports terminé', 'scheduler');
   } catch (error) {
-    log(`[Scheduler] Erreur lors de l'export Excel: ${error instanceof Error ? error.message : 'Unknown error'}`, 'scheduler');
+    log(`[Scheduler] Erreur lors de l'export Excel: ${error instanceof Error ? error.stack || error.message : 'Unknown error'}`, 'scheduler');
   }
 }
 

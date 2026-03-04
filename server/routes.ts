@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated, setupGoogleAuth, setupGoogleAuthRoutes } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail } from "./email";
+import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail, sendDailyExportEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { syncMissionToCalendar, deleteMissionFromCalendar, getGoogleAdminUserId } from "./google";
 import { registerFeedbackRoutes } from "./feedback";
@@ -3143,6 +3143,43 @@ export async function registerRoutes(
     } catch (error) {
       console.error('[Export] Error generating export:', error);
       res.status(500).json({ message: 'Erreur lors de la génération de l\'export' });
+    }
+  });
+
+  // Generate export AND send by email (for testing the nightly job manually)
+  app.post('/api/exports/generate-and-send', isAuthenticated, requireRole('admin'), async (req, res) => {
+    try {
+      const filepath = await generateMissionsExcel();
+      const filename = path.basename(filepath);
+
+      const allUsers = await storage.getUsers();
+      const admins = allUsers.filter(u => u.role === 'admin' && u.status === 'ACTIF');
+
+      if (admins.length === 0) {
+        return res.json({
+          success: false,
+          message: `Aucun admin actif trouvé (${allUsers.filter(u => u.role === 'admin').length} admins au total). Vérifiez le champ status.`,
+          filename,
+        });
+      }
+
+      const results: Array<{ email: string; sent: boolean; error?: string }> = [];
+      for (const admin of admins) {
+        if (admin.email) {
+          try {
+            const adminName = `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin';
+            const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
+            results.push({ email: admin.email, sent });
+          } catch (err) {
+            results.push({ email: admin.email, sent: false, error: err instanceof Error ? err.message : 'Unknown' });
+          }
+        }
+      }
+
+      res.json({ success: true, filename, results });
+    } catch (error) {
+      console.error('[Export] Error generating+sending export:', error);
+      res.status(500).json({ message: 'Erreur lors de l\'export', error: error instanceof Error ? error.message : 'Unknown' });
     }
   });
 

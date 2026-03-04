@@ -9,10 +9,14 @@ const createSmtpTransporter = () => {
     return null;
   }
 
+  const port = parseInt(process.env.SMTP_PORT || '587');
+  const secure = process.env.SMTP_SECURE === 'true';
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
+    port,
+    secure,
+    requireTLS: !secure && port === 587,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
@@ -75,16 +79,15 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     console.error('[Email] Gmail API fallback échoué:', gmailError);
   }
 
-  // Mode développement: log l'email si aucun transport disponible
-  console.log('[Email] Envoi simulé (aucun transport disponible):');
-  console.log(`  De: ${fromEmail}`);
-  console.log(`  À: ${options.to}`);
-  console.log(`  Sujet: ${options.subject}`);
-  console.log(`  Contenu HTML: ${options.html.substring(0, 200)}...`);
+  // Aucun transport disponible — email NON envoyé
+  console.error('[Email] ECHEC: aucun transport email disponible (SMTP et Gmail API ont échoué)');
+  console.error(`  De: ${fromEmail}`);
+  console.error(`  À: ${options.to}`);
+  console.error(`  Sujet: ${options.subject}`);
   if (options.attachments?.length) {
-    console.log(`  Pièces jointes: ${options.attachments.map(a => a.filename).join(', ')}`);
+    console.error(`  Pièces jointes: ${options.attachments.map(a => a.filename).join(', ')}`);
   }
-  return true;
+  return false;
 }
 
 // ==================== EXPORT QUOTIDIEN PAR EMAIL ====================

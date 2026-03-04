@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -115,6 +115,7 @@ export default function Settings() {
   // Task template viewer state (admin only)
   const [templateTypology, setTemplateTypology] = useState("Intra");
   const [templateTrainerRole, setTemplateTrainerRole] = useState("prestataire");
+  const [expandedTaskTitle, setExpandedTaskTitle] = useState<string | null>(null);
 
   // Reminder settings state (admin only)
   const [reminderSettings, setReminderSettings] = useState<any[]>([]);
@@ -493,7 +494,7 @@ export default function Settings() {
 
         <div className="flex-1 p-6">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-9' : 'grid-cols-3'}`}>
+            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-8' : 'grid-cols-3'}`}>
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profil</span>
@@ -522,12 +523,6 @@ export default function Settings() {
                 <TabsTrigger value="reminders" className="flex items-center gap-2">
                   <BellRing className="w-4 h-4" />
                   <span className="hidden sm:inline">Rappels</span>
-                </TabsTrigger>
-              )}
-              {isAdmin && (
-                <TabsTrigger value="consignes" className="flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4" />
-                  <span className="hidden sm:inline">Consignes</span>
                 </TabsTrigger>
               )}
               {isAdmin && (
@@ -1554,183 +1549,21 @@ export default function Settings() {
                 </Card>
               </TabsContent>
             )}
-            {/* Consignes Tab (Admin only) */}
-            {isAdmin && (
-              <TabsContent value="consignes">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Consignes des taches</CardTitle>
-                        <CardDescription>
-                          Personnalisez les textes d'aide affiches dans les popups "consignes" (icone info) de chaque tache de mission.
-                          Les taches sans personnalisation utilisent le texte par defaut.
-                        </CardDescription>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => setIsAddingExplanation(true)}
-                        disabled={isAddingExplanation}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Ajouter
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoadingExplanations ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {/* Add new explanation form */}
-                        {isAddingExplanation && (
-                          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                            <div className="space-y-3">
-                              <div className="space-y-1">
-                                <Label>Nom de la tache</Label>
-                                <Input
-                                  value={newExplanation.taskName}
-                                  onChange={(e) => setNewExplanation({ ...newExplanation, taskName: e.target.value })}
-                                  placeholder="Ex: Envoi compte-rendu entretien cadrage"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label>Consigne</Label>
-                                <Textarea
-                                  value={newExplanation.explanation}
-                                  onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
-                                  placeholder="Texte de la consigne..."
-                                  rows={6}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
-                                Annuler
-                              </Button>
-                              <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
-                                {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Ajouter
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Existing DB overrides */}
-                        {taskExplanationsDb.length > 0 && (
-                          <div>
-                            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                              Consignes personnalisees
-                            </h3>
-                            <div className="space-y-3">
-                              {taskExplanationsDb.map((item: any) => (
-                                <div key={item.id} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="text-sm font-medium mb-2">{item.taskName}</h4>
-                                      {editingExplanationId === item.id ? (
-                                        <div className="space-y-2">
-                                          <Textarea
-                                            value={editingExplanationText}
-                                            onChange={(e) => setEditingExplanationText(e.target.value)}
-                                            rows={6}
-                                            autoFocus
-                                          />
-                                          <div className="flex gap-2 justify-end">
-                                            <Button variant="outline" size="sm" onClick={() => { setEditingExplanationId(null); setEditingExplanationText(""); }}>
-                                              Annuler
-                                            </Button>
-                                            <Button size="sm" onClick={() => handleUpdateExplanation(item.id, editingExplanationText)}>
-                                              Sauvegarder
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      ) : (
-                                        <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-3">
-                                          {item.explanation}
-                                        </p>
-                                      )}
-                                    </div>
-                                    {editingExplanationId !== item.id && (
-                                      <div className="flex gap-1 flex-shrink-0">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => { setEditingExplanationId(item.id); setEditingExplanationText(item.explanation); }}
-                                        >
-                                          <Edit className="w-4 h-4" />
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-destructive hover:text-destructive"
-                                          onClick={() => handleDeleteExplanation(item.id)}
-                                        >
-                                          <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Default explanations (not yet overridden) */}
-                        <div>
-                          <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                            Consignes par defaut
-                          </h3>
-                          <div className="space-y-3">
-                            {TASK_EXPLANATIONS
-                              .filter((defaultItem) => !taskExplanationsDb.some((dbItem: any) => dbItem.taskName === defaultItem.taskName))
-                              .map((item) => (
-                                <div key={item.taskName} className="border rounded-lg p-4 hover:bg-muted/30 transition-colors">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="text-sm font-medium mb-2">{item.taskName}</h4>
-                                      <p className="text-sm text-muted-foreground whitespace-pre-line line-clamp-3">
-                                        {item.explanation}
-                                      </p>
-                                    </div>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      className="flex-shrink-0"
-                                      onClick={() => handleCustomizeExplanation(item.taskName, item.explanation)}
-                                    >
-                                      <Edit className="w-4 h-4 mr-1" />
-                                      Personnaliser
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            )}
-            {/* Task Templates Tab */}
+            {/* Task Templates & Consignes Tab */}
             {isAdmin && (
               <TabsContent value="modeles">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Modeles de taches</CardTitle>
+                    <CardTitle>Modeles de taches & Consignes</CardTitle>
                     <CardDescription>
-                      Visualisez les listes de taches predefinies selon la typologie de mission et le role du formateur.
+                      Visualisez les taches predefinies par typologie et role formateur. Cliquez sur une tache pour voir ou modifier sa consigne.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex gap-4">
                       <div className="space-y-2">
                         <Label>Typologie</Label>
-                        <Select value={templateTypology} onValueChange={setTemplateTypology}>
+                        <Select value={templateTypology} onValueChange={(v) => { setTemplateTypology(v); setExpandedTaskTitle(null); }}>
                           <SelectTrigger className="w-48">
                             <SelectValue />
                           </SelectTrigger>
@@ -1744,7 +1577,7 @@ export default function Settings() {
                       </div>
                       <div className="space-y-2">
                         <Label>Role formateur</Label>
-                        <Select value={templateTrainerRole} onValueChange={setTemplateTrainerRole}>
+                        <Select value={templateTrainerRole} onValueChange={(v) => { setTemplateTrainerRole(v); setExpandedTaskTitle(null); }}>
                           <SelectTrigger className="w-48">
                             <SelectValue />
                           </SelectTrigger>
@@ -1761,42 +1594,188 @@ export default function Settings() {
                       <strong>{templateTypology}</strong> / <strong>{templateTrainerRole === "prestataire" ? "Prestataire" : "Salarie"}</strong>
                     </div>
 
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">#</TableHead>
-                            <TableHead>Tache</TableHead>
-                            <TableHead className="w-32">Deadline prioritaire</TableHead>
-                            <TableHead className="w-32">Deadline retard</TableHead>
-                            <TableHead className="w-28">Assigne</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {getTaskTemplates(templateTypology, templateTrainerRole).map((task, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                              <TableCell className="font-medium">{task.title}</TableCell>
-                              <TableCell>
-                                <Badge variant={task.priorityDaysBefore > 0 ? "default" : "destructive"} className="text-xs">
-                                  {formatDeadlineLabel(task.priorityDaysBefore)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={task.lateDaysBefore > 0 ? "outline" : "destructive"} className="text-xs">
-                                  {formatDeadlineLabel(task.lateDaysBefore)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
-                                  {task.assigneeType === "admin" ? "Admin" : "Formateur"}
-                                </Badge>
-                              </TableCell>
+                    {isLoadingExplanations ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">#</TableHead>
+                              <TableHead>Tache</TableHead>
+                              <TableHead className="w-32">Prioritaire</TableHead>
+                              <TableHead className="w-32">Retard</TableHead>
+                              <TableHead className="w-28">Assigne</TableHead>
+                              <TableHead className="w-24">Consigne</TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {getTaskTemplates(templateTypology, templateTrainerRole).map((task, index) => {
+                              const isExpanded = expandedTaskTitle === task.title;
+                              const dbEntry = taskExplanationsDb.find((d: any) => d.taskName === task.title);
+                              const defaultEntry = TASK_EXPLANATIONS.find((d) => d.taskName === task.title);
+                              const hasConsigne = !!dbEntry || !!defaultEntry;
+                              const isEditing = isExpanded && editingExplanationId === dbEntry?.id;
+
+                              return (
+                                <React.Fragment key={index}>
+                                  <TableRow
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => setExpandedTaskTitle(isExpanded ? null : task.title)}
+                                  >
+                                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                    <TableCell className="font-medium">{task.title}</TableCell>
+                                    <TableCell>
+                                      <Badge variant={task.priorityDaysBefore > 0 ? "default" : "destructive"} className="text-xs">
+                                        {formatDeadlineLabel(task.priorityDaysBefore)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={task.lateDaysBefore > 0 ? "outline" : "destructive"} className="text-xs">
+                                        {formatDeadlineLabel(task.lateDaysBefore)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
+                                        {task.assigneeType === "admin" ? "Admin" : "Formateur"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {hasConsigne ? (
+                                        <Badge variant={dbEntry ? "default" : "outline"} className="text-xs">
+                                          {dbEntry ? "Perso." : "Defaut"}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                  {isExpanded && (
+                                    <TableRow>
+                                      <TableCell colSpan={6} className="bg-muted/30 p-0">
+                                        <div className="p-4 space-y-3">
+                                          {dbEntry ? (
+                                            <>
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne personnalisee</span>
+                                                {editingExplanationId !== dbEntry.id && (
+                                                  <div className="flex gap-1">
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={(e) => { e.stopPropagation(); setEditingExplanationId(dbEntry.id); setEditingExplanationText(dbEntry.explanation); }}
+                                                    >
+                                                      <Edit className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      className="text-destructive hover:text-destructive"
+                                                      onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(dbEntry.id); }}
+                                                    >
+                                                      <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                              {isEditing ? (
+                                                <div className="space-y-2">
+                                                  <Textarea
+                                                    value={editingExplanationText}
+                                                    onChange={(e) => setEditingExplanationText(e.target.value)}
+                                                    rows={6}
+                                                    autoFocus
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  />
+                                                  <div className="flex gap-2 justify-end">
+                                                    <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setEditingExplanationId(null); setEditingExplanationText(""); }}>
+                                                      Annuler
+                                                    </Button>
+                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExplanation(dbEntry.id, editingExplanationText); }}>
+                                                      Sauvegarder
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <p className="text-sm text-muted-foreground whitespace-pre-line">{dbEntry.explanation}</p>
+                                              )}
+                                            </>
+                                          ) : defaultEntry ? (
+                                            <>
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne par defaut</span>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={(e) => { e.stopPropagation(); handleCustomizeExplanation(task.title, defaultEntry.explanation); }}
+                                                >
+                                                  <Edit className="w-4 h-4 mr-1" />
+                                                  Personnaliser
+                                                </Button>
+                                              </div>
+                                              <p className="text-sm text-muted-foreground whitespace-pre-line">{defaultEntry.explanation}</p>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <p className="text-sm text-muted-foreground italic">Aucune consigne pour cette tache.</p>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => { e.stopPropagation(); setNewExplanation({ taskName: task.title, explanation: "" }); setIsAddingExplanation(true); }}
+                                              >
+                                                <Plus className="w-4 h-4 mr-1" />
+                                                Ajouter une consigne
+                                              </Button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  )}
+                                </React.Fragment>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+
+                    {/* Add new explanation form */}
+                    {isAddingExplanation && (
+                      <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                        <h3 className="text-sm font-semibold">Ajouter / Personnaliser une consigne</h3>
+                        <div className="space-y-3">
+                          <div className="space-y-1">
+                            <Label>Nom de la tache</Label>
+                            <Input
+                              value={newExplanation.taskName}
+                              onChange={(e) => setNewExplanation({ ...newExplanation, taskName: e.target.value })}
+                              placeholder="Ex: Envoi compte-rendu entretien cadrage"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label>Consigne</Label>
+                            <Textarea
+                              value={newExplanation.explanation}
+                              onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
+                              placeholder="Texte de la consigne..."
+                              rows={6}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
+                            Annuler
+                          </Button>
+                          <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
+                            {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                            Enregistrer
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
