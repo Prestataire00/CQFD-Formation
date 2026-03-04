@@ -200,7 +200,7 @@ export default function ExportsPage() {
             Fichiers d'export disponibles
           </CardTitle>
           <CardDescription>
-            Les exports sont générés automatiquement chaque jour à 6h00 et conservés pendant 7 jours.
+            Les exports sont générés automatiquement chaque jour à 1h00 du matin et conservés pendant 7 jours.
           </CardDescription>
         </CardHeader>
         <CardContent>

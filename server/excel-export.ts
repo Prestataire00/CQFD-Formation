@@ -236,7 +236,13 @@ export async function generateMissionsExcel(): Promise<string> {
     const missionDocs = allDocuments.filter(d => d.missionId === mission.id);
     const missionInvoices = allInvoices.filter((inv: any) => inv.missionId === mission.id);
 
-    const datesStr = mission.startDate ? formatDate(mission.startDate) : '';
+    // Toutes les dates de sessions (jours d'intervention)
+    const datesStr = missionSess.length > 0
+      ? missionSess
+          .map(s => s.sessionDate ? formatDate(s.sessionDate) : '')
+          .filter(Boolean)
+          .join('\n')
+      : (mission.startDate ? formatDate(mission.startDate) : '');
 
     const contactTel = client
       ? [client.contactName, client.contactPhone || client.phone].filter(Boolean).join(' - ')
@@ -268,11 +274,11 @@ export async function generateMissionsExcel(): Promise<string> {
       titreFormation: titleFormation,
       progInitial: mission.programTitle || '',
       observations: mission.description || '',
-      pubCommunication: '',
+      pubCommunication: getStepStatus(missionStepsList, 'Pub') || getStepStatus(missionStepsList, 'communication'),
       baseTarifaire: mission.rateBase ? `${mission.rateBase}` : '',
-      convention: '',
+      convention: getStepStatus(missionStepsList, 'convention') || getStepStatus(missionStepsList, 'Convention et modalités'),
       modaliteFinanciere: mission.financialTerms || '',
-      recap: '',
+      recap: getStepStatus(missionStepsList, 'Récap') || getStepStatus(missionStepsList, 'recap'),
       nbrePax: mission.expectedParticipants ? `${mission.expectedParticipants}` : '',
       listeParticipants: mission.participantsList || '',
       situationHandicap: mission.hasDisability ? (mission.disabilityDetails || 'Oui') : 'Non',
@@ -287,14 +293,14 @@ export async function generateMissionsExcel(): Promise<string> {
       questionnaireCadrageRef: getStepStatus(missionStepsList, 'cadrage'),
       compteRenduEntretien: getStepStatus(missionStepsList, 'compte-rendu') || getStepStatus(missionStepsList, 'compte rendu') || getStepStatus(missionStepsList, 'bilan'),
       programmeAjuste: getStepStatus(missionStepsList, 'programme'),
-      commandeSpecifique: '',
+      commandeSpecifique: getStepStatus(missionStepsList, 'commande') || getStepStatus(missionStepsList, 'Commande particulière'),
       envoiProgAjuste: getStepStatus(missionStepsList, 'séquençage') || getStepStatus(missionStepsList, 'programme'),
       lienVisio: mission.locationType === 'distanciel' || mission.locationType === 'hybride' ? '' : 'N/A',
       consignesFormateurs: getDocByType(missionDocs, 'consigne') || getStepStatus(missionStepsList, 'consignes'),
       cahierCharges: getDocByType(missionDocs, 'cahier des charges'),
-      budgetDeplHeb: '',
-      contratCDD: '',
-      contratPrestation: '',
+      budgetDeplHeb: getStepStatus(missionStepsList, 'budget') || getStepStatus(missionStepsList, 'dépl/héb'),
+      contratCDD: getStepStatus(missionStepsList, 'DUE') || getStepStatus(missionStepsList, 'Contrat de travail'),
+      contratPrestation: getStepStatus(missionStepsList, 'sous-traitance') || getStepStatus(missionStepsList, 'prestation'),
       livretImprimer: getDocByType(missionDocs, 'annexe') || getDocByType(missionDocs, 'impression'),
       envoiDossier: getStepStatus(missionStepsList, 'dossier') || getStepStatus(missionStepsList, 'feuilles de présence'),
       scanPresence: getDocByType(missionDocs, 'emargement') || getStepStatus(missionStepsList, 'emargement'),
@@ -303,7 +309,7 @@ export async function generateMissionsExcel(): Promise<string> {
       scanAnnexes: getDocByType(missionDocs, 'annexe'),
       syntheseEvaluation: getStepStatus(missionStepsList, 'évaluation') || getStepStatus(missionStepsList, 'evaluation'),
       envoiOriginaux: getStepStatus(missionStepsList, 'originaux') || getStepStatus(missionStepsList, 'courrier'),
-      fichePaie: '',
+      fichePaie: getStepStatus(missionStepsList, 'Fiche de paie') || getStepStatus(missionStepsList, 'solde de tout compte'),
       facturePrestataires: hasInvoice,
       commentairesTaches: buildCommentsColumn(missionStepsList, missionSubTasks, usersMap),
     });
@@ -335,13 +341,17 @@ export async function generateMissionsExcel(): Promise<string> {
     for (let c = 21; c <= 49; c++) {
       const cell = row.getCell(c);
       const val = cell.value as string;
-      if (val === 'Fait') {
+      const valStart = typeof val === 'string' ? val.split('\n')[0] : val;
+      if (valStart === 'Fait') {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
-      } else if (val === 'En retard') {
+      } else if (valStart === 'En retard') {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFCE4D6' } };
         cell.font = { color: { argb: 'FFFF0000' }, bold: true };
-      } else if (val === 'Prioritaire') {
+      } else if (valStart === 'Prioritaire') {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+      } else if (valStart === 'N/A') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD6DCE4' } };
+        cell.font = { color: { argb: 'FF808080' }, italic: true };
       }
     }
   }
