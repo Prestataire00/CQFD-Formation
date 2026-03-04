@@ -79,7 +79,9 @@
       "Bash(test:*)",
       "Bash(git add:*)",
       "Bash(xxd:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "Bash(while read fddir)",
+      "Bash(do ls -la \"$fddir\")"
     ]
   }
 }
