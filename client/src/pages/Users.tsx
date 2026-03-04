@@ -379,7 +379,7 @@ export default function Users() {
                       <TableCell>{user.phone || '-'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          {(user.id === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || user.id === 'admin-001') ? (
+                          {(user.id === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6') ? (
                             <>
                               <Badge variant="secondary" className="text-xs">Système</Badge>
                               <Button

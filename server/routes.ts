@@ -149,7 +149,7 @@ export async function registerRoutes(
     try {
       const targetUserId = req.params.id;
       // Empêcher la désactivation ou le changement de rôle de l'admin principal
-      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || targetUserId === 'admin-001') {
+      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6') {
         const input = req.body;
         if (input.status && input.status !== 'ACTIF') {
           return res.status(403).json({ message: "L'administrateur principal ne peut pas être désactivé" });
@@ -182,7 +182,7 @@ export async function registerRoutes(
     try {
       const targetUserId = req.params.id;
       // Empêcher la suppression de l'admin principal
-      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6' || targetUserId === 'admin-001') {
+      if (targetUserId === 'fc6c33f9-0245-4b10-856c-3f4daa45b6b6') {
         return res.status(403).json({ message: "L'administrateur principal ne peut pas être supprimé" });
       }
 
@@ -337,7 +337,6 @@ export async function registerRoutes(
       const body = {
         ...req.body,
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       const input = api.missions.create.input.parse(body);
       const mission = await storage.createMission(input);
@@ -397,7 +396,6 @@ export async function registerRoutes(
       const body = {
         ...req.body,
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       const input = api.missions.update.input.parse(body);
       const mission = await storage.updateMission(Number(req.params.id), input);
@@ -1163,7 +1161,6 @@ export async function registerRoutes(
       const body = {
         ...req.body,
         sessionDate: req.body.sessionDate ? new Date(req.body.sessionDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       const input = api.missions.sessions.create.input.parse(body);
       const session = await storage.createMissionSession({
@@ -1186,7 +1183,6 @@ export async function registerRoutes(
       const body = {
         ...req.body,
         sessionDate: req.body.sessionDate ? new Date(req.body.sessionDate) : undefined,
-        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
       const input = api.missions.sessions.update.input.parse(body);
       const session = await storage.updateMissionSession(Number(req.params.sessionId), input);
@@ -2232,11 +2228,7 @@ export async function registerRoutes(
       for (const setting of activeSettings) {
         // Calculer la date d'envoi basée sur le type de rappel
         let referenceDate: Date;
-        if (setting.reminderType === 'mission_end' && mission.endDate) {
-          referenceDate = new Date(mission.endDate);
-        } else {
-          referenceDate = new Date(mission.startDate);
-        }
+        referenceDate = new Date(mission.startDate);
 
         const scheduledDate = new Date(referenceDate);
         scheduledDate.setDate(scheduledDate.getDate() - setting.daysBefore);
@@ -3263,7 +3255,6 @@ export async function registerRoutes(
   });
 
   // Seed Data
-  await seedDatabase().catch(err => console.error('Error seeding database:', err));
   await seedBadges().catch(err => console.error('Error seeding badges:', err));
   await seedDefaultTemplates().catch(err => console.error('Error seeding default templates:', err));
   await seedTaskDeadlineDefaults().catch(err => console.error('Error seeding task deadline defaults:', err));
@@ -3271,176 +3262,6 @@ export async function registerRoutes(
   return httpServer;
 }
 
-async function seedDatabase() {
-  // Check if we already have data
-  const existingMissions = await storage.getMissions();
-  if (existingMissions.length > 0) {
-    return; // Already seeded
-  }
-
-  // Create admin user with password
-  const admin = await storage.createUser({
-    email: 'admin@cqfd-formation.fr',
-    firstName: 'Marie',
-    lastName: 'Dupont',
-    role: 'admin',
-  }, 'admin123');
-
-  // Create formateur with password
-  const formateur = await storage.createUser({
-    email: 'formateur@cqfd-formation.fr',
-    firstName: 'Pierre',
-    lastName: 'Martin',
-    role: 'formateur',
-    phone: '06 12 34 56 78',
-    specialties: ['Management', 'Communication'],
-  }, 'formateur123');
-
-  // Create prestataire with password
-  const prestataire = await storage.createUser({
-    email: 'prestataire@example.com',
-    firstName: 'Jean',
-    lastName: 'Bernard',
-    role: 'prestataire',
-    phone: '06 98 76 54 32',
-    siret: '12345678901234',
-    dailyRate: 50000, // 500€
-    specialties: ['Sécurité', 'Gestion de projet'],
-  }, 'prestataire123');
-
-  // Create clients
-  const client1 = await storage.createClient({
-    name: 'TechCorp SAS',
-    type: 'entreprise',
-    siret: '98765432109876',
-    address: '15 rue de la Tech',
-    city: 'Paris',
-    postalCode: '75001',
-    contactName: 'Sophie Leroy',
-    contactEmail: 'sophie.leroy@techcorp.fr',
-    contactPhone: '01 23 45 67 89',
-  });
-
-  const client2 = await storage.createClient({
-    name: 'OPCO Commerce',
-    type: 'opco',
-    address: '50 avenue des OPCO',
-    city: 'Lyon',
-    postalCode: '69001',
-    contactName: 'Marc Durand',
-    contactEmail: 'marc.durand@opco-commerce.fr',
-  });
-
-  // Create training programs
-  const program1 = await storage.createTrainingProgram({
-    code: 'MGMT-001',
-    title: 'Management d\'équipe',
-    type: 'Intra',
-    description: 'Formation aux fondamentaux du management',
-    objectives: 'Développer son leadership, Gérer les conflits, Motiver son équipe',
-    duration: '14 heures (2 jours)',
-    recommendedParticipants: 12,
-  });
-
-  const program2 = await storage.createTrainingProgram({
-    code: 'SEC-001',
-    title: 'Sécurité informatique',
-    type: 'Inter',
-    description: 'Sensibilisation à la cybersécurité',
-    objectives: 'Identifier les menaces, Appliquer les bonnes pratiques, Réagir en cas d\'incident',
-    duration: '7 heures (1 jour)',
-    recommendedParticipants: 15,
-  });
-
-  // Create missions
-  const mission1 = await storage.createMission({
-    title: 'Formation Management TechCorp',
-    typology: 'Intra',
-    status: 'confirmed',
-    programId: program1.id,
-    clientId: client1.id,
-    trainerId: formateur.id,
-    startDate: new Date('2024-02-15'),
-    endDate: new Date('2024-02-16'),
-    totalHours: 14,
-    locationType: 'presentiel',
-    location: '15 rue de la Tech, Paris',
-  });
-
-  const mission2 = await storage.createMission({
-    title: 'Cybersécurité OPCO Commerce',
-    typology: 'Inter',
-    status: 'draft',
-    programId: program2.id,
-    clientId: client2.id,
-    trainerId: prestataire.id,
-    startDate: new Date('2024-03-10'),
-    endDate: new Date('2024-03-10'),
-    totalHours: 7,
-    locationType: 'distanciel',
-    location: 'En ligne',
-  });
-
-  // Create sessions for mission 1
-  await storage.createMissionSession({
-    missionId: mission1.id,
-    sessionDate: new Date('2024-02-15'),
-    startTime: '09:00',
-    endTime: '17:00',
-  });
-
-  await storage.createMissionSession({
-    missionId: mission1.id,
-    sessionDate: new Date('2024-02-16'),
-    startTime: '09:00',
-    endTime: '17:00',
-  });
-
-  // Create participants
-  const participant1 = await storage.createParticipant({
-    firstName: 'Alice',
-    lastName: 'Moreau',
-    email: 'alice.moreau@techcorp.fr',
-    phone: '06 11 22 33 44',
-    company: 'TechCorp SAS',
-    function: 'Chef de projet',
-  });
-
-  const participant2 = await storage.createParticipant({
-    firstName: 'Bruno',
-    lastName: 'Petit',
-    email: 'bruno.petit@techcorp.fr',
-    phone: '06 55 66 77 88',
-    company: 'TechCorp SAS',
-    function: 'Responsable équipe',
-  });
-
-  // Add participants to mission 1
-  await storage.addParticipantToMission({
-    missionId: mission1.id,
-    participantId: participant1.id,
-    status: 'confirmed',
-  });
-
-  await storage.addParticipantToMission({
-    missionId: mission1.id,
-    participantId: participant2.id,
-    status: 'confirmed',
-  });
-
-  // Create a sample invoice
-  await storage.createInvoice({
-    invoiceNumber: 'FAC-2024-001',
-    amount: 50000, // 500€
-    vatAmount: 10000, // 100€ TVA
-    status: 'submitted',
-    userId: prestataire.id,
-    missionId: mission2.id,
-    invoiceDate: new Date(),
-  });
-
-  console.log('Database seeded with CQFD Formation demo data');
-}
 
 // Seed default badges for gamification
 async function seedBadges() {

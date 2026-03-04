@@ -114,7 +114,6 @@ export const missions = pgTable("missions", {
   locationType: text("location_type").default("presentiel"), // presentiel, distanciel, hybride
   videoLink: text("video_link"), // Lien visioconference (Teams, Zoom, etc.)
   startDate: timestamp("start_date"),
-  endDate: timestamp("end_date"),
   totalHours: integer("total_hours"), // Nombre total d'heures de formation
   location: text("location"),
   trainerId: varchar("trainer_id").references(() => users.id),
