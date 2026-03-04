@@ -552,13 +552,6 @@ export default function Feedback() {
                                 month: "long",
                                 year: "numeric"
                               })}
-                              {mission.endDate && mission.endDate !== mission.startDate && (
-                                <> - {new Date(mission.endDate).toLocaleDateString("fr-FR", {
-                                  day: "numeric",
-                                  month: "long",
-                                  year: "numeric"
-                                })}</>
-                              )}
                             </p>
                           )}
                         </div>

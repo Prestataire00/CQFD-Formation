@@ -32,8 +32,26 @@ import {
   Check,
   X,
   MessageSquare,
+  ListTodo,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { TASK_EXPLANATIONS } from "@/lib/task-explanations";
+import { getTaskTemplates, formatDeadlineLabel } from "@/lib/task-templates";
 
 export default function Settings() {
   const { user } = useAuth();
@@ -93,6 +111,10 @@ export default function Settings() {
   const [editingDeadlineId, setEditingDeadlineId] = useState<number | null>(null);
   const [newDeadline, setNewDeadline] = useState({ taskTitle: "", daysBefore: 0, category: "" });
   const [isAddingDeadline, setIsAddingDeadline] = useState(false);
+
+  // Task template viewer state (admin only)
+  const [templateTypology, setTemplateTypology] = useState("Intra");
+  const [templateTrainerRole, setTemplateTrainerRole] = useState("prestataire");
 
   // Reminder settings state (admin only)
   const [reminderSettings, setReminderSettings] = useState<any[]>([]);
@@ -333,12 +355,6 @@ export default function Settings() {
     }
   };
 
-  const formatDeadlineLabel = (days: number) => {
-    if (days > 0) return `J-${days}`;
-    if (days === 0) return "Jour J";
-    return `J+${Math.abs(days)}`;
-  };
-
   // Task explanations (consignes) handlers
   const handleAddExplanation = async () => {
     if (!newExplanation.taskName.trim() || !newExplanation.explanation.trim()) return;
@@ -477,7 +493,7 @@ export default function Settings() {
 
         <div className="flex-1 p-6">
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-7' : 'grid-cols-3'}`}>
+            <TabsList className={`grid w-full max-w-4xl ${isAdmin ? 'grid-cols-9' : 'grid-cols-3'}`}>
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
                 <span className="hidden sm:inline">Profil</span>
@@ -512,6 +528,12 @@ export default function Settings() {
                 <TabsTrigger value="consignes" className="flex items-center gap-2">
                   <MessageSquare className="w-4 h-4" />
                   <span className="hidden sm:inline">Consignes</span>
+                </TabsTrigger>
+              )}
+              {isAdmin && (
+                <TabsTrigger value="modeles" className="flex items-center gap-2">
+                  <ListTodo className="w-4 h-4" />
+                  <span className="hidden sm:inline">Modeles</span>
                 </TabsTrigger>
               )}
               {isAdmin && (
@@ -1690,6 +1712,91 @@ export default function Settings() {
                         </div>
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
+            {/* Task Templates Tab */}
+            {isAdmin && (
+              <TabsContent value="modeles">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Modeles de taches</CardTitle>
+                    <CardDescription>
+                      Visualisez les listes de taches predefinies selon la typologie de mission et le role du formateur.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex gap-4">
+                      <div className="space-y-2">
+                        <Label>Typologie</Label>
+                        <Select value={templateTypology} onValueChange={setTemplateTypology}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Intra">Intra</SelectItem>
+                            <SelectItem value="Inter">Inter</SelectItem>
+                            <SelectItem value="Conseil">Conseil</SelectItem>
+                            <SelectItem value="Conférence">Conference</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Role formateur</Label>
+                        <Select value={templateTrainerRole} onValueChange={setTemplateTrainerRole}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="prestataire">Prestataire</SelectItem>
+                            <SelectItem value="formateur">Salarie</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                      {getTaskTemplates(templateTypology, templateTrainerRole).length} taches pour{" "}
+                      <strong>{templateTypology}</strong> / <strong>{templateTrainerRole === "prestataire" ? "Prestataire" : "Salarie"}</strong>
+                    </div>
+
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Tache</TableHead>
+                            <TableHead className="w-32">Deadline prioritaire</TableHead>
+                            <TableHead className="w-32">Deadline retard</TableHead>
+                            <TableHead className="w-28">Assigne</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getTaskTemplates(templateTypology, templateTrainerRole).map((task, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                              <TableCell className="font-medium">{task.title}</TableCell>
+                              <TableCell>
+                                <Badge variant={task.priorityDaysBefore > 0 ? "default" : "destructive"} className="text-xs">
+                                  {formatDeadlineLabel(task.priorityDaysBefore)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={task.lateDaysBefore > 0 ? "outline" : "destructive"} className="text-xs">
+                                  {formatDeadlineLabel(task.lateDaysBefore)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
+                                  {task.assigneeType === "admin" ? "Admin" : "Formateur"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -62,7 +62,41 @@ export function setupLocalAuth(app: Express) {
     },
     async (email, password, done) => {
       try {
-        const user = await storage.getUserByEmail(email);
+        let user = await storage.getUserByEmail(email);
+
+        // If user not found locally, try to authenticate via Supabase Auth
+        // and sync the user to the local database
+        if (!user && supabaseAdmin) {
+          try {
+            const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+              email,
+              password,
+            });
+
+            if (!error && data.user) {
+              const meta = data.user.user_metadata || {};
+              const bcrypt = await import('bcrypt');
+              const passwordHash = await bcrypt.hash(password, 10);
+
+              const newUser = await storage.createUserDirect({
+                id: data.user.id,
+                email: data.user.email!,
+                firstName: meta.firstName || meta.first_name || 'Utilisateur',
+                lastName: meta.lastName || meta.last_name || '',
+                role: meta.role || 'admin',
+                status: 'ACTIF',
+                passwordHash,
+              });
+
+              if (newUser) {
+                console.log(`[auth] Utilisateur Supabase synchronisé localement: ${email}`);
+                user = newUser;
+              }
+            }
+          } catch (supaErr) {
+            console.error('[auth] Erreur vérification Supabase Auth:', supaErr);
+          }
+        }
 
         if (!user) {
           return done(null, false, { message: 'Email ou mot de passe incorrect' });

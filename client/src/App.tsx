@@ -113,9 +113,6 @@ function Router() {
       <Route path="/clients">
         <ProtectedRoute component={Clients} />
       </Route>
-      <Route path="/equipe">
-        <ProtectedRoute component={Participants} />
-      </Route>
       {/* Admin only routes */}
       <Route path="/users">
         <ProtectedRoute component={Users} adminOnly />

@@ -60,12 +60,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin"],
   },
   {
-    icon: Users,
-    label: "Equipe",
-    href: "/equipe",
-    roles: ["admin"],
-  },
-  {
     icon: UserCog,
     label: "Utilisateurs",
     href: "/users",

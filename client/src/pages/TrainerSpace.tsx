@@ -278,10 +278,9 @@ export default function TrainerSpace() {
       if (!mission.startDate) return;
 
       const startDate = new Date(mission.startDate);
-      const endDate = mission.endDate ? new Date(mission.endDate) : startDate;
 
-      // Ajouter 1 jour à la date de fin pour les événements "toute la journée"
-      const endDatePlusOne = new Date(endDate);
+      // Ajouter 1 jour à la date de début pour les événements "toute la journée"
+      const endDatePlusOne = new Date(startDate);
       endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
 
       const client = allClients?.find((c: Client) => c.id === mission.clientId);

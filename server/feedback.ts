@@ -384,7 +384,6 @@ export function registerFeedbackRoutes(app: Express) {
         mission: mission ? {
           title: mission.title,
           startDate: mission.startDate,
-          endDate: mission.endDate,
         } : null,
         participant: participant ? {
           firstName: participant.firstName,

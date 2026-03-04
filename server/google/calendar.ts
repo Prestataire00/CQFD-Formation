@@ -62,7 +62,7 @@ export async function syncMissionToCalendar(
 
     // Build event
     const startDate = mission.startDate || new Date();
-    const endDate = mission.endDate || mission.startDate || new Date();
+    const endDate = mission.startDate || new Date();
 
     const description = [
       clientName ? `Client : ${clientName}` : '',

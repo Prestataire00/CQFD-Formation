@@ -41,6 +41,7 @@ export interface IStorage {
   getUserByGoogleId(googleId: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   createUser(userData: Partial<User>, password: string): Promise<User>;
+  createUserDirect(userData: { id: string; email: string; firstName: string; lastName: string; role: string; status: string; passwordHash: string }): Promise<User>;
   updateUserWithPassword(id: string, data: Partial<User>, password?: string): Promise<User | undefined>;
   hardDeleteUser(id: string): Promise<boolean>;
   getUsers(): Promise<User[]>;
@@ -90,7 +91,7 @@ export interface IStorage {
   duplicateMissionForMultipleTrainers(originalMissionId: number, trainerIds: string[]): Promise<{ created: Mission[]; errors: { trainerId: string; error: string }[] }>;
   getChildMissions(parentMissionId: number): Promise<Mission[]>;
   getParentMission(missionId: number): Promise<Mission | undefined>;
-  syncParentToChildren(parentMissionId: number, fields?: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[]): Promise<number>;
+  syncParentToChildren(parentMissionId: number, fields?: ('title' | 'description' | 'startDate' | 'location' | 'locationType')[]): Promise<number>;
 
   // Mission Clients
   getMissionClients(missionId: number): Promise<(MissionClient & { client: Client })[]>;
@@ -461,6 +462,25 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    return newUser;
+  }
+
+  // Create a user directly with pre-hashed password (used for Supabase Auth sync)
+  async createUserDirect(userData: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    status: string;
+    passwordHash: string;
+  }): Promise<User> {
+    const [newUser] = await db.insert(users).values({
+      ...userData,
+      currentLevel: 1,
+      totalXP: 0,
+      streakDays: 0,
+    } as any).returning();
     return newUser;
   }
 
@@ -896,15 +916,15 @@ export class DatabaseStorage implements IStorage {
 
   async syncParentToChildren(
     parentMissionId: number,
-    fields?: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[]
+    fields?: ('title' | 'description' | 'startDate' | 'location' | 'locationType')[]
   ): Promise<number> {
     const parent = await this.getMission(parentMissionId);
     if (!parent || !parent.isOriginal) {
       return 0;
     }
 
-    const defaultFields: ('title' | 'description' | 'startDate' | 'endDate' | 'location' | 'locationType')[] =
-      ['title', 'description', 'startDate', 'endDate', 'location', 'locationType'];
+    const defaultFields: ('title' | 'description' | 'startDate' | 'location' | 'locationType')[] =
+      ['title', 'description', 'startDate', 'location', 'locationType'];
     const fieldsToSync = fields || defaultFields;
 
     // Build update object from parent

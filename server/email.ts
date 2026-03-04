@@ -364,10 +364,6 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
   const startDate = mission.startDate
     ? new Date(mission.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
     : 'Non définie';
-  const endDate = mission.endDate
-    ? new Date(mission.endDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
-    : 'Non définie';
-
   const trainerName = trainer
     ? `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Non assigné'
     : 'Non assigné';
@@ -420,9 +416,6 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
               <span class="label">Date de début:</span> ${startDate}
             </div>
             <div class="detail-row">
-              <span class="label">Date de fin:</span> ${endDate}
-            </div>
-            <div class="detail-row">
               <span class="label">Lieu:</span> ${locationInfo}
             </div>
             <div class="detail-row">
@@ -453,7 +446,6 @@ Une formation est prévue dans ${daysBefore} jour(s).
 
 Mission: ${missionTitle}
 Date de début: ${startDate}
-Date de fin: ${endDate}
 Lieu: ${locationInfo}
 Formateur: ${trainerName}
 Client: ${clientName}
@@ -486,10 +478,6 @@ export async function sendAdminFormationReminderEmail(
   const startDate = mission.startDate
     ? new Date(mission.startDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     : 'Non définie';
-  const endDate = mission.endDate
-    ? new Date(mission.endDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-    : 'Non définie';
-
   const trainerName = trainer
     ? `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim()
     : 'Non assigné';
@@ -548,9 +536,6 @@ export async function sendAdminFormationReminderEmail(
             </div>
             <div class="detail-row">
               <span class="label">Date début:</span> ${startDate}
-            </div>
-            <div class="detail-row">
-              <span class="label">Date fin:</span> ${endDate}
             </div>
             ${mission.totalHours ? `<div class="detail-row"><span class="label">Durée:</span> ${mission.totalHours}h</div>` : ''}
           </div>

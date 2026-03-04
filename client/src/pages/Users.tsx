@@ -43,7 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Pencil, Trash2, UserCheck, UserX, Users as UsersIcon } from "lucide-react";
 
 type UserRole = 'admin' | 'formateur' | 'prestataire';
-type UserStatus = 'ACTIF' | 'INACTIF' | 'SUPPRIME';
+type UserStatus = 'ACTIF' | 'INACTIF';
 
 interface UserFormData {
   email: string;
@@ -65,13 +65,11 @@ const roleLabels: Record<UserRole, string> = {
 const statusLabels: Record<UserStatus, string> = {
   ACTIF: 'Actif',
   INACTIF: 'Inactif',
-  SUPPRIME: 'Supprimé',
 };
 
 const statusColors: Record<UserStatus, string> = {
   ACTIF: 'bg-green-100 text-green-800',
   INACTIF: 'bg-yellow-100 text-yellow-800',
-  SUPPRIME: 'bg-red-100 text-red-800',
 };
 
 export default function Users() {
@@ -194,7 +192,6 @@ export default function Users() {
   };
 
   const filteredUsers = users?.filter(user => {
-    if (user.status === 'SUPPRIME') return false;
     if (filterRole !== 'all' && user.role !== filterRole) return false;
     if (filterStatus !== 'all' && user.status !== filterStatus) return false;
     return true;
@@ -332,7 +329,6 @@ export default function Users() {
                 <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
                 <SelectItem value="ACTIF" className="focus:bg-violet-200">Actif</SelectItem>
                 <SelectItem value="INACTIF" className="focus:bg-violet-200">Inactif</SelectItem>
-                <SelectItem value="SUPPRIME" className="focus:bg-violet-200">Supprimé</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -537,8 +533,8 @@ export default function Users() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer l'utilisateur {selectedUser?.firstName} {selectedUser?.lastName} ?
-              Cette action changera son statut en "Supprimé".
+              Êtes-vous sûr de vouloir supprimer définitivement l'utilisateur {selectedUser?.firstName} {selectedUser?.lastName} ?
+              Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

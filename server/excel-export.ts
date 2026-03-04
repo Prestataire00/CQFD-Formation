@@ -236,10 +236,7 @@ export async function generateMissionsExcel(): Promise<string> {
     const missionDocs = allDocuments.filter(d => d.missionId === mission.id);
     const missionInvoices = allInvoices.filter((inv: any) => inv.missionId === mission.id);
 
-    const datesStr = mission.startDate && mission.endDate
-      ? `${formatDate(mission.startDate)} - ${formatDate(mission.endDate)}`
-      : mission.startDate ? formatDate(mission.startDate)
-      : '';
+    const datesStr = mission.startDate ? formatDate(mission.startDate) : '';
 
     const contactTel = client
       ? [client.contactName, client.contactPhone || client.phone].filter(Boolean).join(' - ')

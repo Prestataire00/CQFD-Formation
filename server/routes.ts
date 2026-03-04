@@ -45,6 +45,16 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
 });
 
+// Helper: check if a non-admin user has access to a mission
+async function canAccessMission(userId: string, userRole: string, missionId: number): Promise<boolean> {
+  if (userRole === 'admin') return true;
+  const mission = await storage.getMission(missionId);
+  if (!mission) return false;
+  if (mission.trainerId === userId) return true;
+  const trainers = await storage.getMissionTrainers(missionId);
+  return trainers.some(t => t.trainerId === userId);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -323,7 +333,13 @@ export async function registerRoutes(
   });
 
   app.get(api.missions.get.path, isAuthenticated, async (req, res) => {
-    const mission = await storage.getMission(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé à cette mission" });
+      return;
+    }
+    const mission = await storage.getMission(missionId);
     if (!mission) {
       res.status(404).json({ message: "Mission non trouvée" });
       return;
@@ -904,7 +920,17 @@ export async function registerRoutes(
   // Mission Steps (étapes chronologiques)
   app.get(api.missions.steps.list.path, isAuthenticated, async (req, res) => {
     try {
-      const steps = await storage.getMissionSteps(Number(req.params.id));
+      const missionId = Number(req.params.id);
+      const user = req.user!;
+      if (!(await canAccessMission(user.id, user.role, missionId))) {
+        res.status(403).json({ message: "Accès non autorisé" });
+        return;
+      }
+      let steps = await storage.getMissionSteps(missionId);
+      // Formateurs: ne voir que les tâches qui leur sont assignées
+      if (user.role !== 'admin') {
+        steps = steps.filter(s => s.assigneeId === user.id);
+      }
       res.json(steps);
     } catch (error: any) {
       console.error('Mission steps error:', error);
@@ -1145,13 +1171,26 @@ export async function registerRoutes(
 
   // All Mission Sessions (for calendar & cards)
   app.get('/api/sessions', isAuthenticated, async (req, res) => {
-    const sessions = await storage.getAllMissionSessions();
+    const user = req.user!;
+    let sessions = await storage.getAllMissionSessions();
+    // Formateurs: filtrer pour ne voir que les sessions de leurs missions
+    if (user.role !== 'admin') {
+      const trainerMissions = await storage.getMissionsByTrainer(user.id);
+      const trainerMissionIds = new Set(trainerMissions.map(m => m.id));
+      sessions = sessions.filter(s => trainerMissionIds.has(s.missionId));
+    }
     res.json(sessions);
   });
 
   // Mission Sessions
   app.get(api.missions.sessions.list.path, isAuthenticated, async (req, res) => {
-    const sessions = await storage.getMissionSessions(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé" });
+      return;
+    }
+    const sessions = await storage.getMissionSessions(missionId);
     res.json(sessions);
   });
 
@@ -1211,7 +1250,13 @@ export async function registerRoutes(
 
   // Mission Participants
   app.get(api.missions.participants.list.path, isAuthenticated, async (req, res) => {
-    const participants = await storage.getMissionParticipants(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé" });
+      return;
+    }
+    const participants = await storage.getMissionParticipants(missionId);
     res.json(participants);
   });
 
@@ -1276,7 +1321,13 @@ export async function registerRoutes(
 
   // Mission Attendance
   app.get(api.missions.attendance.list.path, isAuthenticated, async (req, res) => {
-    const records = await storage.getAttendanceRecords(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé" });
+      return;
+    }
+    const records = await storage.getAttendanceRecords(missionId);
     res.json(records);
   });
 
@@ -1335,13 +1386,25 @@ export async function registerRoutes(
 
   // Mission Evaluations
   app.get(api.missions.evaluations.list.path, isAuthenticated, async (req, res) => {
-    const evals = await storage.getEvaluationsByMission(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé" });
+      return;
+    }
+    const evals = await storage.getEvaluationsByMission(missionId);
     res.json(evals);
   });
 
   // Mission Messages
   app.get(api.messages.byMission.path, isAuthenticated, async (req, res) => {
-    const messages = await storage.getMessagesByMission(Number(req.params.id));
+    const missionId = Number(req.params.id);
+    const user = req.user!;
+    if (!(await canAccessMission(user.id, user.role, missionId))) {
+      res.status(403).json({ message: "Accès non autorisé" });
+      return;
+    }
+    const messages = await storage.getMessagesByMission(missionId);
     res.json(messages);
   });
 

@@ -32,7 +32,6 @@ interface QuestionnaireData {
   mission: {
     title: string;
     startDate: string;
-    endDate: string;
   };
   participant: {
     firstName: string;
@@ -210,9 +209,6 @@ export default function QuestionnaireResponse() {
                 <p className="text-sm">
                   <strong>Date:</strong>{" "}
                   {new Date(data.mission.startDate).toLocaleDateString("fr-FR")}
-                  {data.mission.endDate && data.mission.endDate !== data.mission.startDate && (
-                    <> - {new Date(data.mission.endDate).toLocaleDateString("fr-FR")}</>
-                  )}
                 </p>
               )}
             </div>

@@ -32,11 +32,7 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
       // Déterminer la date de référence selon le type de rappel
       let referenceDate: Date | null = null;
       
-      if (setting.reminderType === 'mission_end' && mission.endDate) {
-        // Rappels de fin de mission basés sur endDate
-        referenceDate = new Date(mission.endDate);
-      } else if (setting.reminderType !== 'mission_end' && mission.startDate) {
-        // Rappels de début de mission basés sur startDate
+      if (mission.startDate) {
         referenceDate = new Date(mission.startDate);
       }
       

@@ -73,8 +73,8 @@ function getMissionsForDate(missions: Mission[], date: Date, sessionsByMission?:
       });
     }
 
-    // Fallback: use startDate/endDate range
-    const missionDate = mission.endDate ? new Date(mission.endDate) : mission.startDate ? new Date(mission.startDate) : null;
+    // Fallback: use startDate
+    const missionDate = mission.startDate ? new Date(mission.startDate) : null;
     if (!missionDate) return false;
     const missionDateOnly = new Date(missionDate.getFullYear(), missionDate.getMonth(), missionDate.getDate());
     return dateOnly.getTime() === missionDateOnly.getTime();
