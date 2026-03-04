@@ -179,10 +179,6 @@ export async function sendMissionAssignmentEmail(
   const startDate = mission.startDate
     ? new Date(mission.startDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
     : 'Non définie';
-  const endDate = mission.endDate
-    ? new Date(mission.endDate).toLocaleDateString('fr-FR', { dateStyle: 'long' })
-    : 'Non définie';
-
   const html = `
     <!DOCTYPE html>
     <html>
@@ -214,7 +210,6 @@ export async function sendMissionAssignmentEmail(
           <div class="mission-info">
             <h2>${missionTitle}</h2>
             <p><strong>Date de début:</strong> ${startDate}</p>
-            <p><strong>Date de fin:</strong> ${endDate}</p>
             <p><strong>Lieu:</strong> ${mission.location || 'À définir'}</p>
             <p><strong>Modalité:</strong> ${mission.locationType || 'À définir'}</p>
             ${mission.description ? `<p><strong>Description:</strong> ${mission.description}</p>` : ''}
@@ -245,7 +240,6 @@ Vous avez été assigné(e) à une nouvelle mission de formation.
 
 Mission: ${missionTitle}
 Date de début: ${startDate}
-Date de fin: ${endDate}
 Lieu: ${mission.location || 'À définir'}
 
 Documents liés:

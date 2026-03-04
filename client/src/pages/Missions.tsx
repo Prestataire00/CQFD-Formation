@@ -159,7 +159,6 @@ export default function Missions() {
     clientIds: [],
     trainerId: "",
     trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
-    endDate: "",
     locationType: "presentiel" as LocationType,
     location: "",
     typology: "Intra" as string,
@@ -262,7 +261,6 @@ export default function Missions() {
         clientId: parseInt(newMission.clientIds[0]),
         trainerId: newMission.trainerId || null,
         startDate: globalStartDate,
-        endDate: newMission.endDate || null,
         locationType: newMission.locationType,
         location: newMission.location || null,
         typology: newMission.typology,
@@ -315,7 +313,6 @@ export default function Missions() {
         clientIds: [],
         trainerId: "",
         trainingDays: [{ date: "", startTime: "09:00", endTime: "17:00" }],
-        endDate: "",
         locationType: "presentiel",
         location: "",
         typology: "Intra",
@@ -714,17 +711,6 @@ export default function Missions() {
                         Ajoutez chaque jour de formation avec ses horaires (ex: 18 janv 9h-17h, 24 janv 9h-17h).
                       </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Date de fin de mission (deadline)</Label>
-                      <Input
-                        type="date"
-                        value={newMission.endDate}
-                        onChange={(e) => setNewMission({ ...newMission, endDate: e.target.value })}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Les deadlines des taches seront calculees par rapport a cette date.
-                      </p>
-                    </div>
                     <div className="space-y-2 pt-2 border-t">
                       <Label>Rappel avant la formation</Label>
                       <div className="flex flex-wrap gap-2">
@@ -965,9 +951,6 @@ export default function Missions() {
                           {mission.startDate ? (
                             <>
                               {format(new Date(mission.startDate), "dd/MM/yy", { locale: fr })}
-                              {mission.endDate && mission.startDate !== mission.endDate && (
-                                <> - {format(new Date(mission.endDate), "dd/MM/yy", { locale: fr })}</>
-                              )}
                             </>
                           ) : "-"}
                         </td>
@@ -1144,9 +1127,6 @@ export default function Missions() {
                               <Calendar className="w-4 h-4" />
                               <span>
                                 {format(new Date(mission.startDate), "d MMM yyyy", { locale: fr })}
-                                {mission.endDate && mission.startDate !== mission.endDate && (
-                                  <> - {format(new Date(mission.endDate), "d MMM yyyy", { locale: fr })}</>
-                                )}
                               </span>
                             </div>
                           );
