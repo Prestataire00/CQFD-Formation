@@ -7,9 +7,10 @@ import { supabaseAdmin } from './supabaseAdmin';
 
 export async function seedDefaultAdmin() {
   try {
-    const existingAdmins = await db.select().from(users).where(eq(users.role, 'admin')).limit(1);
+    const existingAdmins = await db.select().from(users).where(eq(users.role, 'admin'));
+    const activeAdmins = existingAdmins.filter(a => a.status === 'ACTIF');
     
-    if (existingAdmins.length === 0) {
+    if (activeAdmins.length === 0) {
       console.log('[seed-admin] Aucun admin trouvé, création d\'un admin par défaut...');
       
       const defaultEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@cqfd-formation.fr';
