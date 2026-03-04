@@ -144,7 +144,6 @@ export default function Missions() {
     clientIds: string[];
     trainerId: string;
     trainingDays: Array<{ date: string; startTime: string; endTime: string }>;
-    endDate: string;
     locationType: LocationType;
     location: string;
     typology: string;
