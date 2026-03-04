@@ -75,8 +75,12 @@ export async function registerRoutes(
     next();
   });
   app.use('/uploads', express.static(uploadDir), (req, res) => {
-    // If express.static didn't find the file, return 404 instead of falling through to SPA
-    res.status(404).json({ message: 'Fichier non trouvé' });
+    // If express.static didn't find the file, return a user-friendly 404 page
+    res.status(404).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fichier non trouvé</title>
+<style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f9fafb;color:#374151}
+.box{text-align:center;padding:2rem}.icon{font-size:3rem;margin-bottom:1rem}h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#6b7280;margin:0 0 1.5rem}
+a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
+<body><div class="box"><div class="icon">&#128196;</div><h1>Fichier non disponible</h1><p>Ce document n'a pas été trouvé sur le serveur.<br>Il doit être rechargé dans la mission.</p><a href="javascript:window.close()">Fermer cet onglet</a></div></body></html>`);
   });
 
   // ==================== STATS ====================

@@ -32,9 +32,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
 } from "@/components/ui/popover";
 import {
   Plus,
@@ -408,79 +405,80 @@ export default function Missions() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="client">{newMission.typology === "Inter" ? "Clients *" : "Client *"}</Label>
-                        <Popover open={clientOpen} onOpenChange={setClientOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={clientOpen}
-                              className="w-full justify-between font-normal"
-                            >
-                              {newMission.typology === "Inter" ? (
-                                <span className="text-muted-foreground flex items-center gap-2">
-                                  <Building2 className="w-4 h-4" />
-                                  Taper pour ajouter des clients...
-                                </span>
-                              ) : newMission.clientIds[0] ? (
-                                (() => {
-                                  const client = clients?.find((c: any) => c.id.toString() === newMission.clientIds[0]);
-                                  return client ? client.name : "Selectionner...";
-                                })()
-                              ) : (
-                                <span className="text-muted-foreground">Taper pour rechercher...</span>
-                              )}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-[350px] p-0" align="start">
-                            <Command shouldFilter={false}>
-                              <CommandInput
-                                placeholder="Rechercher un client (nom, email, ville)..."
-                                value={clientSearch}
-                                onValueChange={setClientSearch}
-                              />
-                              <CommandList>
-                                <CommandEmpty>Aucun client trouve</CommandEmpty>
-                                <CommandGroup>
-                                  {filteredClients
-                                    .filter((c: any) => newMission.typology === "Inter" ? !newMission.clientIds.includes(c.id.toString()) : true)
-                                    .map((client: any) => (
-                                      <CommandItem
-                                        key={client.id}
-                                        value={client.id.toString()}
-                                        onSelect={() => {
-                                          if (newMission.typology === "Inter") {
-                                            if (!newMission.clientIds.includes(client.id.toString())) {
-                                              setNewMission({ ...newMission, clientIds: [...newMission.clientIds, client.id.toString()] });
+                        <div className="relative">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between font-normal"
+                            onClick={() => setClientOpen(!clientOpen)}
+                          >
+                            {newMission.typology === "Inter" ? (
+                              <span className="text-muted-foreground flex items-center gap-2">
+                                <Building2 className="w-4 h-4" />
+                                Taper pour ajouter des clients...
+                              </span>
+                            ) : newMission.clientIds[0] ? (
+                              (() => {
+                                const client = clients?.find((c: any) => c.id.toString() === newMission.clientIds[0]);
+                                return client ? client.name : "Selectionner...";
+                              })()
+                            ) : (
+                              <span className="text-muted-foreground">Taper pour rechercher...</span>
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                          {clientOpen && (
+                            <div className="absolute top-full left-0 mt-1 w-[350px] z-[60] rounded-md border bg-popover shadow-md">
+                              <Command shouldFilter={false}>
+                                <CommandInput
+                                  placeholder="Rechercher un client (nom, email, ville)..."
+                                  value={clientSearch}
+                                  onValueChange={setClientSearch}
+                                />
+                                <CommandList>
+                                  <CommandEmpty>Aucun client trouve</CommandEmpty>
+                                  <CommandGroup>
+                                    {filteredClients
+                                      .filter((c: any) => newMission.typology === "Inter" ? !newMission.clientIds.includes(c.id.toString()) : true)
+                                      .map((client: any) => (
+                                        <CommandItem
+                                          key={client.id}
+                                          value={client.id.toString()}
+                                          onSelect={() => {
+                                            if (newMission.typology === "Inter") {
+                                              if (!newMission.clientIds.includes(client.id.toString())) {
+                                                setNewMission({ ...newMission, clientIds: [...newMission.clientIds, client.id.toString()] });
+                                              }
+                                            } else {
+                                              setNewMission({ ...newMission, clientIds: [client.id.toString()] });
+                                              setClientOpen(false);
                                             }
-                                          } else {
-                                            setNewMission({ ...newMission, clientIds: [client.id.toString()] });
-                                            setClientOpen(false);
-                                          }
-                                          setClientSearch("");
-                                        }}
-                                      >
-                                        <Check
-                                          className={cn(
-                                            "mr-2 h-4 w-4",
-                                            newMission.clientIds.includes(client.id.toString()) ? "opacity-100" : "opacity-0"
-                                          )}
-                                        />
-                                        <div className="flex flex-col">
-                                          <span>{client.name}</span>
-                                          {(client.contactEmail || client.city) && (
-                                            <span className="text-xs text-muted-foreground">
-                                              {[client.contactEmail, client.city].filter(Boolean).join(" • ")}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                                            setClientSearch("");
+                                          }}
+                                        >
+                                          <Check
+                                            className={cn(
+                                              "mr-2 h-4 w-4",
+                                              newMission.clientIds.includes(client.id.toString()) ? "opacity-100" : "opacity-0"
+                                            )}
+                                          />
+                                          <div className="flex flex-col">
+                                            <span>{client.name}</span>
+                                            {(client.contactEmail || client.city) && (
+                                              <span className="text-xs text-muted-foreground">
+                                                {[client.contactEmail, client.city].filter(Boolean).join(" • ")}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </CommandItem>
+                                      ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </div>
+                          )}
+                        </div>
                         {newMission.clientIds.length > 0 && (
                           <div className="flex flex-wrap gap-2">
                             {newMission.clientIds.map(id => {
