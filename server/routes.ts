@@ -74,7 +74,10 @@ export async function registerRoutes(
     }
     next();
   });
-  app.use('/uploads', express.static(uploadDir));
+  app.use('/uploads', express.static(uploadDir), (req, res) => {
+    // If express.static didn't find the file, return 404 instead of falling through to SPA
+    res.status(404).json({ message: 'Fichier non trouvé' });
+  });
 
   // ==================== STATS ====================
   app.get(api.stats.get.path, isAuthenticated, async (req, res) => {

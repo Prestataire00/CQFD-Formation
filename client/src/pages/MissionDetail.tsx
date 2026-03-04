@@ -1678,6 +1678,26 @@ export default function MissionDetail() {
     }
   };
 
+  const handleDocumentDownload = async (url: string, title: string) => {
+    try {
+      const response = await fetch(url, { credentials: 'include' });
+      if (!response.ok) {
+        toast({ title: "Fichier non disponible", description: "Le fichier n'a pas été trouvé sur le serveur.", variant: "destructive" });
+        return;
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = title || url.split('/').pop() || 'document';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch {
+      toast({ title: "Erreur de téléchargement", variant: "destructive" });
+    }
+  };
 
   const handleStatusChange = async (newStatus: MissionStatus) => {
     try {
@@ -2735,10 +2755,8 @@ export default function MissionDetail() {
                     </div>
                     <div className="flex items-center gap-2">
                       {doc.url ? (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
-                            <Download className="w-4 h-4" />
-                          </a>
+                        <Button variant="ghost" size="sm" onClick={() => handleDocumentDownload(doc.url, doc.title || doc.type)}>
+                          <Download className="w-4 h-4" />
                         </Button>
                       ) : (
                         <label className="cursor-pointer">
