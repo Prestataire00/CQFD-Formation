@@ -30,7 +30,7 @@ export const permissions = {
   'missions:assign-trainer': ['admin'] as UserRole[],
 
   // Clients
-  'clients:read': ['admin'] as UserRole[],
+  'clients:read': ['admin', 'formateur', 'prestataire'] as UserRole[],
   'clients:create': ['admin'] as UserRole[],
   'clients:update': ['admin'] as UserRole[],
   'clients:delete': ['admin'] as UserRole[],

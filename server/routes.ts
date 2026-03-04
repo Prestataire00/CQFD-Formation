@@ -1394,14 +1394,7 @@ export async function registerRoutes(
     
     const docs = await storage.getDocumentsByMission(missionId);
 
-    // Filtrer les documents pour les formateurs/prestataires :
-    // ils ne voient que leurs propres documents et les documents système (sans userId)
-    if (user.role === 'formateur' || user.role === 'prestataire') {
-      const filteredDocs = docs.filter(doc => doc.userId === user.id || !doc.userId);
-      res.json(filteredDocs);
-      return;
-    }
-
+    // Le formateur/prestataire assigné voit tous les documents de la mission
     res.json(docs);
   });
 
