@@ -1007,6 +1007,27 @@ export async function registerRoutes(
         delete updateData.commentAuthorId;
       }
 
+      // Recalculate status when dates are pushed to the future
+      // If step is currently 'late' and the new due/late dates are in the future, reset to 'todo' or 'priority'
+      if (currentStep?.status === 'late' && !updateData.status) {
+        const now = new Date();
+        const newDueDate = updateData.dueDate ? new Date(updateData.dueDate) : (currentStep.dueDate ? new Date(currentStep.dueDate) : null);
+        const newLateDate = updateData.lateDate ? new Date(updateData.lateDate) : (currentStep.lateDate ? new Date(currentStep.lateDate) : null);
+
+        // If late_date (deadline retard) is in the future, no longer late
+        if (newLateDate && newLateDate > now) {
+          // If due_date (deadline prioritaire) is in the future too, it's a normal todo
+          // If due_date is passed but late_date isn't, it's priority
+          if (newDueDate && newDueDate <= now) {
+            updateData.status = 'priority';
+          } else {
+            updateData.status = 'todo';
+          }
+        } else if (!newLateDate && newDueDate && newDueDate > now) {
+          updateData.status = 'todo';
+        }
+      }
+
       const step = await storage.updateMissionStep(stepId, {
         ...updateData,
         dueDate: updateData.dueDate ? new Date(updateData.dueDate) : undefined,

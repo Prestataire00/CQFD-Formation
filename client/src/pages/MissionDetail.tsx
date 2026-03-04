@@ -233,14 +233,11 @@ function getAutoStatus(task: any): StepStatus {
   // Manual overrides (user explicitly set a status)
   if (task.isCompleted || task.status === 'done') return 'done';
   if (task.status === 'na') return 'na';
-  if (task.status === 'priority') return 'priority';
-  if (task.status === 'late') return 'late';
 
-  // Auto-compute for tasks in 'todo' status
-  if (!task.dueDate) return 'todo';
+  // Always recompute from dates — handles deadline adjustments
   const now = new Date();
+  if (!task.dueDate) return 'todo';
 
-  // If lateDate exists, use per-task thresholds: past lateDate → late, past dueDate → priority
   if (task.lateDate) {
     const lateDate = new Date(task.lateDate);
     if (now >= lateDate) return 'late';

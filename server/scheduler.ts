@@ -368,14 +368,33 @@ async function markLateStepsServerSide(): Promise<number> {
     let steps: any[] = [];
     try { steps = await storage.getMissionSteps(mission.id); } catch (e) { log(`[Scheduler] Erreur getMissionSteps (late check) mission ${mission.id}: ${e instanceof Error ? e.message : 'Unknown'}`, 'scheduler'); continue; }
     for (const step of steps) {
-      if (
-        step.dueDate &&
-        new Date(step.dueDate) < now &&
-        step.status === 'todo' &&
-        !step.isCompleted
-      ) {
-        await storage.updateMissionStep(step.id, { status: 'late' });
-        marked++;
+      if (step.isCompleted || step.status === 'na') continue;
+
+      const dueDate = step.dueDate ? new Date(step.dueDate) : null;
+      const lateDate = step.lateDate ? new Date(step.lateDate) : null;
+
+      // Mark as late: lateDate passed (or dueDate passed if no lateDate)
+      if (step.status !== 'late') {
+        const deadlineForLate = lateDate || dueDate;
+        if (deadlineForLate && deadlineForLate < now && (step.status === 'todo' || step.status === 'priority')) {
+          await storage.updateMissionStep(step.id, { status: 'late' });
+          marked++;
+        }
+        // Mark as priority: dueDate passed but lateDate not yet
+        else if (dueDate && dueDate < now && lateDate && lateDate > now && step.status === 'todo') {
+          await storage.updateMissionStep(step.id, { status: 'priority' });
+        }
+      }
+      // Un-late: dates were pushed to the future
+      else if (step.status === 'late') {
+        const deadlineForLate = lateDate || dueDate;
+        if (deadlineForLate && deadlineForLate > now) {
+          if (dueDate && dueDate <= now) {
+            await storage.updateMissionStep(step.id, { status: 'priority' });
+          } else {
+            await storage.updateMissionStep(step.id, { status: 'todo' });
+          }
+        }
       }
     }
   }

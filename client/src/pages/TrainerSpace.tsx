@@ -561,7 +561,9 @@ export default function TrainerSpace() {
                     ) : (
                       <div className="space-y-3">
                         {priorityTasks.map((step: MissionStep & { mission: Mission }) => {
-                          const isLate = step.status === "late" || (step.dueDate && new Date(step.dueDate) < new Date());
+                          const isLate = step.lateDate
+                            ? new Date(step.lateDate) <= new Date()
+                            : (step.dueDate && new Date(step.dueDate) < new Date());
 
                           return (
                             <div

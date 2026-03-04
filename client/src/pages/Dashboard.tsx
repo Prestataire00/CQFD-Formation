@@ -238,8 +238,19 @@ export default function Dashboard() {
     if (!allSteps) return { total: 0, done: 0, inProgress: 0, late: 0, priority: 0, todo: 0 };
     const total = allSteps.length;
     const done = allSteps.filter((s: any) => s.isCompleted || s.status === "done").length;
-    const late = allSteps.filter((s: any) => !s.isCompleted && s.status === "late").length;
-    const priority = allSteps.filter((s: any) => !s.isCompleted && s.status === "priority").length;
+    const now = new Date();
+    const late = allSteps.filter((s: any) => {
+      if (s.isCompleted || s.status === "done" || s.status === "na") return false;
+      const deadlineForLate = s.lateDate ? new Date(s.lateDate) : (s.dueDate ? new Date(s.dueDate) : null);
+      return deadlineForLate && deadlineForLate <= now;
+    }).length;
+    const priority = allSteps.filter((s: any) => {
+      if (s.isCompleted || s.status === "done" || s.status === "na") return false;
+      if (s.dueDate && s.lateDate) {
+        return new Date(s.dueDate) <= now && new Date(s.lateDate) > now;
+      }
+      return !s.isCompleted && s.status === "priority";
+    }).length;
     const inProgress = allSteps.filter((s: any) => !s.isCompleted && s.status === "in_progress").length;
     const todo = total - done - late - priority - inProgress;
     return { total, done, inProgress, late, priority, todo };
@@ -649,7 +660,9 @@ export default function Dashboard() {
                     <div className="space-y-2">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Taches prioritaires & en retard</p>
                       {trainerPriorityTasks.map((step: MissionStep & { mission: Mission }) => {
-                        const isLate = step.status === "late" || (step.dueDate && new Date(step.dueDate) < new Date());
+                        const isLate = step.lateDate
+                          ? new Date(step.lateDate) <= new Date()
+                          : (step.dueDate && new Date(step.dueDate) < new Date());
                         return (
                           <div
                             key={step.id}
