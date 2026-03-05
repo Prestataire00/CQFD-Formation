@@ -78,7 +78,10 @@ export function useUpdateMission() {
         credentials: 'include',
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to update mission");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to update mission");
+      }
       return res.json();
     },
     onSuccess: (_, { id }) => {
@@ -419,7 +422,10 @@ export function useCreateMissionStep() {
         credentials: 'include',
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create step");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create step");
+      }
       return res.json();
     },
     onSuccess: (_, { missionId }) => {
@@ -457,7 +463,10 @@ export function useDeleteMissionStep() {
         method: 'DELETE',
         credentials: 'include',
       });
-      if (!res.ok) throw new Error("Failed to delete step");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete step");
+      }
       return res.json();
     },
     onSuccess: (_, { missionId }) => {

@@ -1068,23 +1068,18 @@ export default function MissionDetail() {
           location: editForm.location,
           locationType: editForm.locationType,
           videoLink: editForm.videoLink || null,
-          totalHours: editForm.totalHours ? Number(editForm.totalHours) : undefined,
-          clientId: editForm.clientId ? Number(editForm.clientId) : undefined,
+          totalHours: editForm.totalHours && !isNaN(Number(editForm.totalHours)) ? Number(editForm.totalHours) : undefined,
+          clientId: editForm.clientId && !isNaN(Number(editForm.clientId)) ? Number(editForm.clientId) : undefined,
           trainerId: editForm.trainerId || undefined,
-          programId: editForm.programId ? Number(editForm.programId) : undefined,
+          programId: editForm.programId && !isNaN(Number(editForm.programId)) ? Number(editForm.programId) : undefined,
           programTitle: editForm.programTitle || undefined,
-          expectedParticipants: editForm.expectedParticipants ? Number(editForm.expectedParticipants) : undefined,
+          expectedParticipants: editForm.expectedParticipants && !isNaN(Number(editForm.expectedParticipants)) ? Number(editForm.expectedParticipants) : undefined,
           participantsList: editForm.participantsList || undefined,
         },
       });
 
       // If typology or trainer changed, replace all tasks with the correct template
       if ((typologyChanged || trainerChanged) && steps) {
-        // Delete all existing tasks
-        for (const step of steps) {
-          await deleteStep.mutateAsync({ missionId, stepId: step.id });
-        }
-
         // Determine the correct task template based on new typology + trainer role
         const newTrainer = allUsers?.find((u: any) => u.id === editForm.trainerId);
         const trainerRole = newTrainer?.role;
@@ -1101,14 +1096,22 @@ export default function MissionDetail() {
         else if (typology === "Conférence" && trainerRole === "formateur") taskList = CONFERENCE_SALARIE_TASKS;
 
         if (taskList) {
+          // Delete all existing tasks only when a valid template is found
+          for (const step of steps) {
+            await deleteStep.mutateAsync({ missionId, stepId: step.id });
+          }
+
           const adminId = user?.id || null;
           const formateurId = editForm.trainerId || null;
+          // Validate that assignee IDs exist in user list to prevent FK violations
+          const validAdminId = adminId && allUsers?.some((u: any) => u.id === adminId) ? adminId : null;
+          const validFormateurId = formateurId && allUsers?.some((u: any) => u.id === formateurId) ? formateurId : null;
           const createdAtRef = mission?.createdAt ? new Date(mission.createdAt) : null;
 
           let order = 0;
           for (const task of taskList) {
             order++;
-            const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+            const assigneeId = task.assigneeType === "admin" ? validAdminId : validFormateurId;
             let dueDate: string | undefined;
             let lateDate: string | undefined;
             if (createdAtRef) {
@@ -1133,8 +1136,10 @@ export default function MissionDetail() {
             });
           }
           toast({ title: `Taches mises a jour (${taskList.length} taches)` });
+        } else if (!editForm.trainerId) {
+          toast({ title: "Typologie mise a jour. Assignez un formateur pour generer les taches correspondantes." });
         } else {
-          toast({ title: "Taches supprimees (aucun template correspondant)" });
+          toast({ title: "Typologie mise a jour (aucun template de taches correspondant)" });
         }
       } else {
         // Recalculate all task deadlines based on mission creation date (only if tasks weren't replaced)
@@ -1157,8 +1162,9 @@ export default function MissionDetail() {
 
       setIsEditingInfo(false);
       toast({ title: "Informations mises a jour" });
-    } catch (error) {
-      toast({ title: "Erreur", description: "Impossible de sauvegarder", variant: "destructive" });
+    } catch (error: any) {
+      console.error("[handleSaveInfo] Error:", error);
+      toast({ title: "Erreur", description: error?.message || "Impossible de sauvegarder", variant: "destructive" });
     }
   };
 
@@ -2763,15 +2769,17 @@ export default function MissionDetail() {
                           </Button>
                         </label>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-red-600"
-                        onClick={() => deleteDocument.mutate({ id: doc.id, missionId: mission.id })}
-                        data-testid={`button-delete-document-${doc.id}`}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {(isAdmin || user?.role !== "formateur" || doc.userId === user?.id) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-red-600"
+                          onClick={() => deleteDocument.mutate({ id: doc.id, missionId: mission.id })}
+                          data-testid={`button-delete-document-${doc.id}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

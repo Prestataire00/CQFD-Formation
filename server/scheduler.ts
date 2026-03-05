@@ -454,19 +454,33 @@ async function runDailyExportTask(): Promise<void> {
     const filepath = await generateMissionsExcel();
     log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
 
-    // Envoyer par email à tous les admins actifs
+    // Envoyer par email à l'adresse fixe + tous les admins actifs
+    const DAILY_EXPORT_EMAIL = 'contact@cqfd-formation.fr';
     const allUsers = await storage.getUsers();
     const admins = allUsers.filter(u => u.role === 'admin' && u.status === 'ACTIF');
     const filename = path.basename(filepath);
 
-    if (admins.length === 0) {
-      log(`[Scheduler] ATTENTION: aucun admin actif trouvé (${allUsers.filter(u => u.role === 'admin').length} admins au total, aucun avec status ACTIF). Export non envoyé.`, 'scheduler');
-    }
-
     let sentCount = 0;
     let failCount = 0;
+
+    // Envoi systématique à l'adresse principale
+    try {
+      const sent = await sendDailyExportEmail(DAILY_EXPORT_EMAIL, 'CQFD Formation', filepath, filename);
+      if (sent) {
+        sentCount++;
+        log(`[Scheduler] Export envoyé par email à ${DAILY_EXPORT_EMAIL}`, 'scheduler');
+      } else {
+        failCount++;
+        log(`[Scheduler] Échec envoi export à ${DAILY_EXPORT_EMAIL} (sendEmail a retourné false)`, 'scheduler');
+      }
+    } catch (emailError) {
+      failCount++;
+      log(`[Scheduler] Erreur envoi export à ${DAILY_EXPORT_EMAIL}: ${emailError instanceof Error ? emailError.message : 'Unknown'}`, 'scheduler');
+    }
+
+    // Envoi aux admins actifs (en évitant le doublon si un admin a la même adresse)
     for (const admin of admins) {
-      if (admin.email) {
+      if (admin.email && admin.email !== DAILY_EXPORT_EMAIL) {
         const adminName = `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin';
         try {
           const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
@@ -481,8 +495,6 @@ async function runDailyExportTask(): Promise<void> {
           failCount++;
           log(`[Scheduler] Erreur envoi export à ${admin.email}: ${emailError instanceof Error ? emailError.message : 'Unknown'}`, 'scheduler');
         }
-      } else {
-        log(`[Scheduler] Admin ${admin.firstName} ${admin.lastName} (id=${admin.id}) n'a pas d'email configuré`, 'scheduler');
       }
     }
     log(`[Scheduler] Export quotidien terminé: ${sentCount} envoyé(s), ${failCount} échoué(s)`, 'scheduler');

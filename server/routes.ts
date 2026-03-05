@@ -498,11 +498,12 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       res.json(mission);
     } catch (err) {
       console.error('Mission update error:', err);
+      console.error('Mission update payload:', JSON.stringify(req.body));
       if (err instanceof z.ZodError) {
         res.status(400).json({ message: err.errors[0].message, errors: err.errors });
         return;
       }
-      throw err;
+      res.status(500).json({ message: err instanceof Error ? err.message : "Erreur lors de la mise a jour de la mission" });
     }
   });
 
@@ -979,11 +980,12 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
 
       res.status(201).json(step);
     } catch (err) {
+      console.error('Step create error:', err);
       if (err instanceof z.ZodError) {
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      res.status(500).json({ message: err instanceof Error ? err.message : "Erreur lors de la creation de la tache" });
     }
   });
 
