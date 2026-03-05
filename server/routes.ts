@@ -2823,8 +2823,13 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
 
   // ==================== TASK DEADLINE DEFAULTS ====================
   app.get(api.taskDeadlineDefaults.list.path, isAuthenticated, async (req, res) => {
-    const defaults = await storage.getTaskDeadlineDefaults();
-    res.json(defaults);
+    try {
+      const defaults = await storage.getTaskDeadlineDefaults();
+      res.json(defaults);
+    } catch (err) {
+      console.error('Error fetching task deadline defaults:', err);
+      res.json([]);
+    }
   });
 
   app.post(api.taskDeadlineDefaults.create.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
@@ -2860,8 +2865,13 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   });
 
   app.delete(api.taskDeadlineDefaults.delete.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
-    await storage.deleteTaskDeadlineDefault(Number(req.params.id));
-    res.json({ success: true });
+    try {
+      await storage.deleteTaskDeadlineDefault(Number(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting task deadline default:', err);
+      res.status(500).json({ message: "Erreur" });
+    }
   });
 
   // Upsert: create or update a deadline override by taskTitle + typology + trainerRole
@@ -3416,10 +3426,23 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
     }
   });
 
+  // Auto-migrate: add missing columns to task_deadline_defaults
+  await (async () => {
+    try {
+      const { pool } = await import("./db");
+      await pool.query(`
+        ALTER TABLE task_deadline_defaults ADD COLUMN IF NOT EXISTS typology text NOT NULL DEFAULT 'Intra';
+        ALTER TABLE task_deadline_defaults ADD COLUMN IF NOT EXISTS trainer_role text NOT NULL DEFAULT 'prestataire';
+        ALTER TABLE task_deadline_defaults ADD COLUMN IF NOT EXISTS late_days_before integer;
+      `);
+    } catch (err) {
+      console.error('Auto-migrate task_deadline_defaults:', err);
+    }
+  })();
+
   // Seed Data
   await seedBadges().catch(err => console.error('Error seeding badges:', err));
   await seedDefaultTemplates().catch(err => console.error('Error seeding default templates:', err));
-  // Task deadline defaults are now driven by task-templates.ts; overrides are stored in DB
 
   return httpServer;
 }
