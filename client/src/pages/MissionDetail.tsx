@@ -238,20 +238,24 @@ function getAutoStatus(task: any): StepStatus {
   const now = new Date();
   if (!task.dueDate) return 'todo';
 
-  if (task.lateDate) {
-    const lateDate = new Date(task.lateDate);
-    if (now >= lateDate) return 'late';
-    const dueDate = new Date(task.dueDate);
-    if (now >= dueDate) return 'priority';
+  const dueDate = new Date(task.dueDate);
+
+  // If dueDate is in the future, the task cannot be late
+  if (dueDate > now) {
+    const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 3) return 'priority';
     return 'todo';
   }
 
-  // Fallback: generic thresholds (dueDate only)
-  const dueDate = new Date(task.dueDate);
-  const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return 'late';
-  if (diffDays <= 3) return 'priority';
-  return 'todo';
+  // dueDate is in the past — check lateDate for late vs priority
+  if (task.lateDate) {
+    const lateDate = new Date(task.lateDate);
+    if (now >= lateDate) return 'late';
+    return 'priority'; // dueDate passed but lateDate not yet
+  }
+
+  // No lateDate, dueDate is in the past
+  return 'late';
 }
 
 // Check if status was manually overridden (not 'todo' which is the auto-compute default)

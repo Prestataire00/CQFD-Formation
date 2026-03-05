@@ -373,7 +373,15 @@ async function markLateStepsServerSide(): Promise<number> {
       const dueDate = step.dueDate ? new Date(step.dueDate) : null;
       const lateDate = step.lateDate ? new Date(step.lateDate) : null;
 
-      // Mark as late: lateDate passed (or dueDate passed if no lateDate)
+      // If dueDate is in the future, task cannot be late — reset if needed
+      if (dueDate && dueDate > now) {
+        if (step.status === 'late') {
+          await storage.updateMissionStep(step.id, { status: 'todo' });
+        }
+        continue;
+      }
+
+      // dueDate is in the past (or null) — check lateDate
       if (step.status !== 'late') {
         const deadlineForLate = lateDate || dueDate;
         if (deadlineForLate && deadlineForLate < now && (step.status === 'todo' || step.status === 'priority')) {
@@ -385,7 +393,7 @@ async function markLateStepsServerSide(): Promise<number> {
           await storage.updateMissionStep(step.id, { status: 'priority' });
         }
       }
-      // Un-late: dates were pushed to the future
+      // Un-late: lateDate was pushed to the future
       else if (step.status === 'late') {
         const deadlineForLate = lateDate || dueDate;
         if (deadlineForLate && deadlineForLate > now) {

@@ -241,6 +241,8 @@ export default function Dashboard() {
     const now = new Date();
     const late = allSteps.filter((s: any) => {
       if (s.isCompleted || s.status === "done" || s.status === "na") return false;
+      // If dueDate is in the future, task cannot be late
+      if (s.dueDate && new Date(s.dueDate) > now) return false;
       const deadlineForLate = s.lateDate ? new Date(s.lateDate) : (s.dueDate ? new Date(s.dueDate) : null);
       return deadlineForLate && deadlineForLate <= now;
     }).length;
