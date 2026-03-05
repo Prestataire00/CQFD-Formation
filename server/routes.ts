@@ -2835,6 +2835,8 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   app.post(api.taskDeadlineDefaults.create.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const input = api.taskDeadlineDefaults.create.input.parse(req.body);
+      if (isNaN(input.daysBefore)) input.daysBefore = 0;
+      if (input.lateDaysBefore !== undefined && (input.lateDaysBefore === null || isNaN(input.lateDaysBefore))) input.lateDaysBefore = undefined;
       const created = await storage.createTaskDeadlineDefault(input);
       res.status(201).json(created);
     } catch (err) {
@@ -2849,6 +2851,8 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   app.put(api.taskDeadlineDefaults.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const input = api.taskDeadlineDefaults.update.input.parse(req.body);
+      if (input.daysBefore !== undefined && isNaN(input.daysBefore)) input.daysBefore = 0;
+      if (input.lateDaysBefore !== undefined && (input.lateDaysBefore === null || isNaN(input.lateDaysBefore))) input.lateDaysBefore = undefined;
       const updated = await storage.updateTaskDeadlineDefault(Number(req.params.id), input);
       if (!updated) {
         res.status(404).json({ message: "Parametre non trouve" });
