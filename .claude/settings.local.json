@@ -81,7 +81,8 @@
       "Bash(xxd:*)",
       "Bash(kill:*)",
       "Bash(while read fddir)",
-      "Bash(do ls -la \"$fddir\")"
+      "Bash(do ls -la \"$fddir\")",
+      "Bash(git remote:*)"
     ]
   }
 }
