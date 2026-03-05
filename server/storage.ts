@@ -518,9 +518,15 @@ export class DatabaseStorage implements IStorage {
 
     // Clean up all FK references before deleting
     await db.update(missions).set({ trainerId: null }).where(eq(missions.trainerId, id));
+    await db.delete(missionTrainers).where(eq(missionTrainers.trainerId, id));
     await db.update(missionSteps).set({ assigneeId: null }).where(eq(missionSteps.assigneeId, id));
     await db.update(missionSteps).set({ commentAuthorId: null }).where(eq(missionSteps.commentAuthorId, id));
     await db.update(missionSteps).set({ trainerCommentAuthorId: null }).where(eq(missionSteps.trainerCommentAuthorId, id));
+    await db.update(evaluations).set({ evaluatorId: null }).where(eq(evaluations.evaluatorId, id));
+    await db.update(invoices).set({ userId: null }).where(eq(invoices.userId, id));
+    await db.update(documentTemplateVersions).set({ uploadedBy: null }).where(eq(documentTemplateVersions.uploadedBy, id));
+    await db.update(messages).set({ senderId: null }).where(eq(messages.senderId, id));
+    await db.update(tasks).set({ assigneeId: null }).where(eq(tasks.assigneeId, id));
     await db.delete(documents).where(eq(documents.userId, id));
     await db.delete(templateNotifications).where(eq(templateNotifications.userId, id));
     await db.delete(inAppNotifications).where(eq(inAppNotifications.userId, id));

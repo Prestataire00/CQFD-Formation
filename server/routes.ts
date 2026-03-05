@@ -210,7 +210,8 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       }
       res.json({ success: true });
     } catch (err) {
-      throw err;
+      console.error('User deletion error:', err);
+      res.status(500).json({ message: err instanceof Error ? err.message : "Erreur lors de la suppression de l'utilisateur" });
     }
   });
 
