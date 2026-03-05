@@ -2835,8 +2835,9 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   app.post(api.taskDeadlineDefaults.create.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const input = api.taskDeadlineDefaults.create.input.parse(req.body);
-      if (isNaN(input.daysBefore)) input.daysBefore = 0;
-      if (input.lateDaysBefore !== undefined && (input.lateDaysBefore === null || isNaN(input.lateDaysBefore))) input.lateDaysBefore = undefined;
+      if (typeof input.daysBefore !== 'number' || Number.isNaN(input.daysBefore)) input.daysBefore = 0;
+      if (input.lateDaysBefore === undefined) { /* keep undefined */ }
+      else if (input.lateDaysBefore === null || typeof input.lateDaysBefore !== 'number' || Number.isNaN(input.lateDaysBefore)) input.lateDaysBefore = null;
       const created = await storage.createTaskDeadlineDefault(input);
       res.status(201).json(created);
     } catch (err) {
@@ -2844,15 +2845,18 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error('Error creating task deadline default:', err);
+      res.status(500).json({ message: "Erreur lors de la création" });
     }
   });
 
   app.put(api.taskDeadlineDefaults.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const input = api.taskDeadlineDefaults.update.input.parse(req.body);
-      if (input.daysBefore !== undefined && isNaN(input.daysBefore)) input.daysBefore = 0;
-      if (input.lateDaysBefore !== undefined && (input.lateDaysBefore === null || isNaN(input.lateDaysBefore))) input.lateDaysBefore = undefined;
+      // Sanitize NaN values before DB insert
+      if (input.daysBefore !== undefined && (typeof input.daysBefore !== 'number' || Number.isNaN(input.daysBefore))) input.daysBefore = 0;
+      if (input.lateDaysBefore === undefined) { /* keep undefined */ }
+      else if (input.lateDaysBefore === null || typeof input.lateDaysBefore !== 'number' || Number.isNaN(input.lateDaysBefore)) input.lateDaysBefore = null;
       const updated = await storage.updateTaskDeadlineDefault(Number(req.params.id), input);
       if (!updated) {
         res.status(404).json({ message: "Parametre non trouve" });
@@ -2864,7 +2868,8 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error('Error updating task deadline default:', err);
+      res.status(500).json({ message: "Erreur lors de la mise à jour" });
     }
   });
 
