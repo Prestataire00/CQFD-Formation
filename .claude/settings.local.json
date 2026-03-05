@@ -83,7 +83,8 @@
       "Bash(while read fddir)",
       "Bash(do ls -la \"$fddir\")",
       "Bash(git remote:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm list:*)"
     ]
   }
 }
