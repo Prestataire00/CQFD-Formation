@@ -2881,8 +2881,10 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   // Upsert: create or update a deadline override by taskTitle + typology + trainerRole
   app.put('/api/task-deadline-defaults/upsert', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
-      const { taskTitle, typology, trainerRole, daysBefore, lateDaysBefore } = req.body;
-      if (!taskTitle || !typology || !trainerRole || daysBefore === undefined) {
+      const { taskTitle, typology, trainerRole } = req.body;
+      const daysBefore = Number.isNaN(Number(req.body.daysBefore)) ? 0 : Number(req.body.daysBefore);
+      const lateDaysBefore = req.body.lateDaysBefore == null || Number.isNaN(Number(req.body.lateDaysBefore)) ? null : Number(req.body.lateDaysBefore);
+      if (!taskTitle || !typology || !trainerRole) {
         return res.status(400).json({ message: "Champs requis manquants" });
       }
       const all = await storage.getTaskDeadlineDefaults();
