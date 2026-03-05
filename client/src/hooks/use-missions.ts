@@ -227,7 +227,7 @@ export function useAddTrainerToMission() {
         body: JSON.stringify({ trainerId, isPrimary }),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.message || "Failed to add trainer");
       }
       return res.json();
@@ -286,7 +286,7 @@ export function useAssignMultipleTrainers() {
         body: JSON.stringify({ trainerIds }),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.message || "Failed to assign trainers");
       }
       return res.json();
@@ -312,7 +312,7 @@ export function useDuplicateMissionSimple() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.message || "Failed to duplicate mission");
       }
       return res.json();
@@ -338,7 +338,7 @@ export function useDuplicateMissionMulti() {
         body: JSON.stringify({ trainerIds }),
       });
       if (!res.ok) {
-        const error = await res.json();
+        const error = await res.json().catch(() => ({}));
         throw new Error(error.message || "Failed to duplicate mission");
       }
       return res.json();

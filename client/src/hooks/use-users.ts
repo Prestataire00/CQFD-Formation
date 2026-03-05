@@ -66,7 +66,7 @@ export function useCreateUser() {
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Erreur de création');
       }
       return res.json();
@@ -103,7 +103,7 @@ export function useUpdateUser() {
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Erreur de mise à jour');
       }
       return res.json();
@@ -126,7 +126,7 @@ export function useDeleteUser() {
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Erreur de suppression');
       }
       return res.json();

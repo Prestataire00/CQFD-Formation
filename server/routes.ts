@@ -158,7 +158,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: "Cet email est déjà utilisé" });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -191,7 +191,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -240,7 +240,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -261,7 +261,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -271,7 +271,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       await storage.updateClient(id, { isActive: false } as any);
       res.json({ success: true });
     } catch (err) {
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -300,7 +300,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -318,7 +318,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -410,7 +410,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message, errors: err.errors });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -693,7 +693,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -759,7 +759,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: 'Ce client est déjà associé à cette mission' });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -835,7 +835,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: 'Ce formateur est déjà associé à cette mission' });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1096,7 +1096,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1233,7 +1233,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1251,7 +1251,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1303,7 +1303,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1326,7 +1326,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1364,7 +1364,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1398,7 +1398,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1435,7 +1435,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1533,7 +1533,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1551,7 +1551,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1570,7 +1570,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1585,7 +1585,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1651,7 +1651,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1669,7 +1669,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1696,7 +1696,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1772,7 +1772,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1902,7 +1902,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1922,7 +1922,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1950,7 +1950,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1979,7 +1979,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -1997,7 +1997,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -2035,7 +2035,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -2060,7 +2060,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -2968,7 +2968,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
@@ -2986,7 +2986,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         res.status(400).json({ message: err.errors[0].message });
         return;
       }
-      throw err;
+      console.error("Route error:", err); res.status(500).json({ message: err instanceof Error ? err.message : "Erreur serveur" });
     }
   });
 
