@@ -104,9 +104,15 @@ export default function Settings() {
   });
   const [isSavingCompany, setIsSavingCompany] = useState(false);
 
-  // Deadline tab typology/role selectors (admin only)
+  // Deadline tab state (admin only)
   const [deadlineTypology, setDeadlineTypology] = useState("Intra");
   const [deadlineTrainerRole, setDeadlineTrainerRole] = useState("prestataire");
+  const [deadlineOverrides, setDeadlineOverrides] = useState<any[]>([]);
+  const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
+  const [editingDeadlineKey, setEditingDeadlineKey] = useState<string | null>(null);
+  const [editingPriority, setEditingPriority] = useState(0);
+  const [editingLate, setEditingLate] = useState(0);
+  const [isSavingDeadline, setIsSavingDeadline] = useState(false);
 
   // Task template viewer state (admin only)
   const [templateTypology, setTemplateTypology] = useState("Intra");
@@ -139,9 +145,16 @@ export default function Settings() {
   const [isAddingExplanation, setIsAddingExplanation] = useState(false);
   const [newExplanation, setNewExplanation] = useState({ taskName: "", explanation: "" });
 
-  // Load deadline defaults and reminder settings
+  // Load deadline overrides, reminder settings, and explanations
   useEffect(() => {
     if (isAdmin) {
+      setIsLoadingDeadlines(true);
+      fetch("/api/task-deadline-defaults", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => setDeadlineOverrides(data))
+        .catch(() => {})
+        .finally(() => setIsLoadingDeadlines(false));
+
       setIsLoadingReminders(true);
       fetch("/api/reminder-settings", { credentials: "include" })
         .then((res) => res.json())
@@ -286,6 +299,45 @@ export default function Settings() {
       });
     } finally {
       setIsSavingCompany(false);
+    }
+  };
+
+  // Deadline override handlers
+  const getDeadlineOverride = (taskTitle: string, typology: string, trainerRole: string) => {
+    return deadlineOverrides.find(
+      (d: any) => d.taskTitle === taskTitle && d.typology === typology && d.trainerRole === trainerRole
+    );
+  };
+
+  const handleSaveDeadline = async (taskTitle: string, priorityDays: number, lateDays: number) => {
+    setIsSavingDeadline(true);
+    try {
+      const response = await fetch("/api/task-deadline-defaults/upsert", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          taskTitle,
+          typology: deadlineTypology,
+          trainerRole: deadlineTrainerRole,
+          daysBefore: priorityDays,
+          lateDaysBefore: lateDays,
+        }),
+      });
+      if (!response.ok) throw new Error();
+      const saved = await response.json();
+      setDeadlineOverrides((prev) => {
+        const filtered = prev.filter(
+          (d: any) => !(d.taskTitle === taskTitle && d.typology === deadlineTypology && d.trainerRole === deadlineTrainerRole)
+        );
+        return [...filtered, saved];
+      });
+      setEditingDeadlineKey(null);
+      toast({ title: "Deadline mise a jour" });
+    } catch {
+      toast({ title: "Erreur", variant: "destructive" });
+    } finally {
+      setIsSavingDeadline(false);
     }
   };
 
@@ -1031,42 +1083,112 @@ export default function Settings() {
                       <strong>{deadlineTypology}</strong> / <strong>{deadlineTrainerRole === "prestataire" ? "Prestataire" : "Salarie"}</strong>
                     </div>
 
-                    <div className="border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-12">#</TableHead>
-                            <TableHead>Tache</TableHead>
-                            <TableHead className="w-32">Prioritaire</TableHead>
-                            <TableHead className="w-32">Retard</TableHead>
-                            <TableHead className="w-28">Assigne</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {getTaskTemplates(deadlineTypology, deadlineTrainerRole).map((task, index) => (
-                            <TableRow key={index}>
-                              <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                              <TableCell className="font-medium">{task.title}</TableCell>
-                              <TableCell>
-                                <Badge variant={task.priorityDaysBefore > 0 ? "default" : "destructive"} className="text-xs">
-                                  {formatDeadlineLabel(task.priorityDaysBefore)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={task.lateDaysBefore > 0 ? "outline" : "destructive"} className="text-xs">
-                                  {formatDeadlineLabel(task.lateDaysBefore)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
-                                  {task.assigneeType === "admin" ? "Admin" : "Formateur"}
-                                </Badge>
-                              </TableCell>
+                    {isLoadingDeadlines ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : (
+                      <div className="border rounded-lg">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12">#</TableHead>
+                              <TableHead>Tache</TableHead>
+                              <TableHead className="w-36">Prioritaire</TableHead>
+                              <TableHead className="w-36">Retard</TableHead>
+                              <TableHead className="w-28">Assigne</TableHead>
+                              <TableHead className="w-20"></TableHead>
                             </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
+                          </TableHeader>
+                          <TableBody>
+                            {getTaskTemplates(deadlineTypology, deadlineTrainerRole).map((task, index) => {
+                              const override = getDeadlineOverride(task.title, deadlineTypology, deadlineTrainerRole);
+                              const priorityVal = override ? override.daysBefore : task.priorityDaysBefore;
+                              const lateVal = override?.lateDaysBefore != null ? override.lateDaysBefore : task.lateDaysBefore;
+                              const isEditing = editingDeadlineKey === `${deadlineTypology}_${deadlineTrainerRole}_${task.title}`;
+                              const hasOverride = !!override;
+
+                              return (
+                                <TableRow key={index} className={hasOverride ? "bg-primary/5" : ""}>
+                                  <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                                  <TableCell className="font-medium">
+                                    {task.title}
+                                    {hasOverride && <span className="ml-2 text-xs text-primary">(modifie)</span>}
+                                  </TableCell>
+                                  <TableCell>
+                                    {isEditing ? (
+                                      <Input
+                                        type="number"
+                                        value={editingPriority}
+                                        onChange={(e) => setEditingPriority(parseInt(e.target.value) || 0)}
+                                        className="w-24 h-8"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <Badge variant={priorityVal > 0 ? "default" : "destructive"} className="text-xs">
+                                        {formatDeadlineLabel(priorityVal)}
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    {isEditing ? (
+                                      <Input
+                                        type="number"
+                                        value={editingLate}
+                                        onChange={(e) => setEditingLate(parseInt(e.target.value) || 0)}
+                                        className="w-24 h-8"
+                                      />
+                                    ) : (
+                                      <Badge variant={lateVal > 0 ? "outline" : "destructive"} className="text-xs">
+                                        {formatDeadlineLabel(lateVal)}
+                                      </Badge>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
+                                      {task.assigneeType === "admin" ? "Admin" : "Formateur"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {isEditing ? (
+                                      <div className="flex gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => handleSaveDeadline(task.title, editingPriority, editingLate)}
+                                          disabled={isSavingDeadline}
+                                        >
+                                          {isSavingDeadline ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => setEditingDeadlineKey(null)}
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingDeadlineKey(`${deadlineTypology}_${deadlineTrainerRole}_${task.title}`);
+                                          setEditingPriority(priorityVal);
+                                          setEditingLate(lateVal);
+                                        }}
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1521,30 +1643,78 @@ export default function Settings() {
                                             </>
                                           ) : defaultEntry ? (
                                             <>
-                                              <div className="flex items-center justify-between">
-                                                <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne par defaut</span>
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  onClick={(e) => { e.stopPropagation(); handleCustomizeExplanation(task.title, defaultEntry.explanation); }}
-                                                >
-                                                  <Edit className="w-4 h-4 mr-1" />
-                                                  Personnaliser
-                                                </Button>
-                                              </div>
-                                              <p className="text-sm text-muted-foreground whitespace-pre-line">{defaultEntry.explanation}</p>
+                                              {isAddingExplanation && newExplanation.taskName === task.title ? (
+                                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                  <span className="text-xs font-semibold uppercase text-muted-foreground">Personnaliser la consigne</span>
+                                                  <Textarea
+                                                    value={newExplanation.explanation}
+                                                    onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
+                                                    placeholder="Texte de la consigne..."
+                                                    rows={6}
+                                                    autoFocus
+                                                  />
+                                                  <div className="flex gap-2 justify-end">
+                                                    <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
+                                                      Annuler
+                                                    </Button>
+                                                    <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
+                                                      {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                      Enregistrer
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <>
+                                                  <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne par defaut</span>
+                                                    <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      onClick={(e) => { e.stopPropagation(); handleCustomizeExplanation(task.title, defaultEntry.explanation); }}
+                                                    >
+                                                      <Edit className="w-4 h-4 mr-1" />
+                                                      Personnaliser
+                                                    </Button>
+                                                  </div>
+                                                  <p className="text-sm text-muted-foreground whitespace-pre-line">{defaultEntry.explanation}</p>
+                                                </>
+                                              )}
                                             </>
                                           ) : (
                                             <>
-                                              <p className="text-sm text-muted-foreground italic">Aucune consigne pour cette tache.</p>
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={(e) => { e.stopPropagation(); setNewExplanation({ taskName: task.title, explanation: "" }); setIsAddingExplanation(true); }}
-                                              >
-                                                <Plus className="w-4 h-4 mr-1" />
-                                                Ajouter une consigne
-                                              </Button>
+                                              {isAddingExplanation && newExplanation.taskName === task.title ? (
+                                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                                  <span className="text-xs font-semibold uppercase text-muted-foreground">Nouvelle consigne</span>
+                                                  <Textarea
+                                                    value={newExplanation.explanation}
+                                                    onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
+                                                    placeholder="Texte de la consigne..."
+                                                    rows={4}
+                                                    autoFocus
+                                                  />
+                                                  <div className="flex gap-2 justify-end">
+                                                    <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
+                                                      Annuler
+                                                    </Button>
+                                                    <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
+                                                      {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                      Enregistrer
+                                                    </Button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <>
+                                                  <p className="text-sm text-muted-foreground italic">Aucune consigne pour cette tache.</p>
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={(e) => { e.stopPropagation(); setNewExplanation({ taskName: task.title, explanation: "" }); setIsAddingExplanation(true); }}
+                                                  >
+                                                    <Plus className="w-4 h-4 mr-1" />
+                                                    Ajouter une consigne
+                                                  </Button>
+                                                </>
+                                              )}
                                             </>
                                           )}
                                         </div>
@@ -1559,40 +1729,6 @@ export default function Settings() {
                       </div>
                     )}
 
-                    {/* Add new explanation form */}
-                    {isAddingExplanation && (
-                      <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                        <h3 className="text-sm font-semibold">Ajouter / Personnaliser une consigne</h3>
-                        <div className="space-y-3">
-                          <div className="space-y-1">
-                            <Label>Nom de la tache</Label>
-                            <Input
-                              value={newExplanation.taskName}
-                              onChange={(e) => setNewExplanation({ ...newExplanation, taskName: e.target.value })}
-                              placeholder="Ex: Envoi compte-rendu entretien cadrage"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label>Consigne</Label>
-                            <Textarea
-                              value={newExplanation.explanation}
-                              onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
-                              placeholder="Texte de la consigne..."
-                              rows={6}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
-                            Annuler
-                          </Button>
-                          <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
-                            {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                            Enregistrer
-                          </Button>
-                        </div>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -565,11 +565,14 @@ export const feedbackResponses = pgTable("feedback_responses", {
 });
 
 // --- TASK DEADLINE DEFAULTS ---
-// Defines default deadlines (relative to 1st training session) for each task type
+// Defines default deadlines (relative to 1st training session) for each task type per typology/role
 export const taskDeadlineDefaults = pgTable("task_deadline_defaults", {
   id: serial("id").primaryKey(),
-  taskTitle: text("task_title").notNull().unique(), // Title matching quick action or manual task
-  daysBefore: integer("days_before").notNull(), // Positive = before 1st session, negative = after
+  taskTitle: text("task_title").notNull(), // Title matching task template
+  typology: text("typology").notNull().default("Intra"), // Intra, Inter, Conseil, Conférence
+  trainerRole: text("trainer_role").notNull().default("prestataire"), // prestataire, formateur
+  daysBefore: integer("days_before").notNull(), // priorityDaysBefore: Positive = before 1st session, negative = after
+  lateDaysBefore: integer("late_days_before"), // lateDaysBefore override
   category: text("category"), // "Avant la formation", "Pendant la formation", "Apres la formation"
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow(),

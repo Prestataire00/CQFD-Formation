@@ -2864,6 +2864,28 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
     res.json({ success: true });
   });
 
+  // Upsert: create or update a deadline override by taskTitle + typology + trainerRole
+  app.put('/api/task-deadline-defaults/upsert', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { taskTitle, typology, trainerRole, daysBefore, lateDaysBefore } = req.body;
+      if (!taskTitle || !typology || !trainerRole || daysBefore === undefined) {
+        return res.status(400).json({ message: "Champs requis manquants" });
+      }
+      const all = await storage.getTaskDeadlineDefaults();
+      const existing = all.find(d => d.taskTitle === taskTitle && d.typology === typology && d.trainerRole === trainerRole);
+      if (existing) {
+        const updated = await storage.updateTaskDeadlineDefault(existing.id, { daysBefore, lateDaysBefore });
+        res.json(updated);
+      } else {
+        const created = await storage.createTaskDeadlineDefault({ taskTitle, typology, trainerRole, daysBefore, lateDaysBefore });
+        res.status(201).json(created);
+      }
+    } catch (err) {
+      console.error('Upsert deadline error:', err);
+      res.status(500).json({ message: "Erreur lors de la sauvegarde" });
+    }
+  });
+
   // ==================== TASK EXPLANATIONS (Consignes) ====================
   app.get(api.taskExplanations.list.path, isAuthenticated, async (req, res) => {
     const explanations = await storage.getTaskExplanations();
@@ -3397,7 +3419,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   // Seed Data
   await seedBadges().catch(err => console.error('Error seeding badges:', err));
   await seedDefaultTemplates().catch(err => console.error('Error seeding default templates:', err));
-  await seedTaskDeadlineDefaults().catch(err => console.error('Error seeding task deadline defaults:', err));
+  // Task deadline defaults are now driven by task-templates.ts; overrides are stored in DB
 
   return httpServer;
 }

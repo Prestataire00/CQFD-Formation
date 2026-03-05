@@ -963,7 +963,10 @@ export const api = {
       path: '/api/task-deadline-defaults',
       input: z.object({
         taskTitle: z.string().min(1),
+        typology: z.string().min(1),
+        trainerRole: z.string().min(1),
         daysBefore: z.number(),
+        lateDaysBefore: z.number().optional(),
         category: z.string().optional(),
         isActive: z.boolean().optional(),
       }),
@@ -977,7 +980,10 @@ export const api = {
       path: '/api/task-deadline-defaults/:id',
       input: z.object({
         taskTitle: z.string().optional(),
+        typology: z.string().optional(),
+        trainerRole: z.string().optional(),
         daysBefore: z.number().optional(),
+        lateDaysBefore: z.number().optional(),
         category: z.string().optional(),
         isActive: z.boolean().optional(),
       }),
