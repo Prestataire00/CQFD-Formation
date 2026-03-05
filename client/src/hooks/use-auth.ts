@@ -51,7 +51,7 @@ export function useAuth() {
         credentials: 'include',
       });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Échec de connexion');
       }
       return res.json();
