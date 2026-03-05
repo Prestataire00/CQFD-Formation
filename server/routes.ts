@@ -1110,6 +1110,47 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
     }
   });
 
+  // Bulk replace all steps for a mission (used when typology/trainer changes)
+  app.post('/api/missions/:id/replace-steps', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const missionId = Number(req.params.id);
+      const { steps: newSteps } = req.body as { steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string | null; lateDate?: string | null; link?: string | null }> };
+
+      if (!Array.isArray(newSteps)) {
+        res.status(400).json({ message: "steps doit être un tableau" });
+        return;
+      }
+
+      // Delete all existing steps (with cascade: reminders, stepTasks)
+      const existingSteps = await storage.getMissionSteps(missionId);
+      for (const step of existingSteps) {
+        await storage.deleteMissionStep(step.id);
+      }
+
+      // Create new steps
+      const created = [];
+      for (const stepData of newSteps) {
+        const step = await storage.createMissionStep({
+          missionId,
+          title: stepData.title,
+          status: stepData.status || 'todo',
+          order: stepData.order,
+          assigneeId: stepData.assigneeId || null,
+          dueDate: stepData.dueDate ? new Date(stepData.dueDate) : null,
+          lateDate: stepData.lateDate ? new Date(stepData.lateDate) : null,
+          link: stepData.link || null,
+        });
+        created.push(step);
+      }
+
+      console.log(`[replace-steps] Mission ${missionId}: deleted ${existingSteps.length}, created ${created.length}`);
+      res.json({ deleted: existingSteps.length, created: created.length, steps: created });
+    } catch (error: any) {
+      console.error("Replace steps error:", error);
+      res.status(500).json({ message: error.message || "Erreur lors du remplacement des tâches" });
+    }
+  });
+
   // Send step link by email
   app.post(api.missions.steps.sendLink.path, isAuthenticated, async (req, res) => {
     try {

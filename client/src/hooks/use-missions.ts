@@ -475,6 +475,28 @@ export function useDeleteMissionStep() {
   });
 }
 
+export function useReplaceSteps() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ missionId, steps }: { missionId: number; steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string; lateDate?: string; link?: string }> }) => {
+      const res = await fetch(`/api/missions/${missionId}/replace-steps`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({ steps }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to replace steps");
+      }
+      return res.json();
+    },
+    onSuccess: (_, { missionId }) => {
+      queryClient.invalidateQueries({ queryKey: [api.missions.steps.list.path, missionId] });
+    },
+  });
+}
+
 // Send step link by email
 export function useSendStepLink() {
   return useMutation({

@@ -107,6 +107,7 @@ import {
   useCreateMissionStep,
   useUpdateMissionStep,
   useDeleteMissionStep,
+  useReplaceSteps,
   useSendStepLink,
   useMissionDocuments,
   useCreateDocument,
@@ -825,6 +826,7 @@ export default function MissionDetail() {
   const createStep = useCreateMissionStep();
   const updateStep = useUpdateMissionStep();
   const deleteStep = useDeleteMissionStep();
+  const replaceSteps = useReplaceSteps();
   const createDocument = useCreateDocument();
   const deleteDocument = useDeleteDocument();
   const updateDocument = useUpdateDocument();
@@ -1096,21 +1098,13 @@ export default function MissionDetail() {
         else if (typology === "Conférence" && trainerRole === "formateur") taskList = CONFERENCE_SALARIE_TASKS;
 
         if (taskList) {
-          // Delete all existing tasks only when a valid template is found
-          for (const step of steps) {
-            await deleteStep.mutateAsync({ missionId, stepId: step.id });
-          }
-
           const adminId = user?.id || null;
           const formateurId = editForm.trainerId || null;
-          // Validate that assignee IDs exist in user list to prevent FK violations
           const validAdminId = adminId && allUsers?.some((u: any) => u.id === adminId) ? adminId : null;
           const validFormateurId = formateurId && allUsers?.some((u: any) => u.id === formateurId) ? formateurId : null;
           const createdAtRef = mission?.createdAt ? new Date(mission.createdAt) : null;
 
-          let order = 0;
-          for (const task of taskList) {
-            order++;
+          const newSteps = taskList.map((task, index) => {
             const assigneeId = task.assigneeType === "admin" ? validAdminId : validFormateurId;
             let dueDate: string | undefined;
             let lateDate: string | undefined;
@@ -1122,19 +1116,18 @@ export default function MissionDetail() {
               ld.setDate(ld.getDate() - task.lateDaysBefore);
               lateDate = ld.toISOString();
             }
-            await createStep.mutateAsync({
-              missionId,
-              data: {
-                title: task.title,
-                status: "todo",
-                order,
-                assigneeId,
-                dueDate,
-                lateDate,
-                link: task.link || undefined,
-              },
-            });
-          }
+            return {
+              title: task.title,
+              status: "todo",
+              order: index + 1,
+              assigneeId,
+              dueDate,
+              lateDate,
+              link: task.link || undefined,
+            };
+          });
+
+          await replaceSteps.mutateAsync({ missionId, steps: newSteps });
           toast({ title: `Taches mises a jour (${taskList.length} taches)` });
         } else if (!editForm.trainerId) {
           toast({ title: "Typologie mise a jour. Assignez un formateur pour generer les taches correspondantes." });
