@@ -104,13 +104,9 @@ export default function Settings() {
   });
   const [isSavingCompany, setIsSavingCompany] = useState(false);
 
-  // Task deadline defaults state (admin only)
-  const [deadlineDefaults, setDeadlineDefaults] = useState<any[]>([]);
-  const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
-  const [isSavingDeadlines, setIsSavingDeadlines] = useState(false);
-  const [editingDeadlineId, setEditingDeadlineId] = useState<number | null>(null);
-  const [newDeadline, setNewDeadline] = useState({ taskTitle: "", daysBefore: 0, category: "" });
-  const [isAddingDeadline, setIsAddingDeadline] = useState(false);
+  // Deadline tab typology/role selectors (admin only)
+  const [deadlineTypology, setDeadlineTypology] = useState("Intra");
+  const [deadlineTrainerRole, setDeadlineTrainerRole] = useState("prestataire");
 
   // Task template viewer state (admin only)
   const [templateTypology, setTemplateTypology] = useState("Intra");
@@ -146,13 +142,6 @@ export default function Settings() {
   // Load deadline defaults and reminder settings
   useEffect(() => {
     if (isAdmin) {
-      setIsLoadingDeadlines(true);
-      fetch("/api/task-deadline-defaults", { credentials: "include" })
-        .then((res) => res.json())
-        .then((data) => setDeadlineDefaults(data))
-        .catch(() => {})
-        .finally(() => setIsLoadingDeadlines(false));
-
       setIsLoadingReminders(true);
       fetch("/api/reminder-settings", { credentials: "include" })
         .then((res) => res.json())
@@ -297,62 +286,6 @@ export default function Settings() {
       });
     } finally {
       setIsSavingCompany(false);
-    }
-  };
-
-  const handleUpdateDeadline = async (id: number, daysBefore: number) => {
-    try {
-      const response = await fetch(`/api/task-deadline-defaults/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ daysBefore }),
-      });
-      if (!response.ok) throw new Error();
-      const updated = await response.json();
-      setDeadlineDefaults((prev) =>
-        prev.map((d) => (d.id === id ? updated : d))
-      );
-      setEditingDeadlineId(null);
-      toast({ title: "Deadline mise a jour" });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
-    }
-  };
-
-  const handleAddDeadline = async () => {
-    if (!newDeadline.taskTitle.trim()) return;
-    setIsSavingDeadlines(true);
-    try {
-      const response = await fetch("/api/task-deadline-defaults", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(newDeadline),
-      });
-      if (!response.ok) throw new Error();
-      const created = await response.json();
-      setDeadlineDefaults((prev) => [...prev, created]);
-      setNewDeadline({ taskTitle: "", daysBefore: 0, category: "" });
-      setIsAddingDeadline(false);
-      toast({ title: "Deadline par defaut ajoutee" });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
-    } finally {
-      setIsSavingDeadlines(false);
-    }
-  };
-
-  const handleDeleteDeadline = async (id: number) => {
-    try {
-      await fetch(`/api/task-deadline-defaults/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      setDeadlineDefaults((prev) => prev.filter((d) => d.id !== id));
-      toast({ title: "Deadline supprimee" });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
     }
   };
 
@@ -1057,199 +990,83 @@ export default function Settings() {
               <TabsContent value="deadlines">
                 <Card>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle>Deadlines par defaut</CardTitle>
-                        <CardDescription>
-                          Configurez les deadlines automatiques des taches par rapport au 1er jour de formation.
-                          J-X = X jours avant, Jour J = le jour meme, J+X = X jours apres.
-                        </CardDescription>
-                      </div>
-                      <Button
-                        size="sm"
-                        onClick={() => setIsAddingDeadline(true)}
-                        disabled={isAddingDeadline}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Ajouter
-                      </Button>
-                    </div>
+                    <CardTitle>Deadlines par defaut</CardTitle>
+                    <CardDescription>
+                      Deadlines automatiques des taches par rapport au 1er jour de formation.
+                      J-X = X jours avant, Jour J = le jour meme, J+X = X jours apres.
+                    </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    {isLoadingDeadlines ? (
-                      <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  <CardContent className="space-y-6">
+                    <div className="flex gap-4">
+                      <div className="space-y-2">
+                        <Label>Typologie</Label>
+                        <Select value={deadlineTypology} onValueChange={setDeadlineTypology}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Intra">Intra</SelectItem>
+                            <SelectItem value="Inter">Inter</SelectItem>
+                            <SelectItem value="Conseil">Conseil</SelectItem>
+                            <SelectItem value="Conférence">Conference</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    ) : (
-                      <div className="space-y-6">
-                        {isAddingDeadline && (
-                          <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              <div className="space-y-1">
-                                <Label>Nom de la tache</Label>
-                                <Input
-                                  value={newDeadline.taskTitle}
-                                  onChange={(e) => setNewDeadline({ ...newDeadline, taskTitle: e.target.value })}
-                                  placeholder="Ex: Envoyer la convocation"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label>Jours (positif = avant, negatif = apres)</Label>
-                                <Input
-                                  type="number"
-                                  value={newDeadline.daysBefore}
-                                  onChange={(e) => setNewDeadline({ ...newDeadline, daysBefore: parseInt(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <Label>Categorie</Label>
-                                <Input
-                                  value={newDeadline.category}
-                                  onChange={(e) => setNewDeadline({ ...newDeadline, category: e.target.value })}
-                                  placeholder="Ex: Avant la formation"
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <Button variant="outline" size="sm" onClick={() => setIsAddingDeadline(false)}>
-                                Annuler
-                              </Button>
-                              <Button size="sm" onClick={handleAddDeadline} disabled={isSavingDeadlines}>
-                                {isSavingDeadlines && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Ajouter
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {["Avant la formation", "Pendant la formation", "Apres la formation"].map((cat) => {
-                          const items = deadlineDefaults.filter((d) => d.category === cat);
-                          if (items.length === 0) return null;
-                          return (
-                            <div key={cat}>
-                              <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                                {cat}
-                              </h3>
-                              <div className="space-y-2">
-                                {items.map((d: any) => (
-                                  <div
-                                    key={d.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-                                  >
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <span className="text-sm font-medium flex-1">{d.taskTitle}</span>
-                                      {editingDeadlineId === d.id ? (
-                                        <div className="flex items-center gap-2">
-                                          <Input
-                                            type="number"
-                                            defaultValue={d.daysBefore}
-                                            className="w-24 h-8"
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                handleUpdateDeadline(d.id, parseInt((e.target as HTMLInputElement).value) || 0);
-                                              }
-                                              if (e.key === 'Escape') setEditingDeadlineId(null);
-                                            }}
-                                            autoFocus
-                                          />
-                                          <span className="text-xs text-muted-foreground">jours</span>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setEditingDeadlineId(null)}
-                                          >
-                                            Annuler
-                                          </Button>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          onClick={() => setEditingDeadlineId(d.id)}
-                                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
-                                        >
-                                          {formatDeadlineLabel(d.daysBefore)}
-                                          <Edit className="w-3 h-3 ml-1" />
-                                        </button>
-                                      )}
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:text-destructive ml-2"
-                                      onClick={() => handleDeleteDeadline(d.id)}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })}
-
-                        {/* Show uncategorized items */}
-                        {deadlineDefaults.filter((d) => !d.category || !["Avant la formation", "Pendant la formation", "Apres la formation"].includes(d.category)).length > 0 && (
-                          <div>
-                            <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-                              Autres
-                            </h3>
-                            <div className="space-y-2">
-                              {deadlineDefaults
-                                .filter((d) => !d.category || !["Avant la formation", "Pendant la formation", "Apres la formation"].includes(d.category))
-                                .map((d: any) => (
-                                  <div
-                                    key={d.id}
-                                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors"
-                                  >
-                                    <div className="flex items-center gap-3 flex-1">
-                                      <span className="text-sm font-medium flex-1">{d.taskTitle}</span>
-                                      {editingDeadlineId === d.id ? (
-                                        <div className="flex items-center gap-2">
-                                          <Input
-                                            type="number"
-                                            defaultValue={d.daysBefore}
-                                            className="w-24 h-8"
-                                            onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                handleUpdateDeadline(d.id, parseInt((e.target as HTMLInputElement).value) || 0);
-                                              }
-                                              if (e.key === 'Escape') setEditingDeadlineId(null);
-                                            }}
-                                            autoFocus
-                                          />
-                                          <span className="text-xs text-muted-foreground">jours</span>
-                                          <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setEditingDeadlineId(null)}
-                                          >
-                                            Annuler
-                                          </Button>
-                                        </div>
-                                      ) : (
-                                        <button
-                                          onClick={() => setEditingDeadlineId(d.id)}
-                                          className="inline-flex items-center gap-1 px-2 py-1 rounded bg-primary/10 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
-                                        >
-                                          {formatDeadlineLabel(d.daysBefore)}
-                                          <Edit className="w-3 h-3 ml-1" />
-                                        </button>
-                                      )}
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:text-destructive ml-2"
-                                      onClick={() => handleDeleteDeadline(d.id)}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
+                      <div className="space-y-2">
+                        <Label>Role formateur</Label>
+                        <Select value={deadlineTrainerRole} onValueChange={setDeadlineTrainerRole}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="prestataire">Prestataire</SelectItem>
+                            <SelectItem value="formateur">Salarie</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                      {getTaskTemplates(deadlineTypology, deadlineTrainerRole).length} taches pour{" "}
+                      <strong>{deadlineTypology}</strong> / <strong>{deadlineTrainerRole === "prestataire" ? "Prestataire" : "Salarie"}</strong>
+                    </div>
+
+                    <div className="border rounded-lg">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">#</TableHead>
+                            <TableHead>Tache</TableHead>
+                            <TableHead className="w-32">Prioritaire</TableHead>
+                            <TableHead className="w-32">Retard</TableHead>
+                            <TableHead className="w-28">Assigne</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {getTaskTemplates(deadlineTypology, deadlineTrainerRole).map((task, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="text-muted-foreground">{index + 1}</TableCell>
+                              <TableCell className="font-medium">{task.title}</TableCell>
+                              <TableCell>
+                                <Badge variant={task.priorityDaysBefore > 0 ? "default" : "destructive"} className="text-xs">
+                                  {formatDeadlineLabel(task.priorityDaysBefore)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={task.lateDaysBefore > 0 ? "outline" : "destructive"} className="text-xs">
+                                  {formatDeadlineLabel(task.lateDaysBefore)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={task.assigneeType === "admin" ? "secondary" : "default"} className="text-xs">
+                                  {task.assigneeType === "admin" ? "Admin" : "Formateur"}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

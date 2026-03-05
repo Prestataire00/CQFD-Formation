@@ -233,8 +233,10 @@ function getAutoStatus(task: any): StepStatus {
   // Manual overrides (user explicitly set a status)
   if (task.isCompleted || task.status === 'done') return 'done';
   if (task.status === 'na') return 'na';
+  if (task.status === 'priority') return 'priority';
+  if (task.status === 'late') return 'late';
 
-  // Always recompute from dates — handles deadline adjustments
+  // Auto-compute from dates only when status is 'todo' (default/automatic mode)
   const now = new Date();
   if (!task.dueDate) return 'todo';
 
