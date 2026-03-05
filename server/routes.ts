@@ -1018,8 +1018,8 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       // If step is currently 'late' and the new due/late dates are in the future, reset to 'todo' or 'priority'
       if (currentStep?.status === 'late' && !updateData.status) {
         const now = new Date();
-        const newDueDate = updateData.dueDate ? new Date(updateData.dueDate) : (currentStep.dueDate ? new Date(currentStep.dueDate) : null);
-        const newLateDate = updateData.lateDate ? new Date(updateData.lateDate) : (currentStep.lateDate ? new Date(currentStep.lateDate) : null);
+        const newDueDate = updateData.dueDate ? new Date(updateData.dueDate) : (updateData.dueDate === null ? null : (currentStep.dueDate ? new Date(currentStep.dueDate) : null));
+        const newLateDate = updateData.lateDate ? new Date(updateData.lateDate) : (updateData.lateDate === null ? null : (currentStep.lateDate ? new Date(currentStep.lateDate) : null));
 
         // If late_date (deadline retard) is in the future, no longer late
         if (newLateDate && newLateDate > now) {
@@ -1033,12 +1033,31 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         } else if (!newLateDate && newDueDate && newDueDate > now) {
           updateData.status = 'todo';
         }
+        // If only dueDate was pushed to the future but lateDate remains in the past (not explicitly updated)
+        // Shift lateDate proportionally so the frontend getAutoStatus also sees future dates
+        else if (newLateDate && newLateDate <= now && newDueDate && newDueDate > now && !updateData.lateDate && currentStep.dueDate) {
+          const oldDue = new Date(currentStep.dueDate).getTime();
+          const newDue = newDueDate.getTime();
+          const shift = newDue - oldDue;
+          if (shift > 0) {
+            const shiftedLate = new Date(newLateDate.getTime() + shift);
+            updateData.lateDate = shiftedLate.toISOString();
+            // Recalculate status with the shifted lateDate
+            if (shiftedLate > now) {
+              if (newDueDate <= now) {
+                updateData.status = 'priority';
+              } else {
+                updateData.status = 'todo';
+              }
+            }
+          }
+        }
       }
 
       const step = await storage.updateMissionStep(stepId, {
         ...updateData,
-        dueDate: updateData.dueDate ? new Date(updateData.dueDate) : undefined,
-        lateDate: updateData.lateDate ? new Date(updateData.lateDate) : undefined,
+        dueDate: updateData.dueDate ? new Date(updateData.dueDate) : (updateData.dueDate === null ? null : undefined),
+        lateDate: updateData.lateDate ? new Date(updateData.lateDate) : (updateData.lateDate === null ? null : undefined),
         trainerCommentUpdatedAt: updateData.trainerComment !== undefined ? new Date() : undefined,
         commentUpdatedAt: updateData.comment !== undefined ? new Date() : undefined,
       });

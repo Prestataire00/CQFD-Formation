@@ -422,7 +422,8 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
   };
 
   const handleSaveDeadline = () => {
-    onUpdate(task.id, { dueDate: deadline || null });
+    // When manually editing deadline, clear lateDate so only the chosen date drives the status
+    onUpdate(task.id, { dueDate: deadline || null, lateDate: null });
     setIsEditingDeadline(false);
   };
 

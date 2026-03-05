@@ -772,16 +772,27 @@ export class DatabaseStorage implements IStorage {
       isOriginal: false,
     }).returning();
 
-    // Copy all mission steps
+    // Copy all mission steps and their sub-tasks (stepTasks)
     const originalSteps = await this.getMissionSteps(originalMissionId);
     for (const step of originalSteps) {
       const { id: stepId, missionId, createdAt: stepCreatedAt, updatedAt: stepUpdatedAt, ...stepData } = step;
-      await this.createMissionStep({
+      const newStep = await this.createMissionStep({
         ...stepData,
         missionId: newMission.id,
         isCompleted: false,
         status: 'todo',
       });
+
+      // Copy step tasks (sub-tasks) for this step
+      const originalTasks = await this.getStepTasks(stepId);
+      for (const task of originalTasks) {
+        const { id: taskId, stepId: taskStepId, createdAt: taskCreatedAt, updatedAt: taskUpdatedAt, ...taskData } = task;
+        await this.createStepTask({
+          ...taskData,
+          stepId: newStep.id,
+          isCompleted: false,
+        });
+      }
     }
 
     // Copy all sessions
@@ -855,17 +866,28 @@ export class DatabaseStorage implements IStorage {
           isOriginal: false,
         }).returning();
 
-        // Copy all mission steps (tasks)
+        // Copy all mission steps (tasks) and their sub-tasks (stepTasks)
         const originalSteps = await this.getMissionSteps(originalMissionId);
         for (const step of originalSteps) {
           const { id: stepId, missionId, createdAt: stepCreatedAt, updatedAt: stepUpdatedAt, ...stepData } = step;
-          await this.createMissionStep({
+          const newStep = await this.createMissionStep({
             ...stepData,
             missionId: newMission.id,
             // Reset completion status for new trainer
             isCompleted: false,
             status: 'todo',
           });
+
+          // Copy step tasks (sub-tasks) for this step
+          const originalTasks = await this.getStepTasks(stepId);
+          for (const task of originalTasks) {
+            const { id: taskId, stepId: taskStepId, createdAt: taskCreatedAt, updatedAt: taskUpdatedAt, ...taskData } = task;
+            await this.createStepTask({
+              ...taskData,
+              stepId: newStep.id,
+              isCompleted: false,
+            });
+          }
         }
 
         // Copy all sessions
