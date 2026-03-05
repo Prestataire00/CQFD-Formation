@@ -2850,6 +2850,31 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
     }
   });
 
+  // Upsert: create or update a deadline override by taskTitle + typology + trainerRole
+  // MUST be before the :id route to avoid matching "upsert" as an :id parameter
+  app.put('/api/task-deadline-defaults/upsert', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
+    try {
+      const { taskTitle, typology, trainerRole } = req.body;
+      const daysBefore = Number.isNaN(Number(req.body.daysBefore)) ? 0 : Number(req.body.daysBefore);
+      const lateDaysBefore = req.body.lateDaysBefore == null || Number.isNaN(Number(req.body.lateDaysBefore)) ? null : Number(req.body.lateDaysBefore);
+      if (!taskTitle || !typology || !trainerRole) {
+        return res.status(400).json({ message: "Champs requis manquants" });
+      }
+      const all = await storage.getTaskDeadlineDefaults();
+      const existing = all.find(d => d.taskTitle === taskTitle && d.typology === typology && d.trainerRole === trainerRole);
+      if (existing) {
+        const updated = await storage.updateTaskDeadlineDefault(existing.id, { daysBefore, lateDaysBefore });
+        res.json(updated);
+      } else {
+        const created = await storage.createTaskDeadlineDefault({ taskTitle, typology, trainerRole, daysBefore, lateDaysBefore });
+        res.status(201).json(created);
+      }
+    } catch (err) {
+      console.error('Upsert deadline error:', err);
+      res.status(500).json({ message: "Erreur lors de la sauvegarde" });
+    }
+  });
+
   app.put(api.taskDeadlineDefaults.update.path, isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const input = api.taskDeadlineDefaults.update.input.parse(req.body);
@@ -2880,30 +2905,6 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
     } catch (err) {
       console.error('Error deleting task deadline default:', err);
       res.status(500).json({ message: "Erreur" });
-    }
-  });
-
-  // Upsert: create or update a deadline override by taskTitle + typology + trainerRole
-  app.put('/api/task-deadline-defaults/upsert', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
-    try {
-      const { taskTitle, typology, trainerRole } = req.body;
-      const daysBefore = Number.isNaN(Number(req.body.daysBefore)) ? 0 : Number(req.body.daysBefore);
-      const lateDaysBefore = req.body.lateDaysBefore == null || Number.isNaN(Number(req.body.lateDaysBefore)) ? null : Number(req.body.lateDaysBefore);
-      if (!taskTitle || !typology || !trainerRole) {
-        return res.status(400).json({ message: "Champs requis manquants" });
-      }
-      const all = await storage.getTaskDeadlineDefaults();
-      const existing = all.find(d => d.taskTitle === taskTitle && d.typology === typology && d.trainerRole === trainerRole);
-      if (existing) {
-        const updated = await storage.updateTaskDeadlineDefault(existing.id, { daysBefore, lateDaysBefore });
-        res.json(updated);
-      } else {
-        const created = await storage.createTaskDeadlineDefault({ taskTitle, typology, trainerRole, daysBefore, lateDaysBefore });
-        res.status(201).json(created);
-      }
-    } catch (err) {
-      console.error('Upsert deadline error:', err);
-      res.status(500).json({ message: "Erreur lors de la sauvegarde" });
     }
   });
 
