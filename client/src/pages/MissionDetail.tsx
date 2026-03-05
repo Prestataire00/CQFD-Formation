@@ -158,6 +158,7 @@ import {
   CONSEIL_SALARIE_TASKS,
   CONFERENCE_PRESTA_TASKS,
   CONFERENCE_SALARIE_TASKS,
+  getTaskTemplates,
 } from "@/lib/task-templates";
 
 // Step configuration
@@ -1080,41 +1081,35 @@ export default function MissionDetail() {
         },
       });
 
-      // If typology or trainer changed, replace all tasks with the correct template
       if ((typologyChanged || trainerChanged) && steps) {
-        // Determine the correct task template based on new typology + trainer role
         const newTrainer = allUsers?.find((u: any) => u.id === editForm.trainerId);
         const trainerRole = newTrainer?.role;
         const typology = editForm.typology;
 
-        let taskList: TaskTemplate[] | null = null;
-        if (typology === "Intra" && trainerRole === "prestataire") taskList = INTRA_PRESTA_TASKS;
-        else if (typology === "Intra" && trainerRole === "formateur") taskList = INTRA_SALARIE_TASKS;
-        else if (typology === "Inter" && trainerRole === "prestataire") taskList = INTER_PRESTA_TASKS;
-        else if (typology === "Inter" && trainerRole === "formateur") taskList = INTER_SALARIE_TASKS;
-        else if (typology === "Conseil" && trainerRole === "prestataire") taskList = CONSEIL_PRESTA_TASKS;
-        else if (typology === "Conseil" && trainerRole === "formateur") taskList = CONSEIL_SALARIE_TASKS;
-        else if (typology === "Conférence" && trainerRole === "prestataire") taskList = CONFERENCE_PRESTA_TASKS;
-        else if (typology === "Conférence" && trainerRole === "formateur") taskList = CONFERENCE_SALARIE_TASKS;
+        const taskList = getTaskTemplates(typology, trainerRole || "");
 
         if (taskList) {
           const adminId = user?.id || null;
           const formateurId = editForm.trainerId || null;
           const validAdminId = adminId && allUsers?.some((u: any) => u.id === adminId) ? adminId : null;
           const validFormateurId = formateurId && allUsers?.some((u: any) => u.id === formateurId) ? formateurId : null;
+          const startDateRef = editForm.startDate ? new Date(editForm.startDate) : (mission?.startDate ? new Date(mission.startDate as string) : null);
           const createdAtRef = mission?.createdAt ? new Date(mission.createdAt) : null;
+          const referenceDate = startDateRef || createdAtRef;
 
           const newSteps = taskList.map((task, index) => {
             const assigneeId = task.assigneeType === "admin" ? validAdminId : validFormateurId;
             let dueDate: string | undefined;
             let lateDate: string | undefined;
-            if (createdAtRef) {
-              const d = new Date(createdAtRef);
+            if (referenceDate) {
+              const d = new Date(referenceDate);
               d.setDate(d.getDate() - task.priorityDaysBefore);
               dueDate = d.toISOString();
-              const ld = new Date(createdAtRef);
-              ld.setDate(ld.getDate() - task.lateDaysBefore);
-              lateDate = ld.toISOString();
+              if (task.lateDaysBefore !== undefined) {
+                const ld = new Date(referenceDate);
+                ld.setDate(ld.getDate() - task.lateDaysBefore);
+                lateDate = ld.toISOString();
+              }
             }
             return {
               title: task.title,
@@ -1127,8 +1122,13 @@ export default function MissionDetail() {
             };
           });
 
-          await replaceSteps.mutateAsync({ missionId, steps: newSteps });
-          toast({ title: `Taches mises a jour (${taskList.length} taches)` });
+          try {
+            await replaceSteps.mutateAsync({ missionId, steps: newSteps });
+            toast({ title: `Taches mises a jour (${taskList.length} taches)` });
+          } catch (replaceErr: any) {
+            console.error("[handleSaveInfo] replaceSteps error:", replaceErr);
+            toast({ title: "Erreur lors du remplacement des taches", description: replaceErr?.message, variant: "destructive" });
+          }
         } else if (!editForm.trainerId) {
           toast({ title: "Typologie mise a jour. Assignez un formateur pour generer les taches correspondantes." });
         } else {

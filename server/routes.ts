@@ -1121,32 +1121,44 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         return;
       }
 
+      console.log(`[replace-steps] Mission ${missionId}: replacing with ${newSteps.length} new steps`);
+
       // Delete all existing steps (with cascade: reminders, stepTasks)
       const existingSteps = await storage.getMissionSteps(missionId);
       for (const step of existingSteps) {
-        await storage.deleteMissionStep(step.id);
+        try {
+          await storage.deleteMissionStep(step.id);
+        } catch (delErr: any) {
+          console.error(`[replace-steps] Failed to delete step ${step.id}:`, delErr.message);
+          throw delErr;
+        }
       }
 
       // Create new steps
       const created = [];
       for (const stepData of newSteps) {
-        const step = await storage.createMissionStep({
-          missionId,
-          title: stepData.title,
-          status: stepData.status || 'todo',
-          order: stepData.order,
-          assigneeId: stepData.assigneeId || null,
-          dueDate: stepData.dueDate ? new Date(stepData.dueDate) : null,
-          lateDate: stepData.lateDate ? new Date(stepData.lateDate) : null,
-          link: stepData.link || null,
-        });
-        created.push(step);
+        try {
+          const step = await storage.createMissionStep({
+            missionId,
+            title: stepData.title,
+            status: stepData.status || 'todo',
+            order: stepData.order,
+            assigneeId: stepData.assigneeId || null,
+            dueDate: stepData.dueDate ? new Date(stepData.dueDate) : null,
+            lateDate: stepData.lateDate ? new Date(stepData.lateDate) : null,
+            link: stepData.link || null,
+          });
+          created.push(step);
+        } catch (createErr: any) {
+          console.error(`[replace-steps] Failed to create step "${stepData.title}" (order ${stepData.order}):`, createErr.message);
+          throw createErr;
+        }
       }
 
       console.log(`[replace-steps] Mission ${missionId}: deleted ${existingSteps.length}, created ${created.length}`);
       res.json({ deleted: existingSteps.length, created: created.length, steps: created });
     } catch (error: any) {
-      console.error("Replace steps error:", error);
+      console.error("[replace-steps] Error:", error);
       res.status(500).json({ message: error.message || "Erreur lors du remplacement des tâches" });
     }
   });
