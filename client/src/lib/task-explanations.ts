@@ -198,15 +198,51 @@ export function getTaskExplanation(taskTitle: string): string | null {
 
 export function getTaskExplanationWithOverrides(
   taskTitle: string,
-  dbExplanations: Array<{ taskName: string; explanation: string }>
+  dbExplanations: Array<{ taskName: string; explanation: string; typology?: string | null; trainerRole?: string | null }>,
+  typology?: string | null,
+  trainerRole?: string | null
 ): string | null {
   if (!taskTitle) return null;
   const normalizedTitle = normalize(taskTitle);
 
-  // Priority: search in DB overrides
+  // Priority 1: exact match on typology + trainerRole
+  if (typology && trainerRole) {
+    for (const item of dbExplanations) {
+      const normalizedName = normalize(item.taskName);
+      if ((normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle))
+        && item.typology === typology && item.trainerRole === trainerRole) {
+        return item.explanation;
+      }
+    }
+  }
+
+  // Priority 2: match on typology only (any role)
+  if (typology) {
+    for (const item of dbExplanations) {
+      const normalizedName = normalize(item.taskName);
+      if ((normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle))
+        && item.typology === typology && !item.trainerRole) {
+        return item.explanation;
+      }
+    }
+  }
+
+  // Priority 3: match on trainerRole only (any typology)
+  if (trainerRole) {
+    for (const item of dbExplanations) {
+      const normalizedName = normalize(item.taskName);
+      if ((normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle))
+        && !item.typology && item.trainerRole === trainerRole) {
+        return item.explanation;
+      }
+    }
+  }
+
+  // Priority 4: global DB override (no typology, no role)
   for (const item of dbExplanations) {
     const normalizedName = normalize(item.taskName);
-    if (normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle)) {
+    if ((normalizedTitle.includes(normalizedName) || normalizedName.includes(normalizedTitle))
+      && !item.typology && !item.trainerRole) {
       return item.explanation;
     }
   }

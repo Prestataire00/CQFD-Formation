@@ -35,6 +35,8 @@ function getNotificationIcon(type: string) {
       return <AlertTriangle className="w-4 h-4 mt-0.5 text-red-500 flex-shrink-0" />;
     case 'mission_assignment':
       return <Briefcase className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />;
+    case 'task_assignment':
+      return <ListTodo className="w-4 h-4 mt-0.5 text-blue-500 flex-shrink-0" />;
     case 'mission_update':
       return <Briefcase className="w-4 h-4 mt-0.5 text-green-500 flex-shrink-0" />;
     case 'template_update':
@@ -239,15 +241,15 @@ export function Header({ title }: { title: string }) {
                         );
                       })()}
 
-                      {/* Group: Mission assignments */}
+                      {/* Group: Assignments (missions + tasks) */}
                       {(() => {
-                        const assignments = inAppNotifications?.filter((n: InAppNotification) => n.type === 'mission_assignment') || [];
+                        const assignments = inAppNotifications?.filter((n: InAppNotification) => n.type === 'mission_assignment' || n.type === 'task_assignment') || [];
                         if (assignments.length === 0) return null;
                         return (
                           <div>
                             <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border-b sticky top-0">
                               <Briefcase className="w-4 h-4 text-blue-500" />
-                              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Missions assignees</span>
+                              <span className="text-xs font-semibold text-blue-700 uppercase tracking-wide">Assignations</span>
                               <Badge className="text-[10px] px-1.5 py-0 ml-auto bg-blue-500 text-white">{assignments.length}</Badge>
                             </div>
                             <div className="divide-y">

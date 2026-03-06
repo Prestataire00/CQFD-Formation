@@ -786,37 +786,41 @@ export default function Missions() {
                 </SelectContent>
               </Select>
 
-              {/* Client filter */}
-              <Select value={clientFilter} onValueChange={setClientFilter}>
-                <SelectTrigger className="w-48">
-                  <Building2 className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Client" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  <SelectItem value="all" className="focus:bg-violet-200">Tous les clients</SelectItem>
-                  {clients?.slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((client: any) => (
-                    <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Client filter - admin only */}
+              {isAdmin && (
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger className="w-48">
+                    <Building2 className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Client" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="all" className="focus:bg-violet-200">Tous les clients</SelectItem>
+                    {clients?.slice().sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "", "fr")).map((client: any) => (
+                      <SelectItem key={client.id} value={client.id.toString()} className="focus:bg-violet-200">
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
-              {/* Trainer filter */}
-              <Select value={trainerFilter} onValueChange={setTrainerFilter}>
-                <SelectTrigger className="w-48">
-                  <User className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Formateur" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  <SelectItem value="all" className="focus:bg-violet-200">Tous les formateurs</SelectItem>
-                  {trainers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((trainer: any) => (
-                    <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
-                      {trainer.firstName} {trainer.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Trainer filter - admin only */}
+              {isAdmin && (
+                <Select value={trainerFilter} onValueChange={setTrainerFilter}>
+                  <SelectTrigger className="w-48">
+                    <User className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Formateur" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="all" className="focus:bg-violet-200">Tous les formateurs</SelectItem>
+                    {trainers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((trainer: any) => (
+                      <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
+                        {trainer.firstName} {trainer.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
             </div>
 
@@ -830,10 +834,10 @@ export default function Missions() {
                     <SelectValue placeholder="Trier par" />
                   </SelectTrigger>
                   <SelectContent className="bg-violet-100 border-violet-300">
-                    <SelectItem value="client" className="focus:bg-violet-200">Client (A-Z)</SelectItem>
+                    {isAdmin && <SelectItem value="client" className="focus:bg-violet-200">Client (A-Z)</SelectItem>}
                     <SelectItem value="date_asc" className="focus:bg-violet-200">Date (plus anciennes)</SelectItem>
                     <SelectItem value="date_desc" className="focus:bg-violet-200">Date (plus recentes)</SelectItem>
-                    <SelectItem value="trainer" className="focus:bg-violet-200">Formateur (A-Z)</SelectItem>
+                    {isAdmin && <SelectItem value="trainer" className="focus:bg-violet-200">Formateur (A-Z)</SelectItem>}
                     <SelectItem value="status" className="focus:bg-violet-200">Statut</SelectItem>
                     <SelectItem value="title" className="focus:bg-violet-200">Titre (A-Z)</SelectItem>
                     <SelectItem value="typology" className="focus:bg-violet-200">Typologie</SelectItem>
@@ -906,7 +910,7 @@ export default function Missions() {
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium text-sm">Titre</th>
                     <th className="text-left p-3 font-medium text-sm">Client</th>
-                    <th className="text-left p-3 font-medium text-sm">Formateur</th>
+                    {isAdmin && <th className="text-left p-3 font-medium text-sm">Formateur</th>}
                     <th className="text-left p-3 font-medium text-sm">Dates</th>
                     <th className="text-left p-3 font-medium text-sm">Typologie</th>
                     <th className="text-left p-3 font-medium text-sm">Statut</th>
@@ -942,9 +946,11 @@ export default function Missions() {
                           </div>
                         </td>
                         <td className="p-3 text-sm">{client?.name || "-"}</td>
-                        <td className="p-3 text-sm">
-                          {trainer ? `${trainer.firstName} ${trainer.lastName}` : "-"}
-                        </td>
+                        {isAdmin && (
+                          <td className="p-3 text-sm">
+                            {trainer ? `${trainer.firstName} ${trainer.lastName}` : "-"}
+                          </td>
+                        )}
                         <td className="p-3 text-sm">
                           {mission.startDate ? (
                             <>
@@ -1084,7 +1090,7 @@ export default function Missions() {
                         </div>
                       )}
 
-                      {mission.trainerId && (
+                      {isAdmin && mission.trainerId && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <User className="w-4 h-4" />
                           <span>

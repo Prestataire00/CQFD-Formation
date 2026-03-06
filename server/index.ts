@@ -27,6 +27,10 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+app.get("/health", (_req, res) => {
+  res.status(200).send("OK");
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
@@ -65,10 +69,25 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  const port = parseInt(process.env.PORT || "5000", 10);
+  let isReady = false;
+
+  if (process.env.NODE_ENV === "production") {
+    app.use((req, res, next) => {
+      if (!isReady && !req.path.startsWith("/health")) {
+        return res.status(200).send("<!DOCTYPE html><html><head><meta http-equiv='refresh' content='3'></head><body><p>Starting...</p></body></html>");
+      }
+      next();
+    });
+
+    httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+      log(`listening on port ${port} (initializing...)`);
+    });
+  }
+
   await ensureSchemaSync();
   await registerRoutes(httpServer, app);
   
-  // Créer un admin par défaut si aucun n'existe
   await seedDefaultAdmin();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -81,31 +100,17 @@ app.use((req, res, next) => {
     }
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
+    isReady = true;
+    log(`serving on port ${port}`);
+    startReminderScheduler();
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
-  }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
+    httpServer.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
       log(`serving on port ${port}`);
       startReminderScheduler();
-    },
-  );
+    });
+  }
 })();

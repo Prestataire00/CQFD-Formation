@@ -582,8 +582,10 @@ export const taskDeadlineDefaults = pgTable("task_deadline_defaults", {
 // --- TASK EXPLANATIONS (editable consignes) ---
 export const taskExplanations = pgTable("task_explanations", {
   id: serial("id").primaryKey(),
-  taskName: text("task_name").notNull().unique(),
+  taskName: text("task_name").notNull(),
   explanation: text("explanation").notNull(),
+  typology: text("typology"), // null = all typologies, or Intra/Inter/Conseil/Conférence
+  trainerRole: text("trainer_role"), // null = all roles, or prestataire/formateur
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -1016,6 +1016,8 @@ export const api = {
       input: z.object({
         taskName: z.string().min(1),
         explanation: z.string().min(1),
+        typology: z.string().nullable().optional(),
+        trainerRole: z.string().nullable().optional(),
       }),
       responses: {
         201: z.custom<typeof taskExplanations.$inferSelect>(),
@@ -1028,6 +1030,8 @@ export const api = {
       input: z.object({
         taskName: z.string().optional(),
         explanation: z.string().optional(),
+        typology: z.string().nullable().optional(),
+        trainerRole: z.string().nullable().optional(),
       }),
       responses: {
         200: z.custom<typeof taskExplanations.$inferSelect>(),

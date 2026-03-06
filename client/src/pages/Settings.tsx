@@ -143,7 +143,7 @@ export default function Settings() {
   const [editingExplanationId, setEditingExplanationId] = useState<number | null>(null);
   const [editingExplanationText, setEditingExplanationText] = useState("");
   const [isAddingExplanation, setIsAddingExplanation] = useState(false);
-  const [newExplanation, setNewExplanation] = useState({ taskName: "", explanation: "" });
+  const [newExplanation, setNewExplanation] = useState({ taskName: "", explanation: "", typology: null as string | null, trainerRole: null as string | null });
 
   // Load deadline overrides, reminder settings, and explanations
   useEffect(() => {
@@ -350,14 +350,19 @@ export default function Settings() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(newExplanation),
+        body: JSON.stringify({
+          taskName: newExplanation.taskName,
+          explanation: newExplanation.explanation,
+          typology: newExplanation.typology,
+          trainerRole: newExplanation.trainerRole,
+        }),
       });
       if (!response.ok) throw new Error();
       const created = await response.json();
       setTaskExplanationsDb((prev) => [...prev, created]);
-      setNewExplanation({ taskName: "", explanation: "" });
+      setNewExplanation({ taskName: "", explanation: "", typology: null, trainerRole: null });
       setIsAddingExplanation(false);
-      toast({ title: "Consigne ajoutee" });
+      toast({ title: "Consigne ajoutee pour " + (newExplanation.typology || "toutes typologies") + " / " + (newExplanation.trainerRole === "formateur" ? "Salarie" : newExplanation.trainerRole || "tous roles") });
     } catch {
       toast({ title: "Erreur", variant: "destructive" });
     } finally {
@@ -400,7 +405,7 @@ export default function Settings() {
   };
 
   const handleCustomizeExplanation = (taskName: string, explanation: string) => {
-    setNewExplanation({ taskName, explanation });
+    setNewExplanation({ taskName, explanation, typology: templateTypology, trainerRole: templateTrainerRole });
     setIsAddingExplanation(true);
   };
 
@@ -1553,7 +1558,19 @@ export default function Settings() {
                           <TableBody>
                             {getTaskTemplates(templateTypology, templateTrainerRole).map((task, index) => {
                               const isExpanded = expandedTaskTitle === task.title;
-                              const dbEntry = taskExplanationsDb.find((d: any) => d.taskName === task.title);
+                              // Find DB entry matching current typology+role, then typology only, then global
+                              const dbEntry = taskExplanationsDb.find((d: any) =>
+                                d.taskName === task.title && d.typology === templateTypology && d.trainerRole === templateTrainerRole
+                              ) || taskExplanationsDb.find((d: any) =>
+                                d.taskName === task.title && d.typology === templateTypology && !d.trainerRole
+                              ) || taskExplanationsDb.find((d: any) =>
+                                d.taskName === task.title && !d.typology && d.trainerRole === templateTrainerRole
+                              ) || taskExplanationsDb.find((d: any) =>
+                                d.taskName === task.title && !d.typology && !d.trainerRole
+                              );
+                              const dbEntryExact = taskExplanationsDb.find((d: any) =>
+                                d.taskName === task.title && d.typology === templateTypology && d.trainerRole === templateTrainerRole
+                              );
                               const defaultEntry = TASK_EXPLANATIONS.find((d) => d.taskName === task.title);
                               const hasConsigne = !!dbEntry || !!defaultEntry;
                               const isEditing = isExpanded && editingExplanationId === dbEntry?.id;
@@ -1583,8 +1600,8 @@ export default function Settings() {
                                     </TableCell>
                                     <TableCell>
                                       {hasConsigne ? (
-                                        <Badge variant={dbEntry ? "default" : "outline"} className="text-xs">
-                                          {dbEntry ? "Perso." : "Defaut"}
+                                        <Badge variant={dbEntryExact ? "default" : dbEntry ? "secondary" : "outline"} className="text-xs">
+                                          {dbEntryExact ? "Perso." : dbEntry ? "Heritee" : "Defaut"}
                                         </Badge>
                                       ) : (
                                         <span className="text-xs text-muted-foreground">—</span>
@@ -1595,16 +1612,41 @@ export default function Settings() {
                                     <TableRow>
                                       <TableCell colSpan={6} className="bg-muted/30 p-0">
                                         <div className="p-4 space-y-3">
-                                          {dbEntry ? (
+                                          {/* Adding/customizing form - always takes priority */}
+                                          {isAddingExplanation && newExplanation.taskName === task.title ? (
+                                            <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                              <span className="text-xs font-semibold uppercase text-muted-foreground">
+                                                Personnaliser pour {templateTypology} / {templateTrainerRole === "formateur" ? "Salarie" : "Prestataire"}
+                                              </span>
+                                              <Textarea
+                                                value={newExplanation.explanation}
+                                                onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
+                                                placeholder="Texte de la consigne..."
+                                                rows={6}
+                                                autoFocus
+                                              />
+                                              <div className="flex gap-2 justify-end">
+                                                <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "", typology: null, trainerRole: null }); }}>
+                                                  Annuler
+                                                </Button>
+                                                <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
+                                                  {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                                  Enregistrer
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ) : dbEntryExact ? (
                                             <>
                                               <div className="flex items-center justify-between">
-                                                <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne personnalisee</span>
-                                                {editingExplanationId !== dbEntry.id && (
+                                                <span className="text-xs font-semibold uppercase text-muted-foreground">
+                                                  Consigne pour {templateTypology} / {templateTrainerRole === "formateur" ? "Salarie" : "Prestataire"}
+                                                </span>
+                                                {editingExplanationId !== dbEntryExact.id && (
                                                   <div className="flex gap-1">
                                                     <Button
                                                       variant="ghost"
                                                       size="sm"
-                                                      onClick={(e) => { e.stopPropagation(); setEditingExplanationId(dbEntry.id); setEditingExplanationText(dbEntry.explanation); }}
+                                                      onClick={(e) => { e.stopPropagation(); setEditingExplanationId(dbEntryExact.id); setEditingExplanationText(dbEntryExact.explanation); }}
                                                     >
                                                       <Edit className="w-4 h-4" />
                                                     </Button>
@@ -1612,14 +1654,14 @@ export default function Settings() {
                                                       variant="ghost"
                                                       size="sm"
                                                       className="text-destructive hover:text-destructive"
-                                                      onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(dbEntry.id); }}
+                                                      onClick={(e) => { e.stopPropagation(); handleDeleteExplanation(dbEntryExact.id); }}
                                                     >
                                                       <Trash2 className="w-4 h-4" />
                                                     </Button>
                                                   </div>
                                                 )}
                                               </div>
-                                              {isEditing ? (
+                                              {editingExplanationId === dbEntryExact.id ? (
                                                 <div className="space-y-2">
                                                   <Textarea
                                                     value={editingExplanationText}
@@ -1632,88 +1674,47 @@ export default function Settings() {
                                                     <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setEditingExplanationId(null); setEditingExplanationText(""); }}>
                                                       Annuler
                                                     </Button>
-                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExplanation(dbEntry.id, editingExplanationText); }}>
+                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExplanation(dbEntryExact.id, editingExplanationText); }}>
                                                       Sauvegarder
                                                     </Button>
                                                   </div>
                                                 </div>
                                               ) : (
-                                                <p className="text-sm text-muted-foreground whitespace-pre-line">{dbEntry.explanation}</p>
-                                              )}
-                                            </>
-                                          ) : defaultEntry ? (
-                                            <>
-                                              {isAddingExplanation && newExplanation.taskName === task.title ? (
-                                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                                                  <span className="text-xs font-semibold uppercase text-muted-foreground">Personnaliser la consigne</span>
-                                                  <Textarea
-                                                    value={newExplanation.explanation}
-                                                    onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
-                                                    placeholder="Texte de la consigne..."
-                                                    rows={6}
-                                                    autoFocus
-                                                  />
-                                                  <div className="flex gap-2 justify-end">
-                                                    <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
-                                                      Annuler
-                                                    </Button>
-                                                    <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
-                                                      {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                                      Enregistrer
-                                                    </Button>
-                                                  </div>
-                                                </div>
-                                              ) : (
-                                                <>
-                                                  <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-semibold uppercase text-muted-foreground">Consigne par defaut</span>
-                                                    <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      onClick={(e) => { e.stopPropagation(); handleCustomizeExplanation(task.title, defaultEntry.explanation); }}
-                                                    >
-                                                      <Edit className="w-4 h-4 mr-1" />
-                                                      Personnaliser
-                                                    </Button>
-                                                  </div>
-                                                  <p className="text-sm text-muted-foreground whitespace-pre-line">{defaultEntry.explanation}</p>
-                                                </>
+                                                <p className="text-sm text-muted-foreground whitespace-pre-line">{dbEntryExact.explanation}</p>
                                               )}
                                             </>
                                           ) : (
                                             <>
-                                              {isAddingExplanation && newExplanation.taskName === task.title ? (
-                                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
-                                                  <span className="text-xs font-semibold uppercase text-muted-foreground">Nouvelle consigne</span>
-                                                  <Textarea
-                                                    value={newExplanation.explanation}
-                                                    onChange={(e) => setNewExplanation({ ...newExplanation, explanation: e.target.value })}
-                                                    placeholder="Texte de la consigne..."
-                                                    rows={4}
-                                                    autoFocus
-                                                  />
-                                                  <div className="flex gap-2 justify-end">
-                                                    <Button variant="outline" size="sm" onClick={() => { setIsAddingExplanation(false); setNewExplanation({ taskName: "", explanation: "" }); }}>
-                                                      Annuler
-                                                    </Button>
-                                                    <Button size="sm" onClick={handleAddExplanation} disabled={isSavingExplanation}>
-                                                      {isSavingExplanation && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                                      Enregistrer
-                                                    </Button>
-                                                  </div>
+                                              {/* Show inherited or default consigne as read-only with Personnaliser button */}
+                                              {dbEntry && !dbEntryExact && (
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <Badge variant="secondary" className="text-xs">
+                                                    Heritee {dbEntry.typology ? `de ${dbEntry.typology}` : "globale"}{dbEntry.trainerRole ? ` / ${dbEntry.trainerRole === "formateur" ? "Salarie" : "Prestataire"}` : ""}
+                                                  </Badge>
                                                 </div>
-                                              ) : (
-                                                <>
-                                                  <p className="text-sm text-muted-foreground italic">Aucune consigne pour cette tache.</p>
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={(e) => { e.stopPropagation(); setNewExplanation({ taskName: task.title, explanation: "" }); setIsAddingExplanation(true); }}
-                                                  >
-                                                    <Plus className="w-4 h-4 mr-1" />
-                                                    Ajouter une consigne
-                                                  </Button>
-                                                </>
+                                              )}
+                                              <div className="flex items-center justify-between">
+                                                <span className="text-xs font-semibold uppercase text-muted-foreground">
+                                                  {dbEntry ? "Consigne heritee" : defaultEntry ? "Consigne par defaut" : "Aucune consigne"}
+                                                </span>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const baseText = dbEntry?.explanation || defaultEntry?.explanation || "";
+                                                    handleCustomizeExplanation(task.title, baseText);
+                                                  }}
+                                                >
+                                                  <Edit className="w-4 h-4 mr-1" />
+                                                  Personnaliser pour {templateTypology} / {templateTrainerRole === "formateur" ? "Salarie" : "Prestataire"}
+                                                </Button>
+                                              </div>
+                                              {(dbEntry || defaultEntry) && (
+                                                <p className="text-sm text-muted-foreground whitespace-pre-line">{dbEntry?.explanation || defaultEntry?.explanation}</p>
+                                              )}
+                                              {!dbEntry && !defaultEntry && (
+                                                <p className="text-sm text-muted-foreground italic">Aucune consigne pour cette tache.</p>
                                               )}
                                             </>
                                           )}

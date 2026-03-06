@@ -374,7 +374,9 @@ interface TaskItemProps {
   users: any[];
   assignableUsers: any[];
   currentUserId: string;
-  dbExplanations: Array<{ taskName: string; explanation: string }>;
+  dbExplanations: Array<{ taskName: string; explanation: string; typology?: string | null; trainerRole?: string | null }>;
+  missionTypology?: string | null;
+  missionTrainerRole?: string | null;
   onUpdate: (taskId: number, data: any) => void;
   onDelete: (taskId: number) => void;
   onMoveUp?: () => void;
@@ -383,7 +385,7 @@ interface TaskItemProps {
   isLast?: boolean;
 }
 
-function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, dbExplanations, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
+function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUserId, dbExplanations, missionTypology, missionTrainerRole, onUpdate, onDelete, onMoveUp, onMoveDown, isFirst, isLast }: TaskItemProps) {
   const { toast } = useToast();
   const sendStepLink = useSendStepLink();
   const [isEditingComment, setIsEditingComment] = useState(false);
@@ -483,7 +485,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                 {task.title}
               </h4>
               {(() => {
-                const explanation = getTaskExplanationWithOverrides(task.title, dbExplanations);
+                const explanation = getTaskExplanationWithOverrides(task.title, dbExplanations, missionTypology, missionTrainerRole);
                 if (!explanation) return null;
                 return (
                   <Popover>
@@ -766,7 +768,7 @@ export default function MissionDetail() {
   const [newSession, setNewSession] = useState({ date: "", startTime: "09:00", endTime: "17:00" });
 
   // Task explanations from DB (editable consignes)
-  const [dbExplanations, setDbExplanations] = useState<Array<{ taskName: string; explanation: string }>>([]);
+  const [dbExplanations, setDbExplanations] = useState<Array<{ taskName: string; explanation: string; typology?: string | null; trainerRole?: string | null }>>([]);
   useEffect(() => {
     fetch("/api/task-explanations", { credentials: "include" })
       .then((res) => res.json())
@@ -983,9 +985,9 @@ export default function MissionDetail() {
   const program = programs?.find((p: any) => p.id === mission?.programId);
 
   // Handlers
-  const recalculateTaskDeadlines = async (createdAtStr: string) => {
+  const recalculateTaskDeadlines = async (referenceDateStr: string) => {
     if (!steps || steps.length === 0) return 0;
-    const referenceDate = new Date(createdAtStr);
+    const referenceDate = new Date(referenceDateStr);
     // Build lookup from INTRA_PRESTA_TASKS and INTER_PRESTA_TASKS
     const intraPrestaMap = new Map<string, { priorityDaysBefore: number; lateDaysBefore: number }>();
     for (const t of INTRA_PRESTA_TASKS) {
@@ -1135,9 +1137,10 @@ export default function MissionDetail() {
           toast({ title: "Typologie mise a jour (aucun template de taches correspondant)" });
         }
       } else {
-        // Recalculate all task deadlines based on mission creation date (only if tasks weren't replaced)
-        if (mission?.createdAt && steps && steps.length > 0) {
-          const updatedCount = await recalculateTaskDeadlines(mission.createdAt as string);
+        // Recalculate all task deadlines based on mission start date (only if tasks weren't replaced)
+        const recalcRef = mission?.startDate || mission?.createdAt;
+        if (recalcRef && steps && steps.length > 0) {
+          const updatedCount = await recalculateTaskDeadlines(recalcRef as string);
           if (updatedCount > 0) {
             toast({ title: `${updatedCount} deadline(s) recalculee(s)` });
           }
@@ -1174,14 +1177,15 @@ export default function MissionDetail() {
     }
   };
 
-  // Compute due date based on mission creation date and deadline defaults
+  // Compute due date based on mission start date and deadline defaults
   const computeDueDate = (taskTitle: string): string | null => {
     const daysBefore = deadlineDefaults[taskTitle];
-    if (daysBefore === undefined || !mission?.createdAt) return null;
+    const refDate = mission?.startDate || mission?.createdAt;
+    if (daysBefore === undefined || !refDate) return null;
 
-    const referenceDate = new Date(mission.createdAt);
+    const referenceDate = new Date(refDate);
 
-    // daysBefore > 0 means before creation date, < 0 means after, 0 means same day
+    // daysBefore > 0 means before start date, < 0 means after, 0 means same day
     const dueDate = new Date(referenceDate);
     dueDate.setDate(dueDate.getDate() - daysBefore);
     return dueDate.toISOString();
@@ -1255,8 +1259,9 @@ export default function MissionDetail() {
       const maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
       let dueDate: string | null = null;
       let lateDate: string | null = null;
-      if (overrideDaysBefore !== undefined && mission?.createdAt) {
-        const referenceDate = new Date(mission.createdAt);
+      const quickRefDate = mission?.startDate || mission?.createdAt;
+      if (overrideDaysBefore !== undefined && quickRefDate) {
+        const referenceDate = new Date(quickRefDate);
         const d = new Date(referenceDate);
         d.setDate(d.getDate() - overrideDaysBefore);
         dueDate = d.toISOString();
@@ -1319,13 +1324,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of INTRA_PRESTA_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1358,13 +1364,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of INTER_PRESTA_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1397,13 +1404,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of INTRA_SALARIE_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1436,13 +1444,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of INTER_SALARIE_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1475,13 +1484,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of CONSEIL_PRESTA_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1514,13 +1524,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of CONSEIL_SALARIE_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1553,13 +1564,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of CONFERENCE_PRESTA_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -1592,13 +1604,14 @@ export default function MissionDetail() {
 
     try {
       let maxOrder = steps?.reduce((max: number, s: any) => Math.max(max, s.order || 0), 0) || 0;
+      const refDate = mission?.startDate || mission?.createdAt;
       for (const task of CONFERENCE_SALARIE_TASKS) {
         maxOrder++;
         const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
         let dueDate: string | undefined;
         let lateDate: string | undefined;
-        if (mission?.createdAt) {
-          const referenceDate = new Date(mission.createdAt);
+        if (refDate) {
+          const referenceDate = new Date(refDate);
           const d = new Date(referenceDate);
           d.setDate(d.getDate() - task.priorityDaysBefore);
           dueDate = d.toISOString();
@@ -2425,12 +2438,12 @@ export default function MissionDetail() {
             </p>
           </div>
           <div className="flex gap-2">
-            {isAdmin && mission?.createdAt && steps && steps.length > 0 && (
+            {isAdmin && (mission?.startDate || mission?.createdAt) && steps && steps.length > 0 && (
               <Button
                 variant="outline"
                 onClick={async () => {
                   try {
-                    const count = await recalculateTaskDeadlines(mission.createdAt as string);
+                    const count = await recalculateTaskDeadlines((mission.startDate || mission.createdAt) as string);
                     toast({ title: count > 0 ? `${count} deadline(s) recalculee(s)` : "Aucune tache a recalculer" });
                   } catch {
                     toast({ title: "Erreur", variant: "destructive" });
@@ -2670,6 +2683,8 @@ export default function MissionDetail() {
                         assignableUsers={assignableUsers}
                         currentUserId={user?.id || ""}
                         dbExplanations={dbExplanations}
+                        missionTypology={mission?.typology}
+                        missionTrainerRole={trainer?.role}
                         onUpdate={handleUpdateTask}
                         onDelete={handleDeleteStep}
                         onMoveUp={() => handleMoveTask(task.id, 'up')}
