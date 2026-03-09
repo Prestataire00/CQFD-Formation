@@ -353,10 +353,11 @@ interface ReminderEmailData {
   client?: Client | null;
   daysBefore: number;
   customSubject?: string;
+  taskTitle?: string;
 }
 
 export async function sendReminderEmail(data: ReminderEmailData): Promise<boolean> {
-  const { recipientEmail, recipientName, recipientType, mission, trainer, client, daysBefore, customSubject } = data;
+  const { recipientEmail, recipientName, recipientType, mission, trainer, client, daysBefore, customSubject, taskTitle } = data;
 
   if (!recipientEmail) {
     console.log(`[Email] Pas d'email pour le destinataire, rappel non envoyé`);
@@ -404,13 +405,16 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
     <body>
       <div class="container">
         <div class="header">
-          <h1>Rappel Formation J-${daysBefore}</h1>
+          <h1>${taskTitle ? `Rappel Tâche J-${daysBefore}` : `Rappel Formation J-${daysBefore}`}</h1>
         </div>
         <div class="content">
           <p>Bonjour ${recipientName},</p>
 
           <div class="alert">
-            <strong>Attention:</strong> Une formation est prévue dans <strong>${daysBefore} jour(s)</strong>.
+            ${taskTitle
+              ? `<strong>Attention:</strong> L'échéance de la tâche <strong>"${taskTitle}"</strong> est dans <strong>${daysBefore} jour(s)</strong>.`
+              : `<strong>Attention:</strong> Une formation est prévue dans <strong>${daysBefore} jour(s)</strong>.`
+            }
           </div>
 
           <div class="mission-info">
@@ -441,11 +445,11 @@ export async function sendReminderEmail(data: ReminderEmailData): Promise<boolea
   `;
 
   const text = `
-Rappel Formation J-${daysBefore}
+${taskTitle ? `Rappel Tâche J-${daysBefore}` : `Rappel Formation J-${daysBefore}`}
 
 Bonjour ${recipientName},
 
-Une formation est prévue dans ${daysBefore} jour(s).
+${taskTitle ? `L'échéance de la tâche "${taskTitle}" est dans ${daysBefore} jour(s).` : `Une formation est prévue dans ${daysBefore} jour(s).`}
 
 Mission: ${missionTitle}
 Date de début: ${startDate}

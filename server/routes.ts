@@ -1073,6 +1073,24 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         return;
       }
 
+      // If dueDate changed, cancel pending task_deadline reminders so they get recreated with the correct date
+      if (updateData.dueDate !== undefined || updateData.dueDate === null) {
+        try {
+          const missionReminders = await storage.getRemindersByMission(missionId);
+          const pendingTaskReminders = missionReminders.filter(r =>
+            r.taskId === stepId && r.status === 'pending'
+          );
+          for (const reminder of pendingTaskReminders) {
+            await storage.updateReminder(reminder.id, { status: 'cancelled' });
+          }
+          if (pendingTaskReminders.length > 0) {
+            console.log(`[update-step] Cancelled ${pendingTaskReminders.length} pending reminder(s) for task ${stepId} (dueDate changed)`);
+          }
+        } catch (err) {
+          console.error('[update-step] Error cancelling reminders:', err);
+        }
+      }
+
       // Notify assignee if changed (new assignee different from previous)
       if (newAssigneeId && newAssigneeId !== previousAssigneeId) {
         try {

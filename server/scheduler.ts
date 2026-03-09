@@ -264,14 +264,18 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             client ?? null
           );
         } else {
-          // For task deadline reminders, include the task title in the subject
+          // For task deadline reminders, include the task title in the subject and body
           let customSubject = setting?.emailSubject || undefined;
+          let taskTitle: string | undefined;
           if (setting?.reminderType === 'task_deadline' && reminder.taskId) {
             let steps: any[] = [];
             try { steps = await storage.getMissionSteps(mission.id); } catch (e) { log(`[Scheduler] Erreur getMissionSteps (reminder) mission ${mission.id}: ${e instanceof Error ? e.message : 'Unknown'}`, 'scheduler'); }
             const step = steps.find((s: any) => s.id === reminder.taskId);
-            if (step && !customSubject) {
-              customSubject = `Rappel: Tache "${step.title}" - ${mission.title}`;
+            if (step) {
+              taskTitle = step.title;
+              if (!customSubject) {
+                customSubject = `Rappel: Tache "${step.title}" - ${mission.title}`;
+              }
             }
           }
 
@@ -285,6 +289,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             client,
             daysBefore,
             customSubject,
+            taskTitle,
           });
         }
 
