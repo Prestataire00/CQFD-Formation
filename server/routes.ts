@@ -955,11 +955,14 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       if (body.lateDate && typeof body.lateDate === 'string') body.lateDate = new Date(body.lateDate);
       const input = api.missions.steps.create.input.parse(body);
       const missionId = Number(req.params.id);
-      const step = await storage.createMissionStep({
+      const stepData = {
         ...input,
         missionId,
         createdBy: req.user?.id || null,
-      });
+      };
+      console.log('[create-step] Creating step with createdBy:', stepData.createdBy);
+      const step = await storage.createMissionStep(stepData);
+      console.log('[create-step] Created step:', step.id, 'createdBy:', step.createdBy);
 
       // Notify assignee if set at creation
       if (step.assigneeId) {
