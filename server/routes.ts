@@ -2816,10 +2816,27 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         return;
       }
 
+      const originalMission = await storage.getMission(Number(req.params.id));
       const duplicated = await storage.duplicateMissionForTrainer(Number(req.params.id), trainerId);
       if (!duplicated) {
         res.status(404).json({ message: "Mission non trouvée" });
         return;
+      }
+
+      // Notify the trainer about the new mission assignment
+      try {
+        const trainer = await storage.getUser(trainerId);
+        if (trainer) {
+          await storage.createInAppNotification({
+            userId: trainerId,
+            type: 'mission_assignment',
+            title: 'Nouvelle mission attribuée',
+            message: `La mission "${duplicated.title}" vous a été attribuée.`,
+            missionId: duplicated.id,
+          });
+        }
+      } catch (notifErr) {
+        console.error('Error sending duplication notification:', notifErr);
       }
 
       res.status(201).json(duplicated);
@@ -2855,6 +2872,24 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       }
 
       const result = await storage.duplicateMissionForMultipleTrainers(Number(req.params.id), trainerIds);
+
+      // Notify each trainer about their new mission assignment
+      for (const newMission of result.created) {
+        if (newMission.trainerId) {
+          try {
+            await storage.createInAppNotification({
+              userId: newMission.trainerId,
+              type: 'mission_assignment',
+              title: 'Nouvelle mission attribuée',
+              message: `La mission "${newMission.title}" vous a été attribuée.`,
+              missionId: newMission.id,
+            });
+          } catch (notifErr) {
+            console.error('Error sending duplication notification:', notifErr);
+          }
+        }
+      }
+
       res.status(201).json(result);
     } catch (err) {
       console.error('Multi-trainer duplication error:', err);

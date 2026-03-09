@@ -3018,7 +3018,7 @@ export default function MissionDetail() {
                   {client?.name || "Client non defini"}
                 </p>
               </div>
-              {isAdmin && !mission.parentMissionId && (
+              {isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"

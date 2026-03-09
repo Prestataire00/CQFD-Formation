@@ -758,18 +758,19 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== SIMPLE DUPLICATION (without trainer) ====================
   async duplicateMission(originalMissionId: number): Promise<Mission | undefined> {
-    const originalMission = await this.getMission(originalMissionId);
-    if (!originalMission) {
+    const sourceMission = await this.getMission(originalMissionId);
+    if (!sourceMission) {
       throw new Error("Mission originale non trouvée");
     }
 
-    // Mark original as original if not already
-    if (!originalMission.isOriginal) {
+    // If duplicating a copy, mark the source as original so it can have children
+    // If duplicating an original, it stays original
+    if (!sourceMission.isOriginal) {
       await this.updateMission(originalMissionId, { isOriginal: true });
     }
 
     // Create mission copy without trainer
-    const { id, createdAt, updatedAt, isOriginal, parentMissionId, ...missionData } = originalMission;
+    const { id, createdAt, updatedAt, isOriginal, parentMissionId, ...missionData } = sourceMission;
 
     const [newMission] = await db.insert(missions).values({
       ...missionData,

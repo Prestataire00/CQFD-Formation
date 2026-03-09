@@ -512,6 +512,23 @@ async function runDailyExportTask(): Promise<void> {
 }
 
 /**
+ * Vérifie si l'export quotidien a déjà été envoyé aujourd'hui
+ * en cherchant un fichier d'export avec la date du jour dans le dossier exports/
+ */
+async function hasTodayExportBeenSent(): Promise<boolean> {
+  try {
+    const fs = await import('fs');
+    const exportDir = path.join(process.cwd(), 'exports');
+    if (!fs.existsSync(exportDir)) return false;
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const files = fs.readdirSync(exportDir);
+    return files.some(f => f.includes(today));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Initialise et démarre le scheduler de rappels
  * Exécute toutes les heures à la minute 0
  */
@@ -529,7 +546,22 @@ export function startReminderScheduler(): void {
     await runDailyExportTask();
   });
 
-  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 (pas d\'exécution au démarrage)', 'scheduler');
+  // Au démarrage : rattraper l'export du jour s'il n'a pas encore été envoyé
+  setTimeout(async () => {
+    try {
+      const alreadySent = await hasTodayExportBeenSent();
+      if (!alreadySent) {
+        log('[Scheduler] Export du jour non détecté, lancement du rattrapage...', 'scheduler');
+        await runDailyExportTask();
+      } else {
+        log('[Scheduler] Export du jour déjà envoyé, pas de rattrapage nécessaire', 'scheduler');
+      }
+    } catch (err) {
+      log(`[Scheduler] Erreur lors du rattrapage de l'export: ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
+    }
+  }, 10000); // Attendre 10s après le démarrage pour laisser le serveur s'initialiser
+
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00, rattrapage au démarrage', 'scheduler');
 }
 
 /**
