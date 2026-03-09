@@ -666,25 +666,27 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
           </div>
 
           <div className="flex items-center gap-1">
-            {/* Move up/down buttons */}
-            <div className="flex flex-col">
-              <button
-                onClick={onMoveUp}
-                disabled={isFirst}
-                className={`p-0.5 rounded hover:bg-white/50 ${isFirst ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
-                title="Monter"
-              >
-                <ArrowUp className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={onMoveDown}
-                disabled={isLast}
-                className={`p-0.5 rounded hover:bg-white/50 ${isLast ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
-                title="Descendre"
-              >
-                <ArrowDown className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            {/* Move up/down buttons - admin always, trainer only for tasks they created */}
+            {(isAdmin || task.createdBy === currentUserId) && (
+              <div className="flex flex-col">
+                <button
+                  onClick={onMoveUp}
+                  disabled={isFirst}
+                  className={`p-0.5 rounded hover:bg-white/50 ${isFirst ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Monter"
+                >
+                  <ArrowUp className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={onMoveDown}
+                  disabled={isLast}
+                  className={`p-0.5 rounded hover:bg-white/50 ${isLast ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-gray-600'}`}
+                  title="Descendre"
+                >
+                  <ArrowDown className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             {task.link && (
               <button
                 onClick={async () => {
@@ -2455,10 +2457,12 @@ export default function MissionDetail() {
                 Recalculer deadlines
               </Button>
             )}
-            <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
-              <Zap className="w-4 h-4 mr-2" />
-              Actions rapides
-            </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setShowQuickActions(!showQuickActions)}>
+                <Zap className="w-4 h-4 mr-2" />
+                Actions rapides
+              </Button>
+            )}
             {isAddingStep ? (
               <div className="flex gap-2">
                 <Input
@@ -2708,11 +2712,15 @@ export default function MissionDetail() {
                   <Plus className="w-4 h-4 mr-2" />
                   Ajouter une tache manuellement
                 </Button>
-                <span className="text-sm text-muted-foreground">ou</span>
-                <Button variant="outline" onClick={() => setShowQuickActions(true)}>
-                  <Zap className="w-4 h-4 mr-2" />
-                  Utiliser les actions rapides
-                </Button>
+                {isAdmin && (
+                  <>
+                    <span className="text-sm text-muted-foreground">ou</span>
+                    <Button variant="outline" onClick={() => setShowQuickActions(true)}>
+                      <Zap className="w-4 h-4 mr-2" />
+                      Utiliser les actions rapides
+                    </Button>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

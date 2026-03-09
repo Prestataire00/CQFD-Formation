@@ -170,6 +170,7 @@ export const missionSteps = pgTable("mission_steps", {
   trainerComment: text("trainer_comment"),
   trainerCommentAuthorId: varchar("trainer_comment_author_id").references(() => users.id),
   trainerCommentUpdatedAt: timestamp("trainer_comment_updated_at"),
+  createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

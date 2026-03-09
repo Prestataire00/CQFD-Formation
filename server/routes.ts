@@ -958,6 +958,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       const step = await storage.createMissionStep({
         ...input,
         missionId,
+        createdBy: req.user?.id || null,
       });
 
       // Notify assignee if set at creation
@@ -1147,6 +1148,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
             dueDate: stepData.dueDate ? new Date(stepData.dueDate) : null,
             lateDate: stepData.lateDate ? new Date(stepData.lateDate) : null,
             link: stepData.link || null,
+            createdBy: req.user?.id || null,
           });
           created.push(step);
         } catch (createErr: any) {
