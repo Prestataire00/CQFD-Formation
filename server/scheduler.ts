@@ -8,6 +8,30 @@ import path from 'path';
 // Variable pour suivre si le scheduler est actif
 let isSchedulerRunning = false;
 
+// Keep-alive: self-ping toutes les 4 minutes pour empêcher Replit de mettre le serveur en veille
+let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+
+function startKeepAlive(): void {
+  const port = process.env.PORT || '5000';
+  const externalDomain = process.env.REPLIT_DEV_DOMAIN;
+  const url = externalDomain
+    ? `https://${externalDomain}/health`
+    : `http://0.0.0.0:${port}/health`;
+
+  keepAliveInterval = setInterval(async () => {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        log(`[KeepAlive] Ping réponse non-OK: ${resp.status}`, 'scheduler');
+      }
+    } catch (err) {
+      log(`[KeepAlive] Ping échoué: ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
+    }
+  }, 4 * 60 * 1000); // Toutes les 4 minutes
+
+  log(`[KeepAlive] Self-ping activé toutes les 4 minutes sur ${url}`, 'scheduler');
+}
+
 /**
  * Génère les rappels pour toutes les missions actives basé sur les paramètres configurés
  */
@@ -450,6 +474,34 @@ async function runReminderTask(): Promise<void> {
 }
 
 /**
+ * Envoie l'export par email avec retry (jusqu'à 3 tentatives, 30s entre chaque)
+ */
+async function sendExportEmailWithRetry(
+  email: string,
+  name: string,
+  filepath: string,
+  filename: string,
+  maxRetries = 3
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const sent = await sendDailyExportEmail(email, name, filepath, filename);
+      if (sent) {
+        log(`[Scheduler] Export envoyé à ${email} (tentative ${attempt}/${maxRetries})`, 'scheduler');
+        return true;
+      }
+      log(`[Scheduler] Envoi export à ${email} retourné false (tentative ${attempt}/${maxRetries})`, 'scheduler');
+    } catch (err) {
+      log(`[Scheduler] Erreur envoi export à ${email} (tentative ${attempt}/${maxRetries}): ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
+    }
+    if (attempt < maxRetries) {
+      await new Promise(resolve => setTimeout(resolve, 30_000)); // 30s entre chaque tentative
+    }
+  }
+  return false;
+}
+
+/**
  * Génère l'export Excel quotidien des missions et l'envoie par email aux admins
  */
 async function runDailyExportTask(): Promise<void> {
@@ -458,6 +510,18 @@ async function runDailyExportTask(): Promise<void> {
   try {
     const filepath = await generateMissionsExcel();
     log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
+
+    // Vérifier que le fichier existe et n'est pas vide
+    const fs = await import('fs');
+    if (!fs.existsSync(filepath)) {
+      log('[Scheduler] ERREUR: le fichier d\'export n\'existe pas après génération', 'scheduler');
+      return;
+    }
+    const stats = fs.statSync(filepath);
+    if (stats.size < 1000) {
+      log(`[Scheduler] ATTENTION: fichier d'export anormalement petit (${stats.size} octets)`, 'scheduler');
+    }
+    log(`[Scheduler] Fichier vérifié: ${stats.size} octets`, 'scheduler');
 
     // Envoyer par email à l'adresse fixe + tous les admins actifs
     const DAILY_EXPORT_EMAIL = 'contact@cqfd-formation.fr';
@@ -468,41 +532,24 @@ async function runDailyExportTask(): Promise<void> {
     let sentCount = 0;
     let failCount = 0;
 
-    // Envoi systématique à l'adresse principale
-    try {
-      const sent = await sendDailyExportEmail(DAILY_EXPORT_EMAIL, 'CQFD Formation', filepath, filename);
-      if (sent) {
-        sentCount++;
-        log(`[Scheduler] Export envoyé par email à ${DAILY_EXPORT_EMAIL}`, 'scheduler');
-      } else {
-        failCount++;
-        log(`[Scheduler] Échec envoi export à ${DAILY_EXPORT_EMAIL} (sendEmail a retourné false)`, 'scheduler');
-      }
-    } catch (emailError) {
-      failCount++;
-      log(`[Scheduler] Erreur envoi export à ${DAILY_EXPORT_EMAIL}: ${emailError instanceof Error ? emailError.message : 'Unknown'}`, 'scheduler');
-    }
+    // Envoi systématique à l'adresse principale (avec retry)
+    const mainSent = await sendExportEmailWithRetry(DAILY_EXPORT_EMAIL, 'CQFD Formation', filepath, filename);
+    if (mainSent) sentCount++; else failCount++;
 
     // Envoi aux admins actifs (en évitant le doublon si un admin a la même adresse)
     for (const admin of admins) {
       if (admin.email && admin.email !== DAILY_EXPORT_EMAIL) {
         const adminName = `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin';
-        try {
-          const sent = await sendDailyExportEmail(admin.email, adminName, filepath, filename);
-          if (sent) {
-            sentCount++;
-            log(`[Scheduler] Export envoyé par email à ${admin.email}`, 'scheduler');
-          } else {
-            failCount++;
-            log(`[Scheduler] Échec envoi export à ${admin.email} (sendEmail a retourné false)`, 'scheduler');
-          }
-        } catch (emailError) {
-          failCount++;
-          log(`[Scheduler] Erreur envoi export à ${admin.email}: ${emailError instanceof Error ? emailError.message : 'Unknown'}`, 'scheduler');
-        }
+        const adminSent = await sendExportEmailWithRetry(admin.email, adminName, filepath, filename);
+        if (adminSent) sentCount++; else failCount++;
       }
     }
+
     log(`[Scheduler] Export quotidien terminé: ${sentCount} envoyé(s), ${failCount} échoué(s)`, 'scheduler');
+
+    if (sentCount === 0) {
+      log('[Scheduler] ALERTE: Aucun email d\'export n\'a pu être envoyé malgré les retries!', 'scheduler');
+    }
 
     await cleanOldExports(7);
     log('[Scheduler] Nettoyage des anciens exports terminé', 'scheduler');
@@ -535,6 +582,9 @@ async function hasTodayExportBeenSent(): Promise<boolean> {
 export function startReminderScheduler(): void {
   log('[Scheduler] Initialisation du scheduler de rappels', 'scheduler');
 
+  // Keep-alive pour empêcher Replit de mettre le serveur en veille
+  startKeepAlive();
+
   // Exécuter toutes les heures à :00
   // Format cron: minute heure jour-du-mois mois jour-de-la-semaine
   cron.schedule('0 * * * *', async () => {
@@ -543,7 +593,20 @@ export function startReminderScheduler(): void {
 
   // Export Excel quotidien à 1h00 du matin + envoi par email
   cron.schedule('0 1 * * *', async () => {
+    log('[Scheduler] Cron 1h00 déclenché - export quotidien', 'scheduler');
     await runDailyExportTask();
+  });
+
+  // Export de sécurité à 18h00 (fin de journée) si l'export de 1h00 n'a pas fonctionné
+  cron.schedule('0 18 * * *', async () => {
+    log('[Scheduler] Cron 18h00 déclenché - vérification export de sécurité', 'scheduler');
+    const alreadySent = await hasTodayExportBeenSent();
+    if (!alreadySent) {
+      log('[Scheduler] Export de 1h00 non détecté, lancement de l\'export de sécurité à 18h00', 'scheduler');
+      await runDailyExportTask();
+    } else {
+      log('[Scheduler] Export déjà effectué aujourd\'hui, export de 18h00 ignoré', 'scheduler');
+    }
   });
 
   // Au démarrage : rattraper l'export du jour s'il n'a pas encore été envoyé
@@ -561,7 +624,7 @@ export function startReminderScheduler(): void {
     }
   }, 10000); // Attendre 10s après le démarrage pour laisser le serveur s'initialiser
 
-  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00, rattrapage au démarrage', 'scheduler');
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 + sécurité 18h00, keep-alive activé', 'scheduler');
 }
 
 /**
