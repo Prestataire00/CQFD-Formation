@@ -972,9 +972,21 @@ export class DatabaseStorage implements IStorage {
     return result.length;
   }
 
-  // Helper: delete uploaded files from disk
-  private deleteUploadedFile(fileUrl: string) {
-    if (!fileUrl || !fileUrl.startsWith('/uploads/')) return;
+  // Helper: delete uploaded files from disk or Supabase Storage
+  private async deleteUploadedFile(fileUrl: string) {
+    if (!fileUrl) return;
+    // Fichiers Supabase Storage (URL complète)
+    if (fileUrl.includes('supabase.co/storage/')) {
+      try {
+        const { deleteFromSupabase } = await import('./supabaseStorage');
+        await deleteFromSupabase(fileUrl);
+      } catch (err) {
+        console.error(`[storage] Failed to delete Supabase file ${fileUrl}:`, err);
+      }
+      return;
+    }
+    // Fichiers locaux (anciens, /uploads/...)
+    if (!fileUrl.startsWith('/uploads/')) return;
     try {
       const filePath = path.join(process.cwd(), fileUrl);
       if (fs.existsSync(filePath)) {
@@ -1014,7 +1026,7 @@ export class DatabaseStorage implements IStorage {
     // Delete uploaded files from disk before removing document records
     const missionDocs = await this.getDocumentsByMission(id);
     for (const doc of missionDocs) {
-      this.deleteUploadedFile(doc.url);
+      await this.deleteUploadedFile(doc.url);
     }
     await db.delete(documents).where(eq(documents.missionId, id));
     await db.delete(messages).where(eq(messages.missionId, id));
@@ -1413,7 +1425,7 @@ export class DatabaseStorage implements IStorage {
   async deleteDocument(id: number): Promise<boolean> {
     const doc = await this.getDocument(id);
     if (doc?.url) {
-      this.deleteUploadedFile(doc.url);
+      await this.deleteUploadedFile(doc.url);
     }
     await db.delete(documents).where(eq(documents.id, id));
     return true;

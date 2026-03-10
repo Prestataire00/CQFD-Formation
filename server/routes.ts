@@ -17,6 +17,7 @@ import { generateMissionsExcel, listExports, getLatestExport } from "./excel-exp
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { ensureBucketExists, uploadToSupabase, deleteFromSupabase } from "./supabaseStorage";
 
 // Configuration de multer pour l'upload de fichiers
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -42,18 +43,9 @@ function sanitizeFilename(name: string): string {
   return (sanitized || 'file') + ext.toLowerCase();
 }
 
-const storageConfig = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + sanitizeFilename(file.originalname));
-  }
-});
-
+// Multer en mode mémoire (buffer) pour uploader ensuite vers Supabase Storage
 const upload = multer({
-  storage: storageConfig,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
 });
 
@@ -79,7 +71,10 @@ export async function registerRoutes(
   setupGoogleAuth(app);
   setupGoogleAuthRoutes(app);
 
-  // Serve uploaded files statically
+  // Initialiser le bucket Supabase Storage
+  await ensureBucketExists();
+
+  // Serve uploaded files statically (rétrocompatibilité pour anciens fichiers locaux)
   app.use('/uploads', (req, res, next) => {
     if (!req.isAuthenticated || !req.isAuthenticated()) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -1924,9 +1919,17 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       }
 
       const documentId = Number(req.params.id);
-      const fileUrl = `/uploads/${req.file.filename}`;
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const filename = uniqueSuffix + '-' + sanitizeFilename(req.file.originalname);
 
-      const updatedDoc = await storage.updateDocument(documentId, { url: fileUrl });
+      // Upload vers Supabase Storage
+      const supabaseUrl = await uploadToSupabase(req.file.buffer, filename, req.file.mimetype);
+      if (!supabaseUrl) {
+        res.status(500).json({ message: 'Erreur upload vers le stockage' });
+        return;
+      }
+
+      const updatedDoc = await storage.updateDocument(documentId, { url: supabaseUrl });
       if (!updatedDoc) {
         res.status(404).json({ message: "Document not found" });
         return;
@@ -2670,7 +2673,13 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         return;
       }
 
-      const fileUrl = req.file ? `/uploads/${req.file.filename}` : '';
+      let fileUrl = '';
+      if (req.file) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = uniqueSuffix + '-' + sanitizeFilename(req.file.originalname);
+        const supabaseUrl = await uploadToSupabase(req.file.buffer, filename, req.file.mimetype);
+        fileUrl = supabaseUrl || '';
+      }
 
       const template = await storage.createDocumentTemplate({
         title,
@@ -2703,7 +2712,12 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       if (isActive !== undefined) updateData.isActive = isActive === 'true' || isActive === true;
       if (clientId !== undefined) updateData.clientId = clientId ? Number(clientId) : null;
       if (forTypology !== undefined) updateData.forTypology = forTypology || null;
-      if (req.file) updateData.url = `/uploads/${req.file.filename}`;
+      if (req.file) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        const filename = uniqueSuffix + '-' + sanitizeFilename(req.file.originalname);
+        const supabaseUrl = await uploadToSupabase(req.file.buffer, filename, req.file.mimetype);
+        if (supabaseUrl) updateData.url = supabaseUrl;
+      }
 
       // The storage method now handles versioning and notifications automatically
       const updated = await storage.updateDocumentTemplate(

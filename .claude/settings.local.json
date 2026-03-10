@@ -84,7 +84,8 @@
       "Bash(do ls -la \"$fddir\")",
       "Bash(git remote:*)",
       "Bash(rm:*)",
-      "Bash(npm list:*)"
+      "Bash(npm list:*)",
+      "Bash(npx esbuild:*)"
     ]
   }
 }
