@@ -3007,10 +3007,10 @@ export default function MissionDetail() {
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-bold">{mission.title}</h1>
                   {getStatusBadge(mission.status as MissionStatus)}
-                  {mission.isOriginal && childMissions && childMissions.length > 0 && (
+                  {isAdmin && mission.isOriginal && childMissions && childMissions.length > 0 && (
                     <Badge className="bg-purple-100 text-purple-700 border border-purple-300">Original</Badge>
                   )}
-                  {mission.parentMissionId && (
+                  {isAdmin && mission.parentMissionId && (
                     <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300">Copie</Badge>
                   )}
                 </div>
@@ -3031,8 +3031,8 @@ export default function MissionDetail() {
               )}
             </div>
 
-            {/* Banner if this is a copy */}
-            {mission.parentMissionId && parentMission && (
+            {/* Banner if this is a copy (admin only) */}
+            {isAdmin && mission.parentMissionId && parentMission && (
               <div className="mt-2 flex items-center gap-2 text-sm bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2">
                 <Copy className="w-4 h-4 text-indigo-500" />
                 <span className="text-indigo-700">

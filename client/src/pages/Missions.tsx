@@ -937,10 +937,10 @@ export default function Missions() {
                             <Link href={`/missions/${mission.id}`} className="font-medium hover:text-primary transition-colors">
                               {mission.title}
                             </Link>
-                            {mission.isOriginal && (
+                            {isAdmin && mission.isOriginal && (
                               <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-[10px] px-1.5 py-0">Original</Badge>
                             )}
-                            {mission.parentMissionId && (
+                            {isAdmin && mission.parentMissionId && (
                               <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300 text-[10px] px-1.5 py-0">Copie</Badge>
                             )}
                           </div>
@@ -1040,10 +1040,10 @@ export default function Missions() {
                           <h3 className="font-semibold text-lg group-hover:text-primary transition-colors line-clamp-1">
                             {mission.title}
                           </h3>
-                          {mission.isOriginal && (
+                          {isAdmin && mission.isOriginal && (
                             <Badge className="bg-purple-100 text-purple-700 border border-purple-300 text-[10px] px-1.5 py-0">Original</Badge>
                           )}
-                          {mission.parentMissionId && (
+                          {isAdmin && mission.parentMissionId && (
                             <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300 text-[10px] px-1.5 py-0">Copie</Badge>
                           )}
                         </div>

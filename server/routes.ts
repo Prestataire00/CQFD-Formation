@@ -2860,6 +2860,17 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
             message: `La mission "${duplicated.title}" vous a été attribuée.`,
             missionId: duplicated.id,
           });
+
+          // Send email notification
+          if (trainer.email) {
+            try {
+              const documents = await storage.getDocumentsByMission(duplicated.id);
+              const trainerDocuments = documents.filter(doc => doc.userId === trainerId);
+              await sendMissionAssignmentEmail(trainer, duplicated, trainerDocuments);
+            } catch (emailErr) {
+              console.error('[Email] Erreur envoi email assignation duplication:', emailErr);
+            }
+          }
         }
       } catch (notifErr) {
         console.error('Error sending duplication notification:', notifErr);
@@ -2903,13 +2914,27 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       for (const newMission of result.created) {
         if (newMission.trainerId) {
           try {
-            await storage.createInAppNotification({
-              userId: newMission.trainerId,
-              type: 'mission_assignment',
-              title: 'Nouvelle mission attribuée',
-              message: `La mission "${newMission.title}" vous a été attribuée.`,
-              missionId: newMission.id,
-            });
+            const trainer = await storage.getUser(newMission.trainerId);
+            if (trainer) {
+              await storage.createInAppNotification({
+                userId: newMission.trainerId,
+                type: 'mission_assignment',
+                title: 'Nouvelle mission attribuée',
+                message: `La mission "${newMission.title}" vous a été attribuée.`,
+                missionId: newMission.id,
+              });
+
+              // Send email notification
+              if (trainer.email) {
+                try {
+                  const documents = await storage.getDocumentsByMission(newMission.id);
+                  const trainerDocuments = documents.filter(doc => doc.userId === newMission.trainerId);
+                  await sendMissionAssignmentEmail(trainer, newMission, trainerDocuments);
+                } catch (emailErr) {
+                  console.error('[Email] Erreur envoi email assignation duplication multi:', emailErr);
+                }
+              }
+            }
           } catch (notifErr) {
             console.error('Error sending duplication notification:', notifErr);
           }
