@@ -7,7 +7,7 @@ import type { User } from "@shared/schema";
 import { z } from "zod";
 import { setupLocalAuth, setupAuthRoutes, isAuthenticated, setupGoogleAuth, setupGoogleAuthRoutes } from "./auth";
 import { requirePermission, requireRole } from "./middleware/rbac";
-import { sendMissionAssignmentEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail, sendDailyExportEmail } from "./email";
+import { sendMissionAssignmentEmail, sendMissionNotificationEmail, sendReminderEmail, sendAdminFormationReminderEmail, notifyOtherParty, sendWelcomeEmail, sendStepLinkEmail, sendDailyExportEmail } from "./email";
 import { gamificationService, XP_CONFIG, LEVELS, DEFAULT_BADGES } from "./gamification";
 import { syncMissionToCalendar, deleteMissionFromCalendar, getGoogleAdminUserId } from "./google";
 import { registerFeedbackRoutes } from "./feedback";
@@ -448,11 +448,20 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
       };
       const input = api.missions.update.input.parse(body);
+
+      // Récupérer la mission AVANT la mise à jour pour détecter les changements de formateur
+      const previousMission = await storage.getMission(Number(req.params.id));
+      const previousTrainerId = previousMission?.trainerId || null;
+
       const mission = await storage.updateMission(Number(req.params.id), input);
       if (!mission) {
         res.status(404).json({ message: "Mission non trouvée" });
         return;
       }
+
+      // Détecter si un nouveau formateur a été assigné
+      const newTrainerId = mission.trainerId || null;
+      const trainerNewlyAssigned = newTrainerId && newTrainerId !== previousTrainerId;
 
       // Créer des notifications internes et emails
       try {
@@ -461,7 +470,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
         const admins = await storage.getUsersByRole('admin');
         const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
-        
+
         // Récupérer tous les formateurs assignés à cette mission
         const missionTrainers = await storage.getMissionTrainers(mission.id);
         const modifierName = modifiedBy ? `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || modifiedBy.email : 'Un utilisateur';
@@ -470,13 +479,24 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         for (const mt of missionTrainers) {
           // Ne pas notifier le modificateur lui-même
           if (mt.trainerId !== currentUser.id) {
-            await storage.createInAppNotification({
-              userId: mt.trainerId,
-              type: 'mission_update',
-              title: 'Mission modifiée',
-              message: `La mission "${mission.title}" a été modifiée par ${modifierName}`,
-              missionId: mission.id,
-            });
+            // Si c'est le formateur nouvellement assigné, notification d'assignation
+            if (trainerNewlyAssigned && mt.trainerId === newTrainerId) {
+              await storage.createInAppNotification({
+                userId: mt.trainerId,
+                type: 'mission_assignment',
+                title: 'Nouvelle mission attribuée',
+                message: `La mission "${mission.title}" vous a été attribuée.`,
+                missionId: mission.id,
+              });
+            } else {
+              await storage.createInAppNotification({
+                userId: mt.trainerId,
+                type: 'mission_update',
+                title: 'Mission modifiée',
+                message: `La mission "${mission.title}" a été modifiée par ${modifierName}`,
+                missionId: mission.id,
+              });
+            }
           }
         }
 
@@ -495,15 +515,39 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
 
         // 3. Email (en complément des notifications internes)
         if (modifiedBy) {
-          await notifyOtherParty(
-            mission,
-            modifiedBy,
-            trainer || null,
-            admins,
-            client || null,
-            'update',
-            { changeDetails: 'Les informations de la mission ont été mises à jour.' }
-          );
+          // Si un formateur est nouvellement assigné, lui envoyer un email d'assignation (pas de modification)
+          if (trainerNewlyAssigned && trainer && trainer.email) {
+            try {
+              const documents = await storage.getDocumentsByMission(mission.id);
+              const trainerDocuments = documents.filter(doc => doc.userId === trainer.id);
+              await sendMissionAssignmentEmail(trainer, mission, trainerDocuments);
+            } catch (emailErr) {
+              console.error('[Email] Erreur envoi email assignation:', emailErr);
+            }
+            // Notifier les admins de la modification (mais pas le nouveau formateur qui a reçu l'assignation)
+            for (const admin of admins) {
+              if (admin.email && admin.id !== modifiedBy.id) {
+                await sendMissionNotificationEmail({
+                  mission,
+                  modifiedBy,
+                  recipient: admin,
+                  client,
+                  changeType: 'update',
+                  changeDetails: 'Les informations de la mission ont été mises à jour.',
+                });
+              }
+            }
+          } else {
+            await notifyOtherParty(
+              mission,
+              modifiedBy,
+              trainer || null,
+              admins,
+              client || null,
+              'update',
+              { changeDetails: 'Les informations de la mission ont été mises à jour.' }
+            );
+          }
         }
       } catch (emailErr) {
         console.error('[Notification] Erreur notification mission update:', emailErr);
