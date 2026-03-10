@@ -30,13 +30,25 @@ if (!fs.existsSync(templatesDir)) {
   fs.mkdirSync(templatesDir, { recursive: true });
 }
 
+// Sanitize filename: remove accents, replace spaces/special chars with dashes
+function sanitizeFilename(name: string): string {
+  const ext = path.extname(name);
+  const base = path.basename(name, ext);
+  const sanitized = base
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^a-zA-Z0-9._-]/g, '-') // replace special chars
+    .replace(/-+/g, '-') // collapse consecutive dashes
+    .replace(/^-|-$/g, ''); // trim dashes
+  return (sanitized || 'file') + ext.toLowerCase();
+}
+
 const storageConfig = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    cb(null, uniqueSuffix + '-' + sanitizeFilename(file.originalname));
   }
 });
 
@@ -74,8 +86,22 @@ export async function registerRoutes(
     }
     next();
   });
-  app.use('/uploads', express.static(uploadDir), (req, res) => {
-    // If express.static didn't find the file, return a user-friendly 404 page
+  app.use('/uploads', express.static(uploadDir), (req, res, next) => {
+    // Fallback: try to find the file by decoding the URL (handles accented filenames)
+    try {
+      const decodedPath = decodeURIComponent(req.path);
+      const filePath = path.join(uploadDir, decodedPath);
+      // Prevent path traversal
+      if (!filePath.startsWith(uploadDir)) {
+        return next();
+      }
+      if (fs.existsSync(filePath)) {
+        return res.sendFile(filePath);
+      }
+    } catch {}
+    next();
+  }, (req, res) => {
+    // If file still not found, return a user-friendly 404 page
     res.status(404).send(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Fichier non trouvé</title>
 <style>body{font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f9fafb;color:#374151}
 .box{text-align:center;padding:2rem}.icon{font-size:3rem;margin-bottom:1rem}h1{font-size:1.25rem;margin:0 0 .5rem}p{color:#6b7280;margin:0 0 1.5rem}

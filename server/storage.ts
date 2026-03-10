@@ -1551,17 +1551,21 @@ export class DatabaseStorage implements IStorage {
         .map((doc: Document) => doc.templateId)
     );
 
-    // Attach each template document to the mission (skip if already present)
+    // Attach each template document to the mission (skip if already present or no file)
     for (const template of templates) {
       if (existingTemplateIds.has(template.id)) {
         console.log(`[attachTemplates] Skipping template ${template.id} (${template.title}) - already attached`);
+        continue;
+      }
+      if (!template.url) {
+        console.log(`[attachTemplates] Skipping template ${template.id} (${template.title}) - no file uploaded`);
         continue;
       }
       console.log(`[attachTemplates] Attaching template ${template.id} (${template.title}) to mission ${missionId}`);
       await db.insert(documents).values({
         title: template.title,
         type: template.type,
-        url: template.url, // Reference to the latest version
+        url: template.url,
         missionId: missionId,
         userId: trainerId,
         templateId: template.id,
