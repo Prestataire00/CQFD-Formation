@@ -41,6 +41,7 @@ interface MissionCalendarProps {
   onViewChange: (view: CalendarView) => void;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
 }
 
 // Status colors matching the existing design in Missions.tsx
@@ -133,11 +134,13 @@ function MonthView({
   sessionsByMission,
   selectedDate,
   onDateChange,
+  onDayClick,
 }: {
   missions: Mission[];
   sessionsByMission?: Record<number, MissionSession[]>;
   selectedDate: Date;
   onDateChange: (date: Date) => void;
+  onDayClick?: (date: Date) => void;
 }) {
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
@@ -177,9 +180,10 @@ function MonthView({
               )}
             >
               <div
+                onClick={() => onDayClick?.(day)}
                 className={cn(
-                  "text-sm font-medium mb-1 w-7 h-7 flex items-center justify-center rounded-full",
-                  isToday && "bg-primary text-primary-foreground",
+                  "text-sm font-medium mb-1 w-7 h-7 flex items-center justify-center rounded-full cursor-pointer hover:bg-primary/20 transition-colors",
+                  isToday && "bg-primary text-primary-foreground hover:bg-primary/80",
                   !isCurrentMonth && "text-muted-foreground"
                 )}
               >
@@ -190,7 +194,10 @@ function MonthView({
                   <MissionItem key={mission.id} mission={mission} compact />
                 ))}
                 {dayMissions.length > 3 && (
-                  <div className="text-xs text-muted-foreground pl-1">
+                  <div
+                    onClick={() => onDayClick?.(day)}
+                    className="text-xs text-primary font-medium pl-1 cursor-pointer hover:underline"
+                  >
                     +{dayMissions.length - 3} autres
                   </div>
                 )}
@@ -329,7 +336,17 @@ export function MissionCalendar({
   onViewChange,
   selectedDate,
   onDateChange,
+  onDayClick,
 }: MissionCalendarProps) {
+  const handleDayClick = (date: Date) => {
+    if (onDayClick) {
+      onDayClick(date);
+    } else {
+      // Default: switch to day view for the clicked date
+      onDateChange(date);
+      onViewChange("day");
+    }
+  };
   // Build sessionsByMission map
   const sessionsByMission = useMemo(() => {
     if (!sessions || sessions.length === 0) return undefined;
@@ -433,6 +450,7 @@ export function MissionCalendar({
             sessionsByMission={sessionsByMission}
             selectedDate={selectedDate}
             onDateChange={onDateChange}
+            onDayClick={handleDayClick}
           />
         )}
         {view === "week" && (
