@@ -41,11 +41,32 @@ function translateStatus(status: string): string {
 }
 
 function getStepStatusText(step: any): string {
-  if (step.status === 'na') return 'N/A';
+  // Manual overrides
   if (step.status === 'done' || step.isCompleted) return 'Fait';
-  if (step.status === 'late') return 'En retard';
+  if (step.status === 'na') return 'N/A';
   if (step.status === 'priority') return 'Prioritaire';
-  return 'A faire';
+  if (step.status === 'late') return 'En retard';
+
+  // Auto-compute from dates when status is 'todo'
+  const now = new Date();
+  if (!step.dueDate) return 'A faire';
+
+  const dueDate = new Date(step.dueDate);
+
+  if (dueDate > now) {
+    const diffDays = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 3) return 'Prioritaire';
+    return 'A faire';
+  }
+
+  // dueDate is in the past
+  if (step.lateDate) {
+    const lateDate = new Date(step.lateDate);
+    if (now >= lateDate) return 'En retard';
+    return 'Prioritaire';
+  }
+
+  return 'En retard';
 }
 
 function getStepStatus(steps: any[], title: string): string {
@@ -272,7 +293,7 @@ export async function generateMissionsExcel(): Promise<string> {
       origine: client?.origine || '',
       reseauxSociaux: client?.socialMedia || '',
       titreFormation: titleFormation,
-      progInitial: mission.programTitle || '',
+      progInitial: getStepStatus(missionStepsList, 'Programme initial') || mission.programTitle || '',
       observations: mission.description || '',
       pubCommunication: getStepStatus(missionStepsList, 'Pub') || getStepStatus(missionStepsList, 'communication'),
       baseTarifaire: mission.rateBase ? `${mission.rateBase}` : '',
@@ -284,30 +305,30 @@ export async function generateMissionsExcel(): Promise<string> {
       situationHandicap: mission.hasDisability ? (mission.disabilityDetails || 'Oui') : 'Non',
       coordonneesStagiaires: '',
       questionnaireCadrage: getStepStatus(missionStepsList, 'questionnaire de cadrage'),
-      questionnairePositionnement: getStepStatus(missionStepsList, 'questionnaire de positionnement'),
+      questionnairePositionnement: getStepStatus(missionStepsList, 'positionnement'),
       besoinSalle: getStepStatus(missionStepsList, 'salle'),
       envoiConvocation: getStepStatus(missionStepsList, 'convocation'),
       observation2: '',
       horaires: horaires,
       adresseFormation: mission.location || '',
       questionnaireCadrageRef: getStepStatus(missionStepsList, 'cadrage'),
-      compteRenduEntretien: getStepStatus(missionStepsList, 'compte-rendu') || getStepStatus(missionStepsList, 'compte rendu') || getStepStatus(missionStepsList, 'bilan'),
+      compteRenduEntretien: getStepStatus(missionStepsList, 'compte-rendu') || getStepStatus(missionStepsList, 'compte rendu') || getStepStatus(missionStepsList, 'entretien cadrage'),
       programmeAjuste: getStepStatus(missionStepsList, 'programme'),
       commandeSpecifique: getStepStatus(missionStepsList, 'commande') || getStepStatus(missionStepsList, 'Commande particulière'),
       envoiProgAjuste: getStepStatus(missionStepsList, 'séquençage') || getStepStatus(missionStepsList, 'programme'),
       lienVisio: mission.locationType === 'distanciel' || mission.locationType === 'hybride' ? '' : 'N/A',
-      consignesFormateurs: getDocByType(missionDocs, 'consigne') || getStepStatus(missionStepsList, 'consignes'),
-      cahierCharges: getStepStatus(missionStepsList, 'cahier des charges') || getStepStatus(missionStepsList, 'Consignes') || getDocByType(missionDocs, 'cahier des charges'),
+      consignesFormateurs: getStepStatus(missionStepsList, 'Informer formateur') || getDocByType(missionDocs, 'consigne'),
+      cahierCharges: getStepStatus(missionStepsList, 'Cahier des charges') || getDocByType(missionDocs, 'cahier des charges'),
       budgetDeplHeb: getStepStatus(missionStepsList, 'budget') || getStepStatus(missionStepsList, 'dépl/héb'),
       contratCDD: getStepStatus(missionStepsList, 'DUE') || getStepStatus(missionStepsList, 'Contrat de travail'),
       contratPrestation: getStepStatus(missionStepsList, 'sous-traitance') || getStepStatus(missionStepsList, 'prestation'),
-      livretImprimer: getDocByType(missionDocs, 'annexe') || getDocByType(missionDocs, 'impression'),
+      livretImprimer: getStepStatus(missionStepsList, 'impressions livret') || getStepStatus(missionStepsList, 'livret et annexes') || getDocByType(missionDocs, 'annexe') || getDocByType(missionDocs, 'impression'),
       envoiDossier: getStepStatus(missionStepsList, 'dossier') || getStepStatus(missionStepsList, 'feuilles de présence'),
-      scanPresence: getDocByType(missionDocs, 'emargement') || getStepStatus(missionStepsList, 'emargement'),
+      scanPresence: getStepStatus(missionStepsList, 'feuille de présence') || getDocByType(missionDocs, 'emargement') || getStepStatus(missionStepsList, 'emargement'),
       scanSatisfaction: getStepStatus(missionStepsList, 'satisfaction'),
       bilanQualite: getStepStatus(missionStepsList, 'bilan qualité') || getStepStatus(missionStepsList, 'bilan'),
-      scanAnnexes: getDocByType(missionDocs, 'annexe'),
-      syntheseEvaluation: getStepStatus(missionStepsList, 'évaluation') || getStepStatus(missionStepsList, 'evaluation'),
+      scanAnnexes: getStepStatus(missionStepsList, 'Scan annexes') || getDocByType(missionDocs, 'annexe'),
+      syntheseEvaluation: getStepStatus(missionStepsList, 'Synthèse') || getStepStatus(missionStepsList, 'éval des acquis') || getStepStatus(missionStepsList, 'évaluation') || getStepStatus(missionStepsList, 'evaluation'),
       envoiOriginaux: getStepStatus(missionStepsList, 'originaux') || getStepStatus(missionStepsList, 'courrier'),
       fichePaie: getStepStatus(missionStepsList, 'Fiche de paie') || getStepStatus(missionStepsList, 'solde de tout compte'),
       facturePrestataires: hasInvoice,

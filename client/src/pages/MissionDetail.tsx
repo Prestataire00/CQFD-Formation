@@ -2526,10 +2526,10 @@ export default function MissionDetail() {
         </CardContent>
       </Card>
 
-      {client?.demand && (
+      {isAdmin && client?.demand && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Demande initiale du client</CardTitle>
+            <CardTitle className="text-base">Précisions</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">

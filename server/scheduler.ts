@@ -609,20 +609,10 @@ export function startReminderScheduler(): void {
     }
   });
 
-  // Au démarrage : rattraper l'export du jour s'il n'a pas encore été envoyé
-  setTimeout(async () => {
-    try {
-      const alreadySent = await hasTodayExportBeenSent();
-      if (!alreadySent) {
-        log('[Scheduler] Export du jour non détecté, lancement du rattrapage...', 'scheduler');
-        await runDailyExportTask();
-      } else {
-        log('[Scheduler] Export du jour déjà envoyé, pas de rattrapage nécessaire', 'scheduler');
-      }
-    } catch (err) {
-      log(`[Scheduler] Erreur lors du rattrapage de l'export: ${err instanceof Error ? err.message : 'Unknown'}`, 'scheduler');
-    }
-  }, 10000); // Attendre 10s après le démarrage pour laisser le serveur s'initialiser
+  // Au démarrage : ne PAS relancer l'export automatiquement
+  // Les exports sont envoyés uniquement aux horaires planifiés (1h00 et 18h00 en sécurité)
+  // pour éviter les envois multiples lors des redémarrages fréquents du serveur
+  log('[Scheduler] Export quotidien planifié à 1h00 (+ sécurité 18h00). Pas de rattrapage au démarrage.', 'scheduler');
 
   log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 + sécurité 18h00, keep-alive activé', 'scheduler');
 }
