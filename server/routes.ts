@@ -1201,7 +1201,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   app.post('/api/missions/:id/replace-steps', isAuthenticated, requirePermission('missions:update'), async (req, res) => {
     try {
       const missionId = Number(req.params.id);
-      const { steps: newSteps } = req.body as { steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string | null; lateDate?: string | null; link?: string | null }> };
+      const { steps: newSteps } = req.body as { steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string | null; lateDate?: string | null; link?: string | null; comment?: string | null; commentAuthorId?: string | null; commentUpdatedAt?: string | null; trainerComment?: string | null; trainerCommentAuthorId?: string | null; trainerCommentUpdatedAt?: string | null }> };
 
       if (!Array.isArray(newSteps)) {
         res.status(400).json({ message: "steps doit être un tableau" });
@@ -1234,6 +1234,12 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
             dueDate: stepData.dueDate ? new Date(stepData.dueDate) : null,
             lateDate: stepData.lateDate ? new Date(stepData.lateDate) : null,
             link: stepData.link || null,
+            comment: stepData.comment || null,
+            commentAuthorId: stepData.commentAuthorId || null,
+            commentUpdatedAt: stepData.commentUpdatedAt ? new Date(stepData.commentUpdatedAt) : null,
+            trainerComment: stepData.trainerComment || null,
+            trainerCommentAuthorId: stepData.trainerCommentAuthorId || null,
+            trainerCommentUpdatedAt: stepData.trainerCommentUpdatedAt ? new Date(stepData.trainerCommentUpdatedAt) : null,
             createdBy: req.user?.id || null,
           });
           created.push(step);

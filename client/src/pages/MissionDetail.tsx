@@ -861,6 +861,10 @@ export default function MissionDetail() {
         programTitle: mission.programTitle || "",
         expectedParticipants: mission.expectedParticipants || "",
         participantsList: mission.participantsList || "",
+        rateBase: mission.rateBase || "",
+        financialTerms: mission.financialTerms || "",
+        hasDisability: mission.hasDisability || false,
+        disabilityDetails: mission.disabilityDetails || "",
       });
     }
   }, [mission]);
@@ -888,6 +892,10 @@ export default function MissionDetail() {
       programTitle: mission.programTitle || "",
       expectedParticipants: mission.expectedParticipants || "",
       participantsList: mission.participantsList || "",
+      rateBase: mission.rateBase || "",
+      financialTerms: mission.financialTerms || "",
+      hasDisability: mission.hasDisability || false,
+      disabilityDetails: mission.disabilityDetails || "",
     };
   }, [mission]);
 
@@ -896,7 +904,7 @@ export default function MissionDetail() {
     if (!isEditingInfo && !isEditingDescription) return false;
     if (isEditingInfo) {
       // Check info fields (all except description)
-      const infoKeys = ["title", "startDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList"];
+      const infoKeys = ["title", "startDate", "typology", "location", "locationType", "videoLink", "totalHours", "clientId", "trainerId", "programId", "programTitle", "expectedParticipants", "participantsList", "rateBase", "financialTerms", "hasDisability", "disabilityDetails"];
       for (const key of infoKeys) {
         if (String(editForm[key] ?? "") !== String(originalForm[key] ?? "")) return true;
       }
@@ -1082,63 +1090,14 @@ export default function MissionDetail() {
           programTitle: editForm.programTitle || undefined,
           expectedParticipants: editForm.expectedParticipants && !isNaN(Number(editForm.expectedParticipants)) ? Number(editForm.expectedParticipants) : undefined,
           participantsList: editForm.participantsList || undefined,
+          rateBase: editForm.rateBase || null,
+          financialTerms: editForm.financialTerms || null,
+          hasDisability: editForm.hasDisability || false,
+          disabilityDetails: editForm.disabilityDetails || null,
         },
       });
 
-      if ((typologyChanged || trainerChanged) && steps) {
-        const newTrainer = allUsers?.find((u: any) => u.id === editForm.trainerId);
-        const trainerRole = newTrainer?.role;
-        const typology = editForm.typology;
-
-        const taskList = getTaskTemplates(typology, trainerRole || "");
-
-        if (taskList) {
-          const adminId = user?.id || null;
-          const formateurId = editForm.trainerId || null;
-          const validAdminId = adminId && allUsers?.some((u: any) => u.id === adminId) ? adminId : null;
-          const validFormateurId = formateurId && allUsers?.some((u: any) => u.id === formateurId) ? formateurId : null;
-          const startDateRef = editForm.startDate ? new Date(editForm.startDate) : (mission?.startDate ? new Date(mission.startDate as string) : null);
-          const createdAtRef = mission?.createdAt ? new Date(mission.createdAt) : null;
-          const referenceDate = startDateRef || createdAtRef;
-
-          const newSteps = taskList.map((task, index) => {
-            const assigneeId = task.assigneeType === "admin" ? validAdminId : validFormateurId;
-            let dueDate: string | undefined;
-            let lateDate: string | undefined;
-            if (referenceDate) {
-              const d = new Date(referenceDate);
-              d.setDate(d.getDate() - task.priorityDaysBefore);
-              dueDate = d.toISOString();
-              if (task.lateDaysBefore !== undefined) {
-                const ld = new Date(referenceDate);
-                ld.setDate(ld.getDate() - task.lateDaysBefore);
-                lateDate = ld.toISOString();
-              }
-            }
-            return {
-              title: task.title,
-              status: "todo",
-              order: index + 1,
-              assigneeId,
-              dueDate,
-              lateDate,
-              link: task.link || undefined,
-            };
-          });
-
-          try {
-            await replaceSteps.mutateAsync({ missionId, steps: newSteps });
-            toast({ title: `Taches mises a jour (${taskList.length} taches)` });
-          } catch (replaceErr: any) {
-            console.error("[handleSaveInfo] replaceSteps error:", replaceErr);
-            toast({ title: "Erreur lors du remplacement des taches", description: replaceErr?.message, variant: "destructive" });
-          }
-        } else if (!editForm.trainerId) {
-          toast({ title: "Typologie mise a jour. Assignez un formateur pour generer les taches correspondantes." });
-        } else {
-          toast({ title: "Typologie mise a jour (aucun template de taches correspondant)" });
-        }
-      } else {
+      if (!(typologyChanged || trainerChanged)) {
         // Recalculate all task deadlines based on mission start date (only if tasks weren't replaced)
         const recalcRef = mission?.startDate || mission?.createdAt;
         if (recalcRef && steps && steps.length > 0) {
@@ -1317,6 +1276,70 @@ export default function MissionDetail() {
       toast({ title: `${categoryData.actions.length} taches ajoutees` });
     } catch (error) {
       toast({ title: "Erreur", variant: "destructive" });
+    }
+  };
+
+  const handleInsertTasksForRole = async (taskList: TaskTemplate[], roleLabel: string) => {
+    const adminId = user?.id || null;
+    const formateurId = mission?.trainerId || null;
+
+    try {
+      // Collecter les commentaires des taches existantes par titre
+      const commentsByTitle: Record<string, { comment?: string | null; commentAuthorId?: string | null; commentUpdatedAt?: string | null; trainerComment?: string | null; trainerCommentAuthorId?: string | null; trainerCommentUpdatedAt?: string | null; status?: string }> = {};
+      if (steps) {
+        for (const step of steps) {
+          if (step.comment || step.trainerComment) {
+            commentsByTitle[step.title] = {
+              comment: step.comment,
+              commentAuthorId: step.commentAuthorId,
+              commentUpdatedAt: step.commentUpdatedAt ? new Date(step.commentUpdatedAt).toISOString() : null,
+              trainerComment: step.trainerComment,
+              trainerCommentAuthorId: step.trainerCommentAuthorId,
+              trainerCommentUpdatedAt: step.trainerCommentUpdatedAt ? new Date(step.trainerCommentUpdatedAt).toISOString() : null,
+              status: step.status,
+            };
+          }
+        }
+      }
+
+      const refDate = mission?.startDate || mission?.createdAt;
+      const newSteps = taskList.map((task, index) => {
+        const assigneeId = task.assigneeType === "admin" ? adminId : formateurId;
+        let dueDate: string | undefined;
+        let lateDate: string | undefined;
+        if (refDate) {
+          const referenceDate = new Date(refDate as string);
+          const d = new Date(referenceDate);
+          d.setDate(d.getDate() - task.priorityDaysBefore);
+          dueDate = d.toISOString();
+          const ld = new Date(referenceDate);
+          ld.setDate(ld.getDate() - task.lateDaysBefore);
+          lateDate = ld.toISOString();
+        }
+        // Transferer les commentaires si une tache avec le meme titre existait
+        const existing = commentsByTitle[task.title];
+        return {
+          title: task.title,
+          status: existing?.status || "todo",
+          order: index + 1,
+          assigneeId,
+          dueDate,
+          lateDate,
+          link: task.link || undefined,
+          comment: existing?.comment || null,
+          commentAuthorId: existing?.commentAuthorId || null,
+          commentUpdatedAt: existing?.commentUpdatedAt || null,
+          trainerComment: existing?.trainerComment || null,
+          trainerCommentAuthorId: existing?.trainerCommentAuthorId || null,
+          trainerCommentUpdatedAt: existing?.trainerCommentUpdatedAt || null,
+        };
+      });
+
+      await replaceSteps.mutateAsync({ missionId, steps: newSteps });
+      toast({ title: `${taskList.length} taches ${roleLabel} inserees (${mission?.typology})` });
+      setShowQuickActions(false);
+    } catch (error) {
+      toast({ title: "Erreur lors du remplacement des taches", variant: "destructive" });
     }
   };
 
@@ -1869,6 +1892,27 @@ export default function MissionDetail() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Titre de la mission */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Titre de la mission
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditingInfo ? (
+              <Input
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                placeholder="Titre de la mission"
+              />
+            ) : (
+              <p className="font-medium">{mission.title || "Sans titre"}</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Left column */}
         <Card className="md:col-span-2">
           <CardHeader>
@@ -1945,28 +1989,60 @@ export default function MissionDetail() {
               </div>
             )}
 
-            {mission.totalHours && (
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span>{mission.totalHours} heures au total</span>
+            {isEditingInfo ? (
+              <div className="pt-3 border-t space-y-3">
+                <div>
+                  <Label>Nombre total d'heures</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={editForm.totalHours}
+                    onChange={(e) => setEditForm({ ...editForm, totalHours: e.target.value })}
+                    placeholder="Ex: 14"
+                  />
+                </div>
+                <div>
+                  <Label>Base tarifaire</Label>
+                  <Input
+                    value={editForm.rateBase}
+                    onChange={(e) => setEditForm({ ...editForm, rateBase: e.target.value })}
+                    placeholder="Ex: 1200€/jour"
+                  />
+                </div>
+                <div>
+                  <Label>Modalite financiere</Label>
+                  <Input
+                    value={editForm.financialTerms}
+                    onChange={(e) => setEditForm({ ...editForm, financialTerms: e.target.value })}
+                    placeholder="Ex: Paiement a 30 jours"
+                  />
+                </div>
               </div>
-            )}
-
-            {isAdmin && (mission.rateBase || mission.financialTerms) && (
-              <div className="pt-3 border-t space-y-1 text-sm">
-                {mission.rateBase && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Base tarifaire :</span>
-                    <span>{mission.rateBase}</span>
+            ) : (
+              <>
+                {mission.totalHours && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
+                    <span>{mission.totalHours} heures au total</span>
                   </div>
                 )}
-                {mission.financialTerms && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground font-medium">Modalite financiere :</span>
-                    <span>{mission.financialTerms}</span>
+                {isAdmin && (mission.rateBase || mission.financialTerms) && (
+                  <div className="pt-3 border-t space-y-1 text-sm">
+                    {mission.rateBase && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground font-medium">Base tarifaire :</span>
+                        <span>{mission.rateBase}</span>
+                      </div>
+                    )}
+                    {mission.financialTerms && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground font-medium">Modalite financiere :</span>
+                        <span>{mission.financialTerms}</span>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
+              </>
             )}
 
             {/* Dialog pour ajouter un jour */}
@@ -2275,6 +2351,26 @@ export default function MissionDetail() {
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              Programme de formation
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isEditingInfo ? (
+              <Input
+                value={editForm.programTitle}
+                onChange={(e) => setEditForm({ ...editForm, programTitle: e.target.value })}
+                placeholder="Titre du programme de formation"
+              />
+            ) : (
+              <p className="font-medium">{mission.programTitle || "Non defini"}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-4 h-4" />
               Participants
             </CardTitle>
@@ -2317,17 +2413,55 @@ export default function MissionDetail() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
 
-            {mission.hasDisability && (
-              <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-medium text-amber-700">Situation de handicap</span>
-                  {mission.disabilityDetails && (
-                    <p className="text-amber-600 text-xs mt-0.5">{mission.disabilityDetails}</p>
-                  )}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Situation de handicap
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {isEditingInfo ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="hasDisability"
+                    checked={editForm.hasDisability}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, hasDisability: !!checked })}
+                  />
+                  <Label htmlFor="hasDisability">Situation de handicap signalee</Label>
                 </div>
-              </div>
+                {editForm.hasDisability && (
+                  <div className="space-y-2">
+                    <Label>Details</Label>
+                    <Textarea
+                      value={editForm.disabilityDetails}
+                      onChange={(e) => setEditForm({ ...editForm, disabilityDetails: e.target.value })}
+                      placeholder="Preciser les amenagements necessaires..."
+                      rows={3}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {mission.hasDisability ? (
+                  <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-medium text-amber-700">Situation de handicap</span>
+                      {mission.disabilityDetails && (
+                        <p className="text-amber-600 text-xs mt-0.5">{mission.disabilityDetails}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucune situation de handicap signalee</p>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
@@ -2488,130 +2622,77 @@ export default function MissionDetail() {
           </div>
         </div>
 
-        {/* Quick Actions Panel */}
+        {/* Quick Actions Panel - Insertion rapide par type */}
         {showQuickActions && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Zap className="w-4 h-4 text-amber-500" />
-                Actions rapides predefinies
+                Insertion rapide des taches
               </CardTitle>
               <CardDescription>
-                {isIntraPrestataire(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Intra + Prestataire. Cliquez pour ajouter."
-                  : isInterPrestataire(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Inter + Prestataire. Cliquez pour ajouter."
-                  : isIntraSalarie(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Intra + Salarie. Cliquez pour ajouter."
-                  : isInterSalarie(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Inter + Salarie. Cliquez pour ajouter."
-                  : isConseilPrestataire(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Conseil + Prestataire. Cliquez pour ajouter."
-                  : isConseilSalarie(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Conseil + Salarie. Cliquez pour ajouter."
-                  : isConferencePrestataire(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Conference + Prestataire. Cliquez pour ajouter."
-                  : isConferenceSalarie(mission, allUsers || [])
-                  ? "Taches predefinies pour mission Conference + Salarie. Cliquez pour ajouter."
-                  : "Cliquez sur une action pour l'ajouter ou ajoutez toutes les actions d'une categorie"}
+                {mission?.typology
+                  ? `Mission de type "${mission.typology}" detectee. Choisissez le profil du formateur pour inserer les taches correspondantes.`
+                  : "Veuillez d'abord definir la typologie de la mission dans l'onglet Informations."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isIntraPrestataire(mission, allUsers || []) || isInterPrestataire(mission, allUsers || []) || isIntraSalarie(mission, allUsers || []) || isInterSalarie(mission, allUsers || []) || isConseilPrestataire(mission, allUsers || []) || isConseilSalarie(mission, allUsers || []) || isConferencePrestataire(mission, allUsers || []) || isConferenceSalarie(mission, allUsers || []) ? (() => {
-                const taskList = isIntraPrestataire(mission, allUsers || []) ? INTRA_PRESTA_TASKS
-                  : isInterPrestataire(mission, allUsers || []) ? INTER_PRESTA_TASKS
-                  : isIntraSalarie(mission, allUsers || []) ? INTRA_SALARIE_TASKS
-                  : isInterSalarie(mission, allUsers || []) ? INTER_SALARIE_TASKS
-                  : isConseilPrestataire(mission, allUsers || []) ? CONSEIL_PRESTA_TASKS
-                  : isConseilSalarie(mission, allUsers || []) ? CONSEIL_SALARIE_TASKS
-                  : isConferencePrestataire(mission, allUsers || []) ? CONFERENCE_PRESTA_TASKS
-                  : CONFERENCE_SALARIE_TASKS;
-                const handleAddAll = isIntraPrestataire(mission, allUsers || []) ? handleAddAllIntraPrestaTasks
-                  : isInterPrestataire(mission, allUsers || []) ? handleAddAllInterPrestaTasks
-                  : isIntraSalarie(mission, allUsers || []) ? handleAddAllIntraSalarieTasks
-                  : isInterSalarie(mission, allUsers || []) ? handleAddAllInterSalarieTasks
-                  : isConseilPrestataire(mission, allUsers || []) ? handleAddAllConseilPrestaTasks
-                  : isConseilSalarie(mission, allUsers || []) ? handleAddAllConseilSalarieTasks
-                  : isConferencePrestataire(mission, allUsers || []) ? handleAddAllConferencePrestaTasks
-                  : handleAddAllConferenceSalarieTasks;
-                return (
-                <div>
-                  <Button
-                    className="w-full mb-4"
-                    onClick={handleAddAll}
+              {mission?.typology ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Bouton Prestataire */}
+                  <button
+                    onClick={() => {
+                      const taskList = getTaskTemplates(mission.typology as string, "prestataire");
+                      handleInsertTasksForRole(taskList, "prestataire");
+                    }}
                     disabled={createStep.isPending}
+                    className="p-6 rounded-lg border-2 border-orange-200 bg-orange-50 hover:bg-orange-100 transition-colors text-left"
                   >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Tout ajouter ({taskList.length} taches)
-                  </Button>
-                  <ScrollArea className="h-[400px]">
-                    <div className="space-y-1">
-                      {taskList.map((task, idx) => {
-                        const assigneeId = task.assigneeType === "admin" ? (user?.id || null) : (mission?.trainerId || null);
-                        const deadlineLabel = task.priorityDaysBefore >= 0
-                          ? `J-${task.priorityDaysBefore}`
-                          : `J+${Math.abs(task.priorityDaysBefore)}`;
-                        return (
-                          <button
-                            key={idx}
-                            onClick={() => handleAddQuickAction(task.title, task.priorityDaysBefore, assigneeId, task.lateDaysBefore, task.link)}
-                            className="w-full text-left text-sm p-2.5 rounded-lg hover:bg-muted/50 transition-colors flex items-center gap-2 group"
-                            disabled={createStep.isPending}
-                          >
-                            <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground flex-shrink-0" />
-                            <span className="flex-1 min-w-0 truncate">{task.title}</span>
-                            <Badge variant="outline" className="text-xs flex-shrink-0 font-mono">
-                              {deadlineLabel}
-                            </Badge>
-                            <Badge
-                              className={`text-xs flex-shrink-0 ${
-                                task.assigneeType === "admin"
-                                  ? "bg-blue-100 text-blue-700 hover:bg-blue-100"
-                                  : "bg-green-100 text-green-700 hover:bg-green-100"
-                              }`}
-                            >
-                              {task.assigneeType === "admin" ? "Admin" : "Formateur"}
-                            </Badge>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </ScrollArea>
-                </div>
-                );
-              })() : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {quickActions.map((category) => (
-                    <div
-                      key={category.category}
-                      className={`p-4 rounded-lg border-2 ${category.borderColor} ${category.bgColor}`}
-                    >
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className={`font-semibold ${category.color}`}>{category.category}</h4>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className={category.color}
-                          onClick={() => handleAddAllQuickActions(category.category)}
-                        >
-                          Tout ajouter
-                        </Button>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-orange-200 flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-orange-700" />
                       </div>
-                      <div className="space-y-2">
-                        {category.actions.map((action) => (
-                          <button
-                            key={action}
-                            onClick={() => handleAddQuickAction(action)}
-                            className="w-full text-left text-sm p-2 rounded hover:bg-white/50 transition-colors"
-                          >
-                            <Plus className="w-3 h-3 inline mr-2" />
-                            {action}
-                          </button>
-                        ))}
+                      <div>
+                        <h4 className="font-semibold text-orange-800">Prestataire</h4>
+                        <p className="text-xs text-orange-600">
+                          {getTaskTemplates(mission.typology as string, "prestataire").length} taches
+                        </p>
                       </div>
                     </div>
-                  ))}
+                    <p className="text-sm text-orange-700">
+                      Inserer les taches pour un formateur prestataire ({mission.typology})
+                    </p>
+                  </button>
+
+                  {/* Bouton Salarie */}
+                  <button
+                    onClick={() => {
+                      const taskList = getTaskTemplates(mission.typology as string, "formateur");
+                      handleInsertTasksForRole(taskList, "salarie");
+                    }}
+                    disabled={createStep.isPending}
+                    className="p-6 rounded-lg border-2 border-blue-200 bg-blue-50 hover:bg-blue-100 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
+                        <User className="w-5 h-5 text-blue-700" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-blue-800">Salarie</h4>
+                        <p className="text-xs text-blue-600">
+                          {getTaskTemplates(mission.typology as string, "formateur").length} taches
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-sm text-blue-700">
+                      Inserer les taches pour un formateur salarie ({mission.typology})
+                    </p>
+                  </button>
                 </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Aucune typologie definie pour cette mission. Rendez-vous dans l'onglet Informations pour la definir.
+                </p>
               )}
             </CardContent>
           </Card>

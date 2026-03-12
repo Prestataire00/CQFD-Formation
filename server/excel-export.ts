@@ -41,10 +41,10 @@ function translateStatus(status: string): string {
 }
 
 function getStepStatusText(step: any): string {
-  if (step.isCompleted) return 'Fait';
+  if (step.status === 'na') return 'N/A';
+  if (step.status === 'done' || step.isCompleted) return 'Fait';
   if (step.status === 'late') return 'En retard';
   if (step.status === 'priority') return 'Prioritaire';
-  if (step.status === 'na') return 'N/A';
   return 'A faire';
 }
 
@@ -297,7 +297,7 @@ export async function generateMissionsExcel(): Promise<string> {
       envoiProgAjuste: getStepStatus(missionStepsList, 'séquençage') || getStepStatus(missionStepsList, 'programme'),
       lienVisio: mission.locationType === 'distanciel' || mission.locationType === 'hybride' ? '' : 'N/A',
       consignesFormateurs: getDocByType(missionDocs, 'consigne') || getStepStatus(missionStepsList, 'consignes'),
-      cahierCharges: getDocByType(missionDocs, 'cahier des charges'),
+      cahierCharges: getStepStatus(missionStepsList, 'cahier des charges') || getStepStatus(missionStepsList, 'Consignes') || getDocByType(missionDocs, 'cahier des charges'),
       budgetDeplHeb: getStepStatus(missionStepsList, 'budget') || getStepStatus(missionStepsList, 'dépl/héb'),
       contratCDD: getStepStatus(missionStepsList, 'DUE') || getStepStatus(missionStepsList, 'Contrat de travail'),
       contratPrestation: getStepStatus(missionStepsList, 'sous-traitance') || getStepStatus(missionStepsList, 'prestation'),

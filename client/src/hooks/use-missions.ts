@@ -478,7 +478,7 @@ export function useDeleteMissionStep() {
 export function useReplaceSteps() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ missionId, steps }: { missionId: number; steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string; lateDate?: string; link?: string }> }) => {
+    mutationFn: async ({ missionId, steps }: { missionId: number; steps: Array<{ title: string; status: string; order: number; assigneeId?: string | null; dueDate?: string; lateDate?: string; link?: string; comment?: string | null; commentAuthorId?: string | null; commentUpdatedAt?: string | null; trainerComment?: string | null; trainerCommentAuthorId?: string | null; trainerCommentUpdatedAt?: string | null }> }) => {
       const res = await fetch(`/api/missions/${missionId}/replace-steps`, {
         method: 'POST',
         headers: { "Content-Type": "application/json" },

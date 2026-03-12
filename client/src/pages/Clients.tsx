@@ -5,6 +5,7 @@ import {
   useInvoices, 
 } from "@/hooks/use-missions";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { queryClient } from "@/lib/queryClient";
 import { api } from "@shared/routes";
 import { Header } from "@/components/Header";
@@ -97,6 +98,7 @@ function ClientForm({
   onCancel,
   isSubmitting,
   submitLabel,
+  isAdmin = false,
 }: {
   client: any;
   onChange: (data: any) => void;
@@ -104,6 +106,7 @@ function ClientForm({
   onCancel: () => void;
   isSubmitting: boolean;
   submitLabel: string;
+  isAdmin?: boolean;
 }) {
   return (
     <div className="flex flex-col max-h-[70vh]">
@@ -274,14 +277,16 @@ function ClientForm({
         />
       </div>
 
+      {isAdmin && (
       <div className="space-y-2">
-        <Label>Demande spécifique</Label>
+        <Label>Précisions</Label>
         <Input
           value={client.demand}
           onChange={(e) => onChange({ ...client, demand: e.target.value })}
-          placeholder="Détails de la demande..."
+          placeholder="Détails..."
         />
       </div>
+      )}
       </div>
 
       <div className="flex justify-end gap-3 pt-4 border-t mt-4">
@@ -305,6 +310,7 @@ function ClientDetailDialog({
   onClose,
   onSave,
   onDelete,
+  isAdmin = false,
 }: {
   client: Client;
   stats: ClientStats;
@@ -312,6 +318,7 @@ function ClientDetailDialog({
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
+  isAdmin?: boolean;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -394,6 +401,7 @@ function ClientDetailDialog({
             onCancel={() => { setEditedClient(buildEditState(client)); setIsEditing(false); }}
             isSubmitting={isSaving}
             submitLabel="Enregistrer"
+            isAdmin={isAdmin}
           />
         ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
@@ -462,9 +470,9 @@ function ClientDetailDialog({
               </div>
             </div>
 
-            {client.demand && (
+            {isAdmin && client.demand && (
               <div className="p-4 bg-muted/30 rounded-xl border">
-                <span className="text-xs text-muted-foreground uppercase font-semibold">Demande spécifique</span>
+                <span className="text-xs text-muted-foreground uppercase font-semibold">Précisions</span>
                 <div className="mt-1">{client.demand}</div>
               </div>
             )}
@@ -534,6 +542,8 @@ export default function Clients() {
   const { data: missions } = useMissions();
   const { data: invoices } = useInvoices();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
@@ -715,7 +725,7 @@ export default function Clients() {
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild><Button><Plus className="w-4 h-4 mr-2" /> Nouveau client</Button></DialogTrigger>
               <DialogContent className="max-w-2xl"><DialogHeader><DialogTitle>Ajouter un client</DialogTitle></DialogHeader>
-                <ClientForm client={newClient} onChange={setNewClient} onSubmit={handleCreateClient} onCancel={() => setIsCreateOpen(false)} isSubmitting={false} submitLabel="Ajouter" />
+                <ClientForm client={newClient} onChange={setNewClient} onSubmit={handleCreateClient} onCancel={() => setIsCreateOpen(false)} isSubmitting={false} submitLabel="Ajouter" isAdmin={isAdmin} />
               </DialogContent>
             </Dialog>
           </div>
@@ -749,6 +759,7 @@ export default function Clients() {
             onClose={() => setSelectedClient(null)}
             onSave={handleUpdateClient}
             onDelete={handleDeleteClient}
+            isAdmin={isAdmin}
           />
         )}
       </main>

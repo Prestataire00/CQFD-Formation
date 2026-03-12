@@ -85,6 +85,7 @@ export default function Users() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [filterRole, setFilterRole] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<string>('az');
 
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
@@ -191,11 +192,15 @@ export default function Users() {
     setIsEditOpen(true);
   };
 
-  const filteredUsers = users?.filter(user => {
+  const filteredUsers = (users?.filter(user => {
     if (filterRole !== 'all' && user.role !== filterRole) return false;
     if (filterStatus !== 'all' && user.status !== filterStatus) return false;
     return true;
-  }) || [];
+  }) || []).sort((a, b) => {
+    const nameA = `${a.lastName || ''} ${a.firstName || ''}`.trim().toLowerCase();
+    const nameB = `${b.lastName || ''} ${b.firstName || ''}`.trim().toLowerCase();
+    return sortOrder === 'za' ? nameB.localeCompare(nameA, 'fr') : nameA.localeCompare(nameB, 'fr');
+  });
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -284,16 +289,14 @@ export default function Users() {
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     />
                   </div>
-                  {formData.role === 'prestataire' && (
-                    <div className="space-y-2">
-                      <Label htmlFor="siret">SIRET</Label>
-                      <Input
-                        id="siret"
-                        value={formData.siret}
-                        onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
-                      />
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="siret">Adresse</Label>
+                    <Input
+                      id="siret"
+                      value={formData.siret}
+                      onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
+                    />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -329,6 +332,15 @@ export default function Users() {
                 <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
                 <SelectItem value="ACTIF" className="focus:bg-violet-200">Actif</SelectItem>
                 <SelectItem value="INACTIF" className="focus:bg-violet-200">Inactif</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Trier par nom" />
+              </SelectTrigger>
+              <SelectContent className="bg-violet-100 border-violet-300">
+                <SelectItem value="az" className="focus:bg-violet-200">Nom A → Z</SelectItem>
+                <SelectItem value="za" className="focus:bg-violet-200">Nom Z → A</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -504,16 +516,14 @@ export default function Users() {
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
             </div>
-            {formData.role === 'prestataire' && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-siret">SIRET</Label>
-                <Input
-                  id="edit-siret"
-                  value={formData.siret}
-                  onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
-                />
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="edit-siret">Adresse</Label>
+              <Input
+                id="edit-siret"
+                value={formData.siret}
+                onChange={(e) => setFormData({ ...formData, siret: e.target.value })}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditOpen(false)}>
