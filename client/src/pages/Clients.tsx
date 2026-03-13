@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { 
   useClients, 
   useMissions, 
@@ -550,6 +550,23 @@ export default function Clients() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+
+  // Open client sheet if highlight param is present in URL
+  const highlightHandled = useRef(false);
+  useEffect(() => {
+    if (highlightHandled.current || !clients) return;
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get("highlight");
+    if (highlightId) {
+      const target = clients.find((c: any) => c.id.toString() === highlightId);
+      if (target) {
+        setSelectedClient(target);
+        highlightHandled.current = true;
+        // Clean up URL
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, [clients]);
 
   const [newClient, setNewClient] = useState({
     name: "",

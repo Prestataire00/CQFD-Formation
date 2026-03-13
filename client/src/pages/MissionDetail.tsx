@@ -2307,8 +2307,16 @@ export default function MissionDetail() {
                   </Command>
                 </PopoverContent>
               </Popover>
+            ) : client ? (
+              <span
+                className="font-medium text-primary hover:underline cursor-pointer flex items-center gap-1"
+                onClick={() => setLocation(`/clients?highlight=${client.id}`)}
+              >
+                {client.name}
+                <ExternalLink className="w-3 h-3" />
+              </span>
             ) : (
-              <p className="font-medium">{client?.name || "Non defini"}</p>
+              <p className="font-medium">Non defini</p>
             )}
           </CardContent>
         </Card>

@@ -188,12 +188,13 @@ export async function generateMissionsExcel(): Promise<string> {
     { header: 'Dates intervention', key: 'datesIntervention', width: 18 },
     { header: 'Nom du client', key: 'nomClient', width: 22 },
     { header: 'Contact et Tél', key: 'contactTel', width: 20 },
+    { header: 'Précisions', key: 'precisions', width: 20 },
     { header: 'Adresse de facturation', key: 'adresseFacturation', width: 25 },
     { header: 'Origine', key: 'origine', width: 14 },
     { header: 'Réseaux sociaux', key: 'reseauxSociaux', width: 14 },
     { header: 'Titre formation et Modalité\n(inter intra conseil conf)', key: 'titreFormation', width: 28 },
     { header: 'Prog initial', key: 'progInitial', width: 12 },
-    { header: 'Observations', key: 'observations', width: 20 },
+    { header: 'Description / Demande client', key: 'observations', width: 20 },
     { header: 'Pub / Communication', key: 'pubCommunication', width: 14 },
     { header: 'Base tarifaire', key: 'baseTarifaire', width: 14 },
     { header: 'Convention', key: 'convention', width: 12 },
@@ -207,7 +208,7 @@ export async function generateMissionsExcel(): Promise<string> {
     { header: 'Questionnaire\nde positionnement\n+ programme', key: 'questionnairePositionnement', width: 14 },
     { header: 'Besoin salle matériel\net repas formateur', key: 'besoinSalle', width: 14 },
     { header: 'Envoi Convocation', key: 'envoiConvocation', width: 14 },
-    { header: 'Observation', key: 'observation2', width: 16 },
+    { header: 'Observations', key: 'observation2', width: 16 },
     { header: 'Horaires', key: 'horaires', width: 14 },
     { header: 'Adresse formation', key: 'adresseFormation', width: 22 },
     { header: 'Questionnaire de cadrage\net coordonnées référent', key: 'questionnaireCadrageRef', width: 14 },
@@ -289,6 +290,7 @@ export async function generateMissionsExcel(): Promise<string> {
       datesIntervention: datesStr,
       nomClient: client?.name || '',
       contactTel: contactTel,
+      precisions: client?.demand || '',
       adresseFacturation: billingAddr,
       origine: client?.origine || '',
       reseauxSociaux: client?.socialMedia || '',
@@ -359,7 +361,7 @@ export async function generateMissionsExcel(): Promise<string> {
       statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
     }
 
-    for (let c = 21; c <= 49; c++) {
+    for (let c = 22; c <= 50; c++) {
       const cell = row.getCell(c);
       const val = cell.value as string;
       const valStart = typeof val === 'string' ? val.split('\n')[0] : val;
