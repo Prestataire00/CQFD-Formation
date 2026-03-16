@@ -542,7 +542,7 @@ function TaskItem({ task, missionId, isAdmin, users, assignableUsers, currentUse
                     </SelectTrigger>
                     <SelectContent className="bg-violet-100 border-violet-300">
                       <SelectItem value="unassigned" className="focus:bg-violet-200">Non assigne</SelectItem>
-                      {assignableUsers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((u: any) => (
+                      {assignableUsers?.slice().sort((a: any, b: any) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr")).map((u: any) => (
                         <SelectItem key={u.id} value={u.id} className="focus:bg-violet-200">
                           {u.firstName} {u.lastName}
                         </SelectItem>
@@ -2230,6 +2230,7 @@ export default function MissionDetail() {
           </CardContent>
         </Card>
 
+        {isAdmin && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -2320,6 +2321,7 @@ export default function MissionDetail() {
             )}
           </CardContent>
         </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -2340,7 +2342,7 @@ export default function MissionDetail() {
                 <SelectContent className="bg-violet-100 border-violet-300">
                   <SelectItem value="_none_" className="focus:bg-violet-200">Aucun formateur</SelectItem>
                   {trainers?.slice().sort((a: any, b: any) =>
-                    `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")
+                    `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr")
                   ).map((t: any) => (
                     <SelectItem key={t.id} value={t.id} className="focus:bg-violet-200">
                       {t.firstName} {t.lastName}
@@ -2352,26 +2354,6 @@ export default function MissionDetail() {
               <p className="font-medium">
                 {trainer ? `${trainer.firstName} ${trainer.lastName}` : "Non assigne"}
               </p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <BookOpen className="w-4 h-4" />
-              Programme de formation
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEditingInfo ? (
-              <Input
-                value={editForm.programTitle}
-                onChange={(e) => setEditForm({ ...editForm, programTitle: e.target.value })}
-                placeholder="Titre du programme de formation"
-              />
-            ) : (
-              <p className="font-medium">{mission.programTitle || "Non defini"}</p>
             )}
           </CardContent>
         </Card>
@@ -3103,9 +3085,11 @@ export default function MissionDetail() {
                     <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300">Copie</Badge>
                   )}
                 </div>
+                {isAdmin && (
                 <p className="text-sm text-muted-foreground">
                   {client?.name || "Client non defini"}
                 </p>
+                )}
               </div>
               {isAdmin && (
                 <Button
@@ -3203,7 +3187,7 @@ export default function MissionDetail() {
                       <CommandGroup>
                         {availableTrainersForDuplication
                           .filter((t: any) => !selectedTrainerIds.includes(t.id))
-                          .sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr"))
+                          .sort((a: any, b: any) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr"))
                           .map((t: any) => (
                             <CommandItem
                               key={t.id}

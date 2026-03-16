@@ -7,7 +7,7 @@ import { StatCard } from "@/components/StatCard";
 import { GridCard } from "@/components/DashboardGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useStats, useMissions, useClients, useAllSessions } from "@/hooks/use-missions";
+import { useStats, useMissions, useAllSessions } from "@/hooks/use-missions";
 import { useAuth } from "@/hooks/use-auth";
 import {
   useUnreadInAppNotifications,
@@ -35,15 +35,12 @@ import {
   CheckCheck,
   Flag,
   ListChecks,
-  Building2,
   ListTodo,
-  Mail,
-  Phone,
   Download,
 } from "lucide-react";
 import { format, formatDistanceToNow, differenceInDays, addDays } from "date-fns";
 import { fr } from "date-fns/locale";
-import type { Mission, MissionStatus, MissionSession, MissionStep, Client, InAppNotification } from "@shared/schema";
+import type { Mission, MissionStatus, MissionSession, MissionStep, InAppNotification } from "@shared/schema";
 
 function getMissionStatusLabel(status: MissionStatus): { label: string; color: string } {
   const styles: Record<MissionStatus, { label: string; color: string }> = {
@@ -75,8 +72,6 @@ export default function Dashboard() {
   const { data: stats } = useStats();
   const { data: missions } = useMissions();
   const { data: allSessions } = useAllSessions();
-  const { data: allClients } = useClients();
-
   const isAdmin = user?.role === "admin";
 
   // Calendar state (trainer)
@@ -133,11 +128,6 @@ export default function Dashboard() {
     if (isAdmin || !missions || !user) return [];
     return missions.filter((m: Mission) => m.trainerId === user.id);
   }, [missions, user, isAdmin]);
-
-  const trainerClients = useMemo(() => {
-    if (isAdmin || !allClients || !user) return [];
-    return allClients.filter((c: Client) => c.assignedTrainerId === user.id);
-  }, [allClients, user, isAdmin]);
 
   const trainerStats = useMemo(() => {
     if (isAdmin) return null;
@@ -304,12 +294,11 @@ export default function Dashboard() {
               />
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <StatCard label="En cours" value={trainerStats?.inProgress || 0} icon={Clock} href="/missions" />
               <StatCard label="Confirmees" value={trainerStats?.confirmed || 0} icon={Briefcase} href="/missions" />
               <StatCard label="A venir" value={trainerStats?.upcoming || 0} icon={CalendarDays} href="/missions" />
               <StatCard label="Terminees" value={trainerStats?.completed || 0} icon={CheckCircle2} href="/missions" />
-              <StatCard label="Mes clients" value={trainerClients.length} icon={Building2} />
             </div>
           )}
 
@@ -754,7 +743,6 @@ export default function Dashboard() {
                   ) : (
                     <div className="space-y-3">
                       {trainerUpcomingMissions.map((mission: Mission) => {
-                        const client = allClients?.find((c: Client) => c.id === mission.clientId);
                         const sessions = sessionsByMission[mission.id];
                         const now = new Date();
                         now.setHours(0, 0, 0, 0);
@@ -781,7 +769,6 @@ export default function Dashboard() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm truncate">{mission.title}</p>
-                              <p className="text-xs text-muted-foreground">{client?.name || "Client non defini"}</p>
                               {sessions && sessions.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {sessions.map((s: MissionSession, i: number) => (
@@ -809,38 +796,6 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Mes Clients */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-indigo-500" />
-                    Mes Clients ({trainerClients.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {trainerClients.length === 0 ? (
-                    <p className="text-muted-foreground text-sm text-center py-4">Aucun client assigne</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {trainerClients.map((client: Client) => (
-                        <div key={client.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 border hover:bg-muted/50 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm">{client.name}</p>
-                            <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                              {client.contactName && <p>{client.contactName}</p>}
-                              {client.contactEmail && <p className="flex items-center gap-1"><Mail className="w-3 h-3" />{client.contactEmail}</p>}
-                              {client.contactPhone && <p className="flex items-center gap-1"><Phone className="w-3 h-3" />{client.contactPhone}</p>}
-                            </div>
-                          </div>
-                          <Badge variant="outline" className={client.contractStatus === "client" ? "bg-green-100 text-green-700 border-green-300" : "bg-blue-100 text-blue-700 border-blue-300"}>
-                            {client.contractStatus === "client" ? "Client" : client.contractStatus === "negotiation" ? "Negociation" : client.contractStatus === "lost" ? "Perdu" : "Prospect"}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           )}
 

@@ -801,7 +801,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
   });
 
   // Mission Clients (multi-clients support)
-  app.get('/api/missions/:id/clients', isAuthenticated, async (req, res) => {
+  app.get('/api/missions/:id/clients', isAuthenticated, requireRole('admin'), async (req, res) => {
     const missionClients = await storage.getMissionClients(Number(req.params.id));
     res.json(missionClients);
   });

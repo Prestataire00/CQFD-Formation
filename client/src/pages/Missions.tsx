@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,7 @@ function getLocationBadge(type: LocationType) {
 export default function Missions() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const { data: missions, isLoading } = useMissions();
   const { data: clients } = useClients();
   const { data: trainers } = useTrainers();
@@ -167,6 +168,18 @@ export default function Missions() {
     rateBase: "",
     financialTerms: "",
   });
+
+  // Auto-open creation dialog with pre-filled client from URL param
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const clientId = params.get("newMission");
+    if (clientId) {
+      setNewMission(prev => ({ ...prev, clientIds: [clientId] }));
+      setIsCreateOpen(true);
+      // Clean URL
+      setLocation("/missions", { replace: true });
+    }
+  }, []);
 
   // Filter clients based on search
   const filteredClients = useMemo(() => {
@@ -511,7 +524,7 @@ export default function Missions() {
                           <SelectContent className="bg-violet-100 border-violet-300">
                             <SelectItem value="_none_" className="focus:bg-violet-200">Aucun formateur</SelectItem>
                             {trainers?.slice().sort((a: any, b: any) =>
-                              `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")
+                              `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr")
                             ).map((trainer: any) => (
                               <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
                                 {trainer.firstName} {trainer.lastName}
@@ -813,7 +826,7 @@ export default function Missions() {
                   </SelectTrigger>
                   <SelectContent className="bg-violet-100 border-violet-300">
                     <SelectItem value="all" className="focus:bg-violet-200">Tous les formateurs</SelectItem>
-                    {trainers?.slice().sort((a: any, b: any) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, "fr")).map((trainer: any) => (
+                    {trainers?.slice().sort((a: any, b: any) => `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`, "fr")).map((trainer: any) => (
                       <SelectItem key={trainer.id} value={trainer.id} className="focus:bg-violet-200">
                         {trainer.firstName} {trainer.lastName}
                       </SelectItem>
@@ -909,7 +922,7 @@ export default function Missions() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="text-left p-3 font-medium text-sm">Titre</th>
-                    <th className="text-left p-3 font-medium text-sm">Client</th>
+                    {isAdmin && <th className="text-left p-3 font-medium text-sm">Client</th>}
                     {isAdmin && <th className="text-left p-3 font-medium text-sm">Formateur</th>}
                     <th className="text-left p-3 font-medium text-sm">Dates</th>
                     <th className="text-left p-3 font-medium text-sm">Typologie</th>
@@ -945,7 +958,7 @@ export default function Missions() {
                             )}
                           </div>
                         </td>
-                        <td className="p-3 text-sm">{client?.name || "-"}</td>
+                        {isAdmin && <td className="p-3 text-sm">{client?.name || "-"}</td>}
                         {isAdmin && (
                           <td className="p-3 text-sm">
                             {trainer ? `${trainer.firstName} ${trainer.lastName}` : "-"}
@@ -1083,7 +1096,7 @@ export default function Missions() {
                         </Badge>
                       )}
 
-                      {mission.clientId && (
+                      {isAdmin && mission.clientId && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Building2 className="w-4 h-4" />
                           <span>{clients?.find((c: any) => c.id === mission.clientId)?.name || "Client"}</span>

@@ -496,9 +496,17 @@ function ClientDetailDialog({
 
           <div className="space-y-6">
             <div>
-              <h3 className="font-semibold text-lg flex items-center gap-2 mb-3">
-                <Briefcase className="w-5 h-5" /> Missions ({stats.missions.length})
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Briefcase className="w-5 h-5" /> Missions ({stats.missions.length})
+                </h3>
+                <a href={`/missions?newMission=${client.id}`}>
+                  <Button size="sm" variant="outline" className="gap-1">
+                    <Plus className="w-4 h-4" />
+                    Créer une mission
+                  </Button>
+                </a>
+              </div>
               <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                 {stats.missions.map((mission) => (
                   <div key={mission.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg text-sm">
@@ -720,7 +728,6 @@ export default function Clients() {
             <StatCard title="Privé" value={kpis.prive} icon={Building2} color="bg-indigo-100 text-indigo-600" />
             <StatCard title="Public" value={kpis.publique} icon={Building2} color="bg-purple-100 text-purple-600" />
             <StatCard title="Particulier" value={kpis.particulier} icon={UserCircle} color="bg-green-100 text-green-600" />
-            <StatCard title="CA Total" value={formatCurrency(kpis.totalRevenue)} icon={Euro} color="bg-amber-100 text-amber-600" />
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
@@ -758,9 +765,8 @@ export default function Clients() {
                   <div className="space-y-2 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2"><Mail className="w-4 h-4" /> {client.contactEmail || "-"}</div>
                     <div className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {client.city || "-"}</div>
-                    <div className="pt-2 border-t mt-2 grid grid-cols-2 gap-2 text-xs">
+                    <div className="pt-2 border-t mt-2 text-xs">
                       <div>Missions: {clientStatsMap.get(client.id)?.completedMissions || 0}</div>
-                      <div>CA: {formatCurrency(clientStatsMap.get(client.id)?.totalRevenue || 0)}</div>
                     </div>
                   </div>
                 </CardContent>
