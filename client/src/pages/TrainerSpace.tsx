@@ -628,8 +628,7 @@ export default function TrainerSpace() {
                       {trainerClients.map((client: Client) => (
                         <Card
                           key={client.id}
-                          className="hover:shadow-md transition-shadow cursor-pointer"
-                          onClick={() => setLocation(`/clients`)}
+                          className="transition-shadow"
                         >
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between">
@@ -653,7 +652,6 @@ export default function TrainerSpace() {
                                     : "Prospect"}
                                 </Badge>
                               </div>
-                              <ArrowRight className="w-4 h-4 text-muted-foreground" />
                             </div>
                             <div className="mt-3 space-y-1 text-sm text-muted-foreground">
                               {client.contactName && (

@@ -1096,7 +1096,7 @@ export default function Missions() {
                         </Badge>
                       )}
 
-                      {isAdmin && mission.clientId && (
+                      {mission.clientId && (
                         <div className="flex items-center gap-2 text-muted-foreground">
                           <Building2 className="w-4 h-4" />
                           <span>{clients?.find((c: any) => c.id === mission.clientId)?.name || "Client"}</span>
