@@ -42,6 +42,16 @@ interface EmailOptions {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const fromEmail = process.env.SMTP_FROM || 'noreply@formation.local';
 
+  // Ajouter le bandeau "ne pas répondre" en haut de tous les emails
+  const noReplyBanner = `<div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 10px 15px; text-align: center; font-size: 12px; color: #991b1b; font-family: Arial, sans-serif; border-radius: 6px; margin-bottom: 15px; max-width: 600px; margin-left: auto; margin-right: auto;">
+    <strong>Adresse mail technique non consultee, ne pas repondre a cette adresse.</strong>
+  </div>`;
+  const htmlWithBanner = options.html.replace(
+    /(<body[^>]*>)/i,
+    `$1\n${noReplyBanner}`
+  );
+  const textWithBanner = `[Adresse mail technique non consultee, ne pas repondre a cette adresse.]\n\n${options.text || ''}`;
+
   // Priority 1: SMTP (adresse dédiée cqfd.formation@gmail.com)
   if (smtpTransporter) {
     try {
@@ -49,8 +59,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         from: fromEmail,
         to: options.to,
         subject: options.subject,
-        html: options.html,
-        text: options.text,
+        html: htmlWithBanner,
+        text: textWithBanner,
         attachments: options.attachments,
       });
       console.log(`[Email] Email envoyé via SMTP à ${options.to}`);
@@ -68,8 +78,8 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
         from: fromEmail,
         to: options.to,
         subject: options.subject,
-        html: options.html,
-        text: options.text,
+        html: htmlWithBanner,
+        text: textWithBanner,
         attachments: options.attachments,
       });
       console.log(`[Email] Email envoyé via Gmail API à ${options.to}`);

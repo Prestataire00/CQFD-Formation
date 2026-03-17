@@ -3085,11 +3085,9 @@ export default function MissionDetail() {
                     <Badge className="bg-indigo-100 text-indigo-700 border border-indigo-300">Copie</Badge>
                   )}
                 </div>
-                {isAdmin && (
                 <p className="text-sm text-muted-foreground">
                   {client?.name || "Client non defini"}
                 </p>
-                )}
               </div>
               {isAdmin && (
                 <Button
