@@ -1185,6 +1185,64 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         }
       }
 
+      // Notify via email when a comment is added or updated on a step
+      const commentChanged = updateData.comment !== undefined && updateData.comment !== (currentStep?.comment || null);
+      const trainerCommentChanged = updateData.trainerComment !== undefined && updateData.trainerComment !== (currentStep?.trainerComment || null);
+      if (commentChanged || trainerCommentChanged) {
+        try {
+          const mission = await storage.getMission(missionId);
+          const modifiedBy = await storage.getUser(req.user!.id);
+          if (mission && modifiedBy) {
+            const admins = await storage.getUsersByRole('admin');
+            const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
+
+            // Find trainer(s) from missionTrainers table, fallback to mission.trainerId
+            const missionTrainers = await storage.getMissionTrainers(missionId);
+            const trainerUsers = missionTrainers.map(mt => mt.trainer);
+            if (trainerUsers.length === 0 && mission.trainerId) {
+              const fallbackTrainer = await storage.getUser(mission.trainerId);
+              if (fallbackTrainer) trainerUsers.push(fallbackTrainer);
+            }
+
+            const commentContent = commentChanged ? (updateData.comment || '') : (updateData.trainerComment || '');
+            const stepTitle = step.title || '';
+            const fullComment = `[${stepTitle}] ${commentContent}`;
+
+            // Notify all admins (except modifier)
+            for (const admin of admins) {
+              if (admin.email && admin.id !== modifiedBy.id) {
+                await sendMissionNotificationEmail({
+                  mission,
+                  modifiedBy,
+                  recipient: admin,
+                  client,
+                  changeType: 'comment',
+                  commentContent: fullComment,
+                });
+              }
+            }
+
+            // If admin comments, notify all assigned trainers
+            if (modifiedBy.role === 'admin') {
+              for (const trainer of trainerUsers) {
+                if (trainer.email && trainer.id !== modifiedBy.id) {
+                  await sendMissionNotificationEmail({
+                    mission,
+                    modifiedBy,
+                    recipient: trainer,
+                    client,
+                    changeType: 'comment',
+                    commentContent: fullComment,
+                  });
+                }
+              }
+            }
+          }
+        } catch (emailErr) {
+          console.error('[Step Comment] Error sending notification email:', emailErr);
+        }
+      }
+
       res.json(step);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -1997,20 +2055,47 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
           const mission = await storage.getMission(input.missionId);
           if (mission) {
             const modifiedBy = await storage.getUser(user.id);
-            const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
             const admins = await storage.getUsersByRole('admin');
             const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
 
+            // Find trainer(s) from missionTrainers table, fallback to mission.trainerId
+            const missionTrainers = await storage.getMissionTrainers(input.missionId);
+            const trainerUsers = missionTrainers.map(mt => mt.trainer);
+            if (trainerUsers.length === 0 && mission.trainerId) {
+              const fallbackTrainer = await storage.getUser(mission.trainerId);
+              if (fallbackTrainer) trainerUsers.push(fallbackTrainer);
+            }
+
             if (modifiedBy) {
-              await notifyOtherParty(
-                mission,
-                modifiedBy,
-                trainer || null,
-                admins,
-                client || null,
-                'comment',
-                { commentContent: input.content }
-              );
+              // Notify all admins (except modifier)
+              for (const admin of admins) {
+                if (admin.email && admin.id !== modifiedBy.id) {
+                  await sendMissionNotificationEmail({
+                    mission,
+                    modifiedBy,
+                    recipient: admin,
+                    client,
+                    changeType: 'comment',
+                    commentContent: input.content,
+                  });
+                }
+              }
+
+              // If admin comments, notify all assigned trainers
+              if (modifiedBy.role === 'admin') {
+                for (const trainer of trainerUsers) {
+                  if (trainer.email && trainer.id !== modifiedBy.id) {
+                    await sendMissionNotificationEmail({
+                      mission,
+                      modifiedBy,
+                      recipient: trainer,
+                      client,
+                      changeType: 'comment',
+                      commentContent: input.content,
+                    });
+                  }
+                }
+              }
             }
           }
         } catch (emailErr) {

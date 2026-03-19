@@ -1085,7 +1085,7 @@ export default function MissionDetail() {
           videoLink: editForm.videoLink || null,
           totalHours: editForm.totalHours && !isNaN(Number(editForm.totalHours)) ? Number(editForm.totalHours) : undefined,
           clientId: editForm.clientId && !isNaN(Number(editForm.clientId)) ? Number(editForm.clientId) : undefined,
-          trainerId: editForm.trainerId || undefined,
+          trainerId: editForm.trainerId || null,
           programId: editForm.programId && !isNaN(Number(editForm.programId)) ? Number(editForm.programId) : undefined,
           programTitle: editForm.programTitle || undefined,
           expectedParticipants: editForm.expectedParticipants && !isNaN(Number(editForm.expectedParticipants)) ? Number(editForm.expectedParticipants) : undefined,

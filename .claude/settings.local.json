@@ -85,7 +85,8 @@
       "Bash(git remote:*)",
       "Bash(rm:*)",
       "Bash(npm list:*)",
-      "Bash(npx esbuild:*)"
+      "Bash(npx esbuild:*)",
+      "Bash(find /home/runner/workspace -maxdepth 3 -type f \\\\\\(-name *.py -o -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx \\\\\\) ! -path *node_modules* ! -path *.cache* ! -path *dist*)"
     ]
   }
 }
