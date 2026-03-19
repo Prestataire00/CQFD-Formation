@@ -2323,6 +2323,7 @@ export default function MissionDetail() {
         </Card>
         )}
 
+        {isAdmin ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -2357,6 +2358,21 @@ export default function MissionDetail() {
             )}
           </CardContent>
         </Card>
+        ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Client
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="font-medium">
+              {client ? client.name : (mission?.clientName || "Non defini")}
+            </p>
+          </CardContent>
+        </Card>
+        )}
 
         <Card className="md:col-span-2">
           <CardHeader>

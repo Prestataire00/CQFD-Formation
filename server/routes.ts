@@ -373,7 +373,15 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       res.status(404).json({ message: "Mission non trouvée" });
       return;
     }
-    res.json(mission);
+    // Enrichir avec le nom du client pour les formateurs/prestataires qui n'ont pas accès à l'API clients
+    let clientName: string | null = null;
+    if (mission.clientId) {
+      const client = await storage.getClient(mission.clientId);
+      if (client) {
+        clientName = client.name;
+      }
+    }
+    res.json({ ...mission, clientName });
   });
 
   app.post(api.missions.create.path, isAuthenticated, requirePermission('missions:create'), async (req, res) => {
