@@ -208,12 +208,22 @@ export default function Missions() {
   }) || [];
 
   // Sort missions
+  // Helper: get the earliest session date for a mission, fallback to startDate
+  const getEarliestSessionDate = (mission: Mission): number => {
+    const sessions = sessionsByMission[mission.id];
+    if (sessions && sessions.length > 0) {
+      const dates = sessions.map(s => new Date(s.sessionDate).getTime()).filter(d => !isNaN(d));
+      if (dates.length > 0) return Math.min(...dates);
+    }
+    return new Date(mission.startDate || 0).getTime();
+  };
+
   const sortedMissions = [...filteredMissions].sort((a: Mission, b: Mission) => {
     switch (sortBy) {
       case "date_asc":
-        return new Date(a.startDate || 0).getTime() - new Date(b.startDate || 0).getTime();
+        return getEarliestSessionDate(b) - getEarliestSessionDate(a);
       case "date_desc":
-        return new Date(b.startDate || 0).getTime() - new Date(a.startDate || 0).getTime();
+        return getEarliestSessionDate(a) - getEarliestSessionDate(b);
       case "client":
         const clientA = clients?.find((c: any) => c.id === a.clientId)?.name || "";
         const clientB = clients?.find((c: any) => c.id === b.clientId)?.name || "";
