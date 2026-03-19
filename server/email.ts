@@ -44,13 +44,13 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
   // Ajouter le bandeau "ne pas répondre" en haut de tous les emails
   const noReplyBanner = `<div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 10px 15px; text-align: center; font-size: 12px; color: #991b1b; font-family: Arial, sans-serif; border-radius: 6px; margin-bottom: 15px; max-width: 600px; margin-left: auto; margin-right: auto;">
-    <strong>Adresse mail technique non consultee, ne pas repondre a cette adresse.</strong>
+    <strong>Adresse mail technique non consultée, ne pas répondre à ce mail.</strong>
   </div>`;
   const htmlWithBanner = options.html.replace(
     /(<body[^>]*>)/i,
     `$1\n${noReplyBanner}`
   );
-  const textWithBanner = `[Adresse mail technique non consultee, ne pas repondre a cette adresse.]\n\n${options.text || ''}`;
+  const textWithBanner = `[Adresse mail technique non consultée, ne pas répondre à ce mail.]\n\n${options.text || ''}`;
 
   // Priority 1: SMTP (adresse dédiée cqfd.formation@gmail.com)
   if (smtpTransporter) {
@@ -239,7 +239,7 @@ export async function sendMissionAssignmentEmail(
           <p>Connectez-vous à votre espace formateur pour accéder à tous les détails de la mission et télécharger les documents.</p>
         </div>
         <div class="footer">
-          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce message.</p>
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce mail.</p>
         </div>
       </div>
     </body>
@@ -326,7 +326,7 @@ export async function sendTaskAssignmentEmail(
           <p>Connectez-vous a votre espace pour consulter les details de cette tache.</p>
         </div>
         <div class="footer">
-          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce mail.</p>
         </div>
       </div>
     </body>
@@ -663,7 +663,7 @@ export async function sendPasswordResetEmail(
           <p class="link-text">${resetUrl}</p>
         </div>
         <div class="footer">
-          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce mail.</p>
           <p>CQFD Formation - Gestion des formations</p>
         </div>
       </div>
@@ -753,7 +753,7 @@ export async function sendWelcomeEmail(
           <p class="link-text">${setupUrl}</p>
         </div>
         <div class="footer">
-          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce message.</p>
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce mail.</p>
           <p>CQFD Formation - Gestion des formations</p>
         </div>
       </div>
@@ -975,7 +975,7 @@ export async function sendStepLinkEmail(
           <p class="link-text">${link}</p>
         </div>
         <div class="footer">
-          <p>Cet email a ete envoye automatiquement. Merci de ne pas repondre directement a ce message.</p>
+          <p>Cet email a été envoyé automatiquement. Merci de ne pas répondre directement à ce mail.</p>
           <p>CQFD Formation</p>
         </div>
       </div>
