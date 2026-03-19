@@ -587,26 +587,28 @@ export function startReminderScheduler(): void {
 
   // Exécuter toutes les heures à :00
   // Format cron: minute heure jour-du-mois mois jour-de-la-semaine
-  cron.schedule('0 * * * *', async () => {
-    await runReminderTask();
+  cron.schedule('0 * * * *', () => {
+    runReminderTask().catch(err => log(`[Scheduler] Erreur critique tâche rappels: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
   // Export Excel quotidien à 1h00 du matin + envoi par email
-  cron.schedule('0 1 * * *', async () => {
+  cron.schedule('0 1 * * *', () => {
     log('[Scheduler] Cron 1h00 déclenché - export quotidien', 'scheduler');
-    await runDailyExportTask();
+    runDailyExportTask().catch(err => log(`[Scheduler] Erreur critique export quotidien: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
   // Export de sécurité à 18h00 (fin de journée) si l'export de 1h00 n'a pas fonctionné
-  cron.schedule('0 18 * * *', async () => {
+  cron.schedule('0 18 * * *', () => {
     log('[Scheduler] Cron 18h00 déclenché - vérification export de sécurité', 'scheduler');
-    const alreadySent = await hasTodayExportBeenSent();
-    if (!alreadySent) {
-      log('[Scheduler] Export de 1h00 non détecté, lancement de l\'export de sécurité à 18h00', 'scheduler');
-      await runDailyExportTask();
-    } else {
-      log('[Scheduler] Export déjà effectué aujourd\'hui, export de 18h00 ignoré', 'scheduler');
-    }
+    (async () => {
+      const alreadySent = await hasTodayExportBeenSent();
+      if (!alreadySent) {
+        log('[Scheduler] Export de 1h00 non détecté, lancement de l\'export de sécurité à 18h00', 'scheduler');
+        await runDailyExportTask();
+      } else {
+        log('[Scheduler] Export déjà effectué aujourd\'hui, export de 18h00 ignoré', 'scheduler');
+      }
+    })().catch(err => log(`[Scheduler] Erreur critique export sécurité 18h: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
   log('[Scheduler] Export quotidien planifié à 1h00 (+ sécurité 18h00).', 'scheduler');
