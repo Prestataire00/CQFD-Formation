@@ -397,11 +397,11 @@ export default function Missions() {
         description: "La mission a été archivée et ses documents supprimés pour libérer l'espace.",
       });
       setMissionToDelete(null);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to archive mission:", error);
       toast({
         title: "Erreur",
-        description: "Impossible d'archiver la mission.",
+        description: error?.message || "Impossible d'archiver la mission.",
         variant: "destructive",
       });
     }
