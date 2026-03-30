@@ -86,7 +86,9 @@
       "Bash(rm:*)",
       "Bash(npm list:*)",
       "Bash(npx esbuild:*)",
-      "Bash(find /home/runner/workspace -maxdepth 3 -type f \\\\\\(-name *.py -o -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx \\\\\\) ! -path *node_modules* ! -path *.cache* ! -path *dist*)"
+      "Bash(find /home/runner/workspace -maxdepth 3 -type f \\\\\\(-name *.py -o -name *.js -o -name *.jsx -o -name *.ts -o -name *.tsx \\\\\\) ! -path *node_modules* ! -path *.cache* ! -path *dist*)",
+      "Bash(GIT_ASKPASS=\"\" GIT_TERMINAL_PROMPT=0 git push origin main)",
+      "Bash(GIT_ASKPASS=\"\" git push origin main)"
     ]
   }
 }
