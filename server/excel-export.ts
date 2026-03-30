@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import { db } from './db';
-import { missions, users, clients, missionSessions, missionSteps, stepTasks, documents, invoices } from '@shared/schema';
+import { missions, users, clients, missionSessions, missionSteps, stepTasks, documents, invoices, personalNotes } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -377,6 +377,64 @@ export async function generateMissionsExcel(): Promise<string> {
         cell.font = { color: { argb: 'FF808080' }, italic: true };
       }
     }
+  }
+
+  // ==================== Feuille "Mes Notes" ====================
+  try {
+    const allNotes = await db.select().from(personalNotes);
+
+    if (allNotes.length > 0) {
+      const notesSheet = workbook.addWorksheet('Mes Notes');
+
+      notesSheet.columns = [
+        { header: 'Auteur', key: 'auteur', width: 20 },
+        { header: 'Titre', key: 'titre', width: 30 },
+        { header: 'Contenu', key: 'contenu', width: 60 },
+        { header: 'Épinglée', key: 'epinglee', width: 10 },
+        { header: 'Créée le', key: 'creeLe', width: 18 },
+        { header: 'Modifiée le', key: 'modifieeLe', width: 18 },
+      ];
+
+      // Style de l'en-tête
+      const headerRow = notesSheet.getRow(1);
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      // Couleurs des notes
+      const noteColors: Record<string, string> = {
+        yellow: 'FFFFFDE7',
+        green: 'FFE8F5E9',
+        blue: 'FFE3F2FD',
+        pink: 'FFFCE4EC',
+        purple: 'FFF3E5F5',
+      };
+
+      for (const note of allNotes) {
+        const author = usersMap.get(note.userId);
+        const authorName = author ? `${author.firstName || ''} ${author.lastName || ''}`.trim() : 'Inconnu';
+
+        const row = notesSheet.addRow({
+          auteur: authorName,
+          titre: note.title,
+          contenu: note.content || '',
+          epinglee: note.isPinned ? 'Oui' : 'Non',
+          creeLe: formatDateTime(note.createdAt),
+          modifieeLe: formatDateTime(note.updatedAt),
+        });
+
+        // Appliquer la couleur de fond de la note
+        if (note.color && noteColors[note.color]) {
+          row.eachCell((cell) => {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: noteColors[note.color!] } };
+          });
+        }
+
+        row.alignment = { vertical: 'top', wrapText: true };
+      }
+    }
+  } catch (e) {
+    console.log(`[excel-export] Erreur ajout feuille notes: ${e instanceof Error ? e.message : 'Unknown'}`);
   }
 
   const timestamp = format(new Date(), 'yyyy-MM-dd_HH-mm', { locale: fr });
