@@ -1049,11 +1049,10 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(feedbackQuestionnaires).where(eq(feedbackQuestionnaires.missionId, id));
 
-    // Delete child missions (duplications)
-    const children = await db.select().from(missions).where(eq(missions.parentMissionId, id));
-    for (const child of children) {
-      await this.deleteMission(child.id);
-    }
+    // Détacher les missions enfants (elles deviennent indépendantes au lieu d'être supprimées)
+    await db.update(missions)
+      .set({ parentMissionId: null, isOriginal: true })
+      .where(eq(missions.parentMissionId, id));
 
     const [deleted] = await db.delete(missions).where(eq(missions.id, id)).returning();
     return !!deleted;
