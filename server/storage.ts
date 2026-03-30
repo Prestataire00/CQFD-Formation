@@ -29,7 +29,7 @@ import {
 } from "@shared/schema";
 import type { UpsertUser } from "@shared/models/auth";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, gte, sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { supabaseAdmin } from "./supabaseAdmin";
@@ -163,6 +163,8 @@ export interface IStorage {
   createDocument(doc: InsertDocument): Promise<Document>;
   updateDocument(id: number, data: Partial<Document>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
+  deleteDocumentsByMission(missionId: number): Promise<number>;
+  deleteUploadedFile(fileUrl: string): Promise<void>;
   initializeMissionDocuments(missionId: number): Promise<void>;
 
   // Document Templates
@@ -250,6 +252,7 @@ export interface IStorage {
   createInAppNotification(notification: InsertInAppNotification): Promise<InAppNotification>;
   markInAppNotificationAsRead(id: number): Promise<InAppNotification | undefined>;
   markAllInAppNotificationsAsRead(userId: string): Promise<boolean>;
+  getUnreadNotificationsForTrainersSince(since: Date): Promise<{ userId: string; notifications: InAppNotification[] }[]>;
 
   // Feedback Questionnaires
   getFeedbackQuestionnaire(id: number): Promise<FeedbackQuestionnaire | undefined>;
@@ -973,7 +976,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Helper: delete uploaded files from disk or Supabase Storage
-  private async deleteUploadedFile(fileUrl: string) {
+  async deleteUploadedFile(fileUrl: string) {
     if (!fileUrl) return;
     // Fichiers Supabase Storage (URL complète)
     if (fileUrl.includes('supabase.co/storage/')) {
@@ -1429,6 +1432,11 @@ export class DatabaseStorage implements IStorage {
     }
     await db.delete(documents).where(eq(documents.id, id));
     return true;
+  }
+
+  async deleteDocumentsByMission(missionId: number): Promise<number> {
+    const result = await db.delete(documents).where(eq(documents.missionId, missionId)).returning();
+    return result.length;
   }
 
   // No longer used - keeping for reference
@@ -1990,6 +1998,31 @@ export class DatabaseStorage implements IStorage {
         eq(inAppNotifications.isRead, false)
       ));
     return true;
+  }
+
+  async getUnreadNotificationsForTrainersSince(since: Date): Promise<{ userId: string; notifications: InAppNotification[] }[]> {
+    const trainers = await this.getTrainers();
+    const activeTrainerIds = trainers.filter(t => t.status === 'ACTIF' && t.email).map(t => t.id);
+
+    if (activeTrainerIds.length === 0) return [];
+
+    const result: { userId: string; notifications: InAppNotification[] }[] = [];
+
+    for (const trainerId of activeTrainerIds) {
+      const notifs = await db.select().from(inAppNotifications)
+        .where(and(
+          eq(inAppNotifications.userId, trainerId),
+          eq(inAppNotifications.isRead, false),
+          gte(inAppNotifications.createdAt, since)
+        ))
+        .orderBy(desc(inAppNotifications.createdAt));
+
+      if (notifs.length > 0) {
+        result.push({ userId: trainerId, notifications: notifs });
+      }
+    }
+
+    return result;
   }
 
   // ==================== FEEDBACK QUESTIONNAIRES ====================

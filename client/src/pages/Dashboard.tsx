@@ -49,6 +49,7 @@ function getMissionStatusLabel(status: MissionStatus): { label: string; color: s
     in_progress: { label: "En cours", color: "bg-green-100 text-green-700" },
     completed: { label: "Terminee", color: "bg-purple-100 text-purple-700" },
     cancelled: { label: "Annulee", color: "bg-red-100 text-red-700" },
+    archived: { label: "Archivée", color: "bg-gray-100 text-gray-500" },
   };
   return styles[status] || styles.draft;
 }
@@ -126,7 +127,7 @@ export default function Dashboard() {
   // ===== TRAINER-SPECIFIC DATA =====
   const trainerMissions = useMemo(() => {
     if (isAdmin || !missions || !user) return [];
-    return missions.filter((m: Mission) => m.trainerId === user.id);
+    return missions.filter((m: Mission) => m.trainerId === user.id && m.status !== "archived");
   }, [missions, user, isAdmin]);
 
   const trainerStats = useMemo(() => {

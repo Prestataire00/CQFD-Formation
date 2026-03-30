@@ -50,7 +50,7 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
 });
 
 // --- CRM MODELS ---
-export type MissionStatus = 'draft' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+export type MissionStatus = 'draft' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'archived';
 export type InvoiceStatus = 'draft' | 'submitted' | 'paid' | 'rejected';
 export type StepStatus = 'todo' | 'priority' | 'late' | 'done' | 'na';
 export type LocationType = 'presentiel' | 'distanciel' | 'hybride';

@@ -478,13 +478,14 @@ Merci de vous assurer que tout est prêt pour cette formation.
   });
 }
 
-// Email spécifique pour le rappel admin J-2 avec tous les détails
+// Email spécifique pour le rappel admin avec tous les détails (J-2, J-7, etc.)
 export async function sendAdminFormationReminderEmail(
   adminEmail: string,
   adminName: string,
   mission: Mission,
   trainer: User | null,
-  client: Client | null
+  client: Client | null,
+  daysBefore?: number
 ): Promise<boolean> {
   if (!adminEmail) {
     console.log(`[Email] Pas d'email admin, rappel non envoyé`);
@@ -495,6 +496,11 @@ export async function sendAdminFormationReminderEmail(
   const startDate = mission.startDate
     ? new Date(mission.startDate).toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
     : 'Non définie';
+  // Calculer les jours restants dynamiquement si non fourni
+  const actualDays = daysBefore ?? (mission.startDate
+    ? Math.max(0, Math.ceil((new Date(mission.startDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 2);
+
   const trainerName = trainer
     ? `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim()
     : 'Non assigné';
@@ -537,13 +543,13 @@ export async function sendAdminFormationReminderEmail(
     <body>
       <div class="container">
         <div class="header">
-          <h1>Formation dans 2 jours</h1>
+          <h1>Formation dans ${actualDays} jour${actualDays > 1 ? 's' : ''}</h1>
         </div>
         <div class="content">
           <p>Bonjour ${adminName},</p>
 
           <div class="alert">
-            <strong>Rappel important:</strong> Une formation commence dans <strong>2 jours</strong>.
+            <strong>Rappel important:</strong> Une formation commence dans <strong>${actualDays} jour${actualDays > 1 ? 's' : ''}</strong>.
           </div>
 
           <div class="section">
@@ -599,7 +605,7 @@ export async function sendAdminFormationReminderEmail(
           <p>Veuillez vous assurer que tous les éléments sont en place pour le bon déroulement de cette formation.</p>
         </div>
         <div class="footer">
-          <p>Rappel automatique J-2 - Système de gestion des formations</p>
+          <p>Rappel automatique J-${actualDays} - Système de gestion des formations</p>
         </div>
       </div>
     </body>
@@ -608,7 +614,7 @@ export async function sendAdminFormationReminderEmail(
 
   return sendEmail({
     to: adminEmail,
-    subject: `[J-2] Formation à venir: ${missionTitle}`,
+    subject: `[J-${actualDays}] Formation à venir: ${missionTitle}`,
     html,
   });
 }
@@ -1030,17 +1036,84 @@ export async function notifyOtherParty(
     }
   }
 
-  // Si c'est un admin qui modifie, notifier aussi le formateur
-  if (isModifierAdmin) {
-    if (trainer && trainer.email && trainer.id !== modifiedBy.id) {
-      await sendMissionNotificationEmail({
-        mission,
-        modifiedBy,
-        recipient: trainer,
-        client,
-        changeType,
-        ...options,
-      });
-    }
-  }
+  // Les formateurs ne reçoivent plus d'emails instantanés.
+  // Ils reçoivent un récapitulatif quotidien à 18h via le digest.
+  // Les notifications in-app sont toujours créées dans routes.ts.
+}
+
+/**
+ * Envoie un email récapitulatif quotidien à un formateur avec toutes les notifications du jour
+ */
+export async function sendTrainerDailyDigestEmail(
+  trainerEmail: string,
+  trainerName: string,
+  notificationsByMission: { missionTitle: string; items: { title: string; message: string; createdAt: Date | null }[] }[]
+): Promise<boolean> {
+  const totalCount = notificationsByMission.reduce((sum, m) => sum + m.items.length, 0);
+  if (totalCount === 0) return false;
+
+  const today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  // Construire les sections par mission
+  const missionsHtml = notificationsByMission.map(({ missionTitle, items }) => {
+    const itemsHtml = items.map(item => {
+      const time = item.createdAt
+        ? new Date(item.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      return `
+        <tr>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f3f4f6; color: #6b7280; font-size: 13px; white-space: nowrap;">${time}</td>
+          <td style="padding: 8px 12px; border-bottom: 1px solid #f3f4f6;">
+            <strong style="color: #1f2937;">${item.title}</strong><br>
+            <span style="color: #6b7280; font-size: 13px;">${item.message}</span>
+          </td>
+        </tr>`;
+    }).join('');
+
+    return `
+      <div style="background-color: white; padding: 15px; border-radius: 8px; margin: 15px 0; border: 1px solid #e5e7eb;">
+        <div style="font-size: 16px; font-weight: bold; color: #1f2937; margin-bottom: 10px; border-bottom: 2px solid #2563eb; padding-bottom: 5px;">
+          ${missionTitle}
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${itemsHtml}
+        </table>
+      </div>`;
+  }).join('');
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background-color: #2563eb; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">Récapitulatif du ${today}</h1>
+          <p style="margin: 5px 0 0; opacity: 0.9;">${totalCount} modification${totalCount > 1 ? 's' : ''} sur ${notificationsByMission.length} mission${notificationsByMission.length > 1 ? 's' : ''}</p>
+        </div>
+        <div style="background-color: #f9fafb; padding: 20px; border: 1px solid #e5e7eb;">
+          <p>Bonjour ${trainerName},</p>
+          <p>Voici le récapitulatif des modifications effectuées aujourd'hui sur vos missions :</p>
+          ${missionsHtml}
+        </div>
+        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; text-align: center;">
+          <p style="margin: 0;">Cet email est un récapitulatif automatique envoyé chaque jour à 18h.</p>
+          <p style="margin: 5px 0 0;">CQFD Formation — Merci de ne pas répondre à ce mail.</p>
+        </div>
+      </div>
+    </body>
+    </html>`;
+
+  const text = `Récapitulatif du ${today}\n${totalCount} modification(s)\n\nBonjour ${trainerName},\n\n` +
+    notificationsByMission.map(({ missionTitle, items }) =>
+      `== ${missionTitle} ==\n` + items.map(i => `- ${i.title}: ${i.message}`).join('\n')
+    ).join('\n\n') +
+    `\n\nCQFD Formation — Merci de ne pas répondre à ce mail.`;
+
+  return sendEmail({
+    to: trainerEmail,
+    subject: `Récapitulatif quotidien — ${totalCount} modification${totalCount > 1 ? 's' : ''}`,
+    html,
+    text,
+  });
 }

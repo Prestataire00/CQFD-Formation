@@ -304,7 +304,7 @@ export const api = {
       method: 'PATCH' as const,
       path: '/api/missions/:id/status',
       input: z.object({
-        status: z.enum(['draft', 'confirmed', 'in_progress', 'completed', 'cancelled']),
+        status: z.enum(['draft', 'confirmed', 'in_progress', 'completed', 'cancelled', 'archived']),
       }),
       responses: {
         200: z.custom<typeof missions.$inferSelect>(),

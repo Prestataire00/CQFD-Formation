@@ -452,6 +452,12 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       };
       const input = api.missions.update.input.parse(body);
 
+      // Gérer explicitement la mise à null du formateur (trainerId)
+      // Le schéma Zod .partial() ne gère pas null, donc on le réinjecte manuellement
+      if (req.body.trainerId === null || req.body.trainerId === '') {
+        (input as any).trainerId = null;
+      }
+
       // Récupérer la mission AVANT la mise à jour pour détecter les changements de formateur
       const previousMission = await storage.getMission(Number(req.params.id));
       const previousTrainerId = previousMission?.trainerId || null;
@@ -516,7 +522,30 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
           }
         }
 
-        // 3. Email (en complément des notifications internes)
+        // 3. Si le formateur a changé, annuler les rappels en attente de l'ancien formateur
+        if (trainerNewlyAssigned && previousTrainerId) {
+          try {
+            const previousTrainer = await storage.getUser(previousTrainerId);
+            if (previousTrainer?.email) {
+              const missionReminders = await storage.getRemindersByMission(mission.id);
+              const oldTrainerReminders = missionReminders.filter(r =>
+                r.recipientEmail === previousTrainer.email &&
+                r.recipientType === 'trainer' &&
+                r.status === 'pending'
+              );
+              for (const reminder of oldTrainerReminders) {
+                await storage.updateReminder(reminder.id, { status: 'cancelled' });
+              }
+              if (oldTrainerReminders.length > 0) {
+                console.log(`[Mission Update] Annulé ${oldTrainerReminders.length} rappel(s) en attente pour l'ancien formateur ${previousTrainer.email} (mission ${mission.id})`);
+              }
+            }
+          } catch (reminderErr) {
+            console.error('[Mission Update] Erreur annulation rappels ancien formateur:', reminderErr);
+          }
+        }
+
+        // 4. Email (en complément des notifications internes)
         if (modifiedBy) {
           // Si un formateur est nouvellement assigné, lui envoyer un email d'assignation (pas de modification)
           if (trainerNewlyAssigned && trainer && trainer.email) {
@@ -672,6 +701,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         'in_progress': 'En cours',
         'completed': 'Terminée',
         'cancelled': 'Annulée',
+        'archived': 'Archivée',
       };
       const statusLabel = statusLabels[input.status] || input.status;
 
@@ -712,8 +742,22 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         console.error('[Notification] Erreur notification changement statut:', notifErr);
       }
 
-      // Annuler les rappels en attente si la mission est annulée ou terminée
-      if (input.status === 'cancelled' || input.status === 'completed') {
+      // Si archivage : supprimer tous les documents (fichiers + enregistrements) pour libérer le stockage
+      if (input.status === 'archived') {
+        try {
+          const missionDocs = await storage.getDocumentsByMission(mission.id);
+          for (const doc of missionDocs) {
+            await storage.deleteUploadedFile(doc.url);
+          }
+          await storage.deleteDocumentsByMission(mission.id);
+          console.log(`[Archive] ${missionDocs.length} document(s) supprimé(s) pour la mission ${mission.id}`);
+        } catch (docErr) {
+          console.error('[Archive] Erreur suppression documents:', docErr);
+        }
+      }
+
+      // Annuler les rappels en attente si la mission est annulée, terminée ou archivée
+      if (input.status === 'cancelled' || input.status === 'completed' || input.status === 'archived') {
         try {
           const pendingReminders = await storage.getRemindersByMission(mission.id);
           for (const reminder of pendingReminders) {
@@ -1185,7 +1229,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         }
       }
 
-      // Notify via email when a comment is added or updated on a step
+      // Notify via email + in-app when a comment is added or updated on a step
       const commentChanged = updateData.comment !== undefined && updateData.comment !== (currentStep?.comment || null);
       const trainerCommentChanged = updateData.trainerComment !== undefined && updateData.trainerComment !== (currentStep?.trainerComment || null);
       if (commentChanged || trainerCommentChanged) {
@@ -1207,34 +1251,47 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
             const commentContent = commentChanged ? (updateData.comment || '') : (updateData.trainerComment || '');
             const stepTitle = step.title || '';
             const fullComment = `[${stepTitle}] ${commentContent}`;
+            const modifierName = `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || 'Un utilisateur';
 
-            // Notify all admins (except modifier)
+            // Strip HTML tags for in-app notification message (comment may contain rich text)
+            const plainComment = commentContent.replace(/<[^>]*>/g, '').trim();
+            const inAppMessage = `${modifierName} a ajouté un commentaire sur la tâche "${stepTitle}" de la mission : ${mission.title || `Mission #${mission.id}`}${plainComment ? `\n« ${plainComment.substring(0, 150)}${plainComment.length > 150 ? '...' : ''} »` : ''}`;
+
+            // Notify all admins (except modifier) — email + in-app
             for (const admin of admins) {
-              if (admin.email && admin.id !== modifiedBy.id) {
-                await sendMissionNotificationEmail({
-                  mission,
-                  modifiedBy,
-                  recipient: admin,
-                  client,
-                  changeType: 'comment',
-                  commentContent: fullComment,
+              if (admin.id !== modifiedBy.id) {
+                // In-app notification
+                await storage.createInAppNotification({
+                  userId: admin.id,
+                  type: 'admin_alert',
+                  title: `Nouveau commentaire : ${stepTitle}`,
+                  message: inAppMessage,
+                  missionId: mission.id,
                 });
-              }
-            }
-
-            // If admin comments, notify all assigned trainers
-            if (modifiedBy.role === 'admin') {
-              for (const trainer of trainerUsers) {
-                if (trainer.email && trainer.id !== modifiedBy.id) {
+                // Email notification
+                if (admin.email) {
                   await sendMissionNotificationEmail({
                     mission,
                     modifiedBy,
-                    recipient: trainer,
+                    recipient: admin,
                     client,
                     changeType: 'comment',
                     commentContent: fullComment,
                   });
                 }
+              }
+            }
+
+            // Notify all assigned trainers (except modifier) — in-app only (digest quotidien à 18h)
+            for (const trainer of trainerUsers) {
+              if (trainer.id !== modifiedBy.id) {
+                await storage.createInAppNotification({
+                  userId: trainer.id,
+                  type: 'admin_alert',
+                  title: `Nouveau commentaire : ${stepTitle}`,
+                  message: inAppMessage,
+                  missionId: mission.id,
+                });
               }
             }
           }
@@ -1931,6 +1988,25 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
                 'document',
                 { documentTitle: input.title }
               );
+
+              // In-app notification pour les formateurs (digest quotidien à 18h)
+              if (modifiedBy.role === 'admin') {
+                const missionTrainers = await storage.getMissionTrainers(mission.id);
+                const docTrainerUsers = missionTrainers.map(mt => mt.trainer).filter(Boolean);
+                if (docTrainerUsers.length === 0 && trainer) docTrainerUsers.push(trainer);
+                const modifierName = `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || 'Un administrateur';
+                for (const t of docTrainerUsers) {
+                  if (t.id !== modifiedBy.id) {
+                    await storage.createInAppNotification({
+                      userId: t.id,
+                      type: 'admin_alert',
+                      title: 'Nouveau document ajouté',
+                      message: `${modifierName} a ajouté le document "${input.title}" sur la mission "${mission.title}"`,
+                      missionId: mission.id,
+                    });
+                  }
+                }
+              }
             }
           }
         } catch (emailErr) {
@@ -2081,17 +2157,17 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
                 }
               }
 
-              // If admin comments, notify all assigned trainers
+              // If admin comments, notify all assigned trainers — in-app only (digest quotidien à 18h)
               if (modifiedBy.role === 'admin') {
+                const modifierName = `${modifiedBy.firstName || ''} ${modifiedBy.lastName || ''}`.trim() || 'Un administrateur';
                 for (const trainer of trainerUsers) {
-                  if (trainer.email && trainer.id !== modifiedBy.id) {
-                    await sendMissionNotificationEmail({
-                      mission,
-                      modifiedBy,
-                      recipient: trainer,
-                      client,
-                      changeType: 'comment',
-                      commentContent: input.content,
+                  if (trainer.id !== modifiedBy.id) {
+                    await storage.createInAppNotification({
+                      userId: trainer.id,
+                      type: 'admin_alert',
+                      title: `Nouveau message`,
+                      message: `${modifierName} a envoyé un message sur la mission "${mission.title}": ${input.content.substring(0, 100)}`,
+                      missionId: mission.id,
                     });
                   }
                 }
@@ -2324,16 +2400,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
           }
         }
 
-        if (setting.notifyClient && mission.clientId) {
-          const client = await storage.getClient(mission.clientId);
-          if (client && client.contactEmail) {
-            recipients.push({
-              type: 'client',
-              email: client.contactEmail,
-              name: client.contactName || client.name,
-            });
-          }
-        }
+        // NE JAMAIS envoyer de rappels aux clients - alertes réservées aux admins et formateurs
 
         for (const recipient of recipients) {
           await storage.createReminder({
@@ -2479,13 +2546,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
             });
           }
 
-          if (setting.notifyClient && client?.contactEmail) {
-            recipients.push({
-              type: 'client',
-              email: client.contactEmail,
-              name: client.contactName || client.name || 'Client',
-            });
-          }
+          // NE JAMAIS envoyer de rappels aux clients - alertes réservées aux admins et formateurs
 
           for (const recipient of recipients) {
             // Vérifier si ce rappel existe déjà

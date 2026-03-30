@@ -178,6 +178,7 @@ function getStatusBadge(status: MissionStatus) {
     in_progress: { label: "En cours", className: "bg-amber-100 text-amber-700" },
     completed: { label: "Terminee", className: "bg-green-100 text-green-700" },
     cancelled: { label: "Annulee", className: "bg-red-100 text-red-700" },
+    archived: { label: "Archivée", className: "bg-gray-100 text-gray-500" },
   };
   const { label, className } = styles[status] || styles.draft;
   return <Badge className={className}>{label}</Badge>;
@@ -223,10 +224,10 @@ const stepStatusConfig: Record<StepStatus, {
   },
   na: {
     label: "Sans objet",
-    color: "text-gray-500",
-    bgColor: "bg-gray-50",
-    borderColor: "border-gray-200",
-    icon: <MinusCircle className="w-5 h-5 text-gray-400" />,
+    color: "text-teal-700",
+    bgColor: "bg-teal-50",
+    borderColor: "border-teal-300",
+    icon: <MinusCircle className="w-5 h-5 text-teal-500" />,
   },
 };
 
@@ -2749,7 +2750,7 @@ export default function MissionDetail() {
                         task.isCompleted
                           ? 'bg-green-500 text-white'
                           : task.status === 'na'
-                          ? 'bg-gray-300 text-gray-600'
+                          ? 'bg-teal-400 text-white'
                           : getAutoStatus(task) === 'late'
                           ? 'bg-red-500 text-white'
                           : getAutoStatus(task) === 'priority'
@@ -3048,6 +3049,9 @@ export default function MissionDetail() {
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleStatusChange("cancelled")} className="text-red-600">
                     Annulee
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStatusChange("archived" as MissionStatus)} className="text-gray-500">
+                    Archiver (supprime les documents)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

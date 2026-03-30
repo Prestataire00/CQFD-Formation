@@ -53,6 +53,7 @@ import {
   ChevronsUpDown,
   Users,
   Copy,
+  Archive,
 } from "lucide-react";
 import { useMissions, useClients, useTrainers, useCreateMission, useUpdateMissionStatus, useAllSessions } from "@/hooks/use-missions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -81,6 +82,7 @@ function getStatusBadge(status: MissionStatus) {
     in_progress: { label: "En cours", className: "bg-orange-100 text-orange-700 border border-orange-300" },
     completed: { label: "Terminée", className: "bg-green-100 text-green-700 border border-green-300" },
     cancelled: { label: "Annulée", className: "bg-red-100 text-red-700 border border-red-300" },
+    archived: { label: "Archivée", className: "bg-gray-100 text-gray-500 border border-gray-300" },
   };
   const { label, className } = styles[status] || styles.draft;
   return <Badge className={className}>{label}</Badge>;
@@ -132,6 +134,7 @@ export default function Missions() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [missionToDelete, setMissionToDelete] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<"missions" | "archived">("missions");
 
   // Combobox states
   const [clientOpen, setClientOpen] = useState(false);
@@ -200,11 +203,12 @@ export default function Missions() {
   const filteredMissions = missions?.filter((mission: Mission) => {
     const matchesSearch =
       (mission.title?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
-    const matchesStatus = statusFilter === "all" || mission.status === statusFilter;
+    const matchesTab = activeTab === "archived" ? mission.status === "archived" : mission.status !== "archived";
+    const matchesStatus = activeTab === "archived" || statusFilter === "all" || mission.status === statusFilter;
     const matchesTrainer = trainerFilter === "all" || mission.trainerId === trainerFilter;
     const matchesTypology = typologyFilter === "all" || (mission.typology || "") === typologyFilter;
     const matchesClient = clientFilter === "all" || mission.clientId?.toString() === clientFilter;
-    return matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient;
+    return matchesTab && matchesSearch && matchesStatus && matchesTrainer && matchesTypology && matchesClient;
   }) || [];
 
   // Sort missions
@@ -239,12 +243,15 @@ export default function Missions() {
       case "typology":
         return (a.typology || "").localeCompare(b.typology || "");
       case "status":
-        const statusOrder = { draft: 0, confirmed: 1, in_progress: 2, completed: 3, cancelled: 4 };
+        const statusOrder = { draft: 0, confirmed: 1, in_progress: 2, completed: 3, cancelled: 4, archived: 5 };
         return (statusOrder[a.status as keyof typeof statusOrder] || 0) - (statusOrder[b.status as keyof typeof statusOrder] || 0);
       default:
         return 0;
     }
   });
+
+  // Count archived missions
+  const archivedCount = missions?.filter((m: Mission) => m.status === "archived").length || 0;
 
   // Check if any filter is active
   const hasActiveFilters = statusFilter !== "all" || trainerFilter !== "all" || typologyFilter !== "all" || clientFilter !== "all" || searchTerm !== "";
@@ -365,8 +372,8 @@ export default function Missions() {
       await apiRequest("DELETE", `/api/missions/${missionToDelete}`);
       queryClient.invalidateQueries({ queryKey: ["/api/missions"] });
       toast({
-        title: "Mission supprimee",
-        description: "La mission a ete supprimee avec succes.",
+        title: "Mission supprimée",
+        description: "La mission a été supprimée définitivement.",
       });
       setMissionToDelete(null);
     } catch (error) {
@@ -374,6 +381,27 @@ export default function Missions() {
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la mission.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleArchiveMission = async () => {
+    if (!missionToDelete) return;
+
+    try {
+      await apiRequest("PATCH", `/api/missions/${missionToDelete}/status`, { status: "archived" });
+      queryClient.invalidateQueries({ queryKey: ["/api/missions"] });
+      toast({
+        title: "Mission archivée",
+        description: "La mission a été archivée et ses documents supprimés pour libérer l'espace.",
+      });
+      setMissionToDelete(null);
+    } catch (error) {
+      console.error("Failed to archive mission:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'archiver la mission.",
         variant: "destructive",
       });
     }
@@ -775,24 +803,56 @@ export default function Missions() {
             )}
           </div>
 
+          {/* Tabs: Missions / Archivées */}
+          <div className="flex border-b">
+            <button
+              onClick={() => { setActiveTab("missions"); setStatusFilter("all"); }}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors",
+                activeTab === "missions"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Missions
+            </button>
+            <button
+              onClick={() => { setActiveTab("archived"); setStatusFilter("all"); }}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
+                activeTab === "archived"
+                  ? "border-gray-500 text-gray-700"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Archive className="w-4 h-4" />
+              Archivées
+              {archivedCount > 0 && (
+                <span className="bg-gray-200 text-gray-600 text-xs px-1.5 py-0.5 rounded-full">{archivedCount}</span>
+              )}
+            </button>
+          </div>
+
           {/* Filters bar */}
           <div className="bg-muted/30 rounded-lg p-4 space-y-4">
             <div className="flex flex-wrap gap-3">
-              {/* Status filter */}
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Statut" />
-                </SelectTrigger>
-                <SelectContent className="bg-violet-100 border-violet-300">
-                  <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
-                  <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
-                  <SelectItem value="draft" className="focus:bg-violet-200">En option</SelectItem>
-                  <SelectItem value="confirmed" className="focus:bg-violet-200">Confirmee</SelectItem>
-                  <SelectItem value="in_progress" className="focus:bg-violet-200">En cours</SelectItem>
-                  <SelectItem value="completed" className="focus:bg-violet-200">Terminee</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Status filter (hidden on archived tab) */}
+              {activeTab !== "archived" && (
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-40">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Statut" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-violet-100 border-violet-300">
+                    <SelectItem value="all" className="focus:bg-violet-200">Tous les statuts</SelectItem>
+                    <SelectItem value="cancelled" className="focus:bg-violet-200">Annulee</SelectItem>
+                    <SelectItem value="draft" className="focus:bg-violet-200">En option</SelectItem>
+                    <SelectItem value="confirmed" className="focus:bg-violet-200">Confirmee</SelectItem>
+                    <SelectItem value="in_progress" className="focus:bg-violet-200">En cours</SelectItem>
+                    <SelectItem value="completed" className="focus:bg-violet-200">Terminee</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Typology filter */}
               <Select value={typologyFilter} onValueChange={setTypologyFilter}>
@@ -951,6 +1011,7 @@ export default function Missions() {
                       in_progress: "bg-orange-50/70 border-l-4 border-l-orange-500",
                       completed: "bg-green-50/70 border-l-4 border-l-green-500",
                       cancelled: "bg-red-50/70 border-l-4 border-l-red-500",
+                      archived: "bg-gray-50/70 border-l-4 border-l-gray-400",
                     };
                     const rowClass = rowStatusStyles[mission.status as MissionStatus] || rowStatusStyles.draft;
                     return (
@@ -1051,6 +1112,7 @@ export default function Missions() {
                   in_progress: "border-l-4 border-l-orange-500 bg-orange-50/50",
                   completed: "border-l-4 border-l-green-500 bg-green-50/50",
                   cancelled: "border-l-4 border-l-red-500 bg-red-50/50",
+                  archived: "border-l-4 border-l-gray-400 bg-gray-50/50",
                 };
                 const statusClass = statusStyles[mission.status as MissionStatus] || statusStyles.draft;
 
@@ -1210,17 +1272,27 @@ export default function Missions() {
         </div>
 
         <AlertDialog open={missionToDelete !== null} onOpenChange={(open) => !open && setMissionToDelete(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent className="max-w-md">
             <AlertDialogHeader>
-              <AlertDialogTitle>Etes-vous sur ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Cette action est irreversible. Cela supprimera definitivement la mission ainsi que toutes les donnees associees (etapes, documents, messages, etc.).
+              <AlertDialogTitle>Que souhaitez-vous faire ?</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <span className="block">
+                  <strong className="text-gray-700">Archiver :</strong> Conserve la mission et ses données (évaluations, factures, sessions...) mais supprime les documents pour libérer l'espace de stockage.
+                </span>
+                <span className="block">
+                  <strong className="text-gray-700">Supprimer :</strong> Supprime définitivement la mission et toutes les données associées. Cette action est irréversible.
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter>
+            <AlertDialogFooter className="flex-col sm:flex-row gap-2">
               <AlertDialogCancel>Annuler</AlertDialogCancel>
+              <AlertDialogAction onClick={handleArchiveMission} className="bg-gray-600 text-white hover:bg-gray-700">
+                <Archive className="w-4 h-4 mr-2" />
+                Archiver
+              </AlertDialogAction>
               <AlertDialogAction onClick={handleDeleteMission} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Supprimer
+                <Trash2 className="w-4 h-4 mr-2" />
+                Supprimer définitivement
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

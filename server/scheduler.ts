@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { storage } from './storage';
-import { sendReminderEmail, sendAdminFormationReminderEmail, sendDailyExportEmail } from './email';
+import { sendReminderEmail, sendAdminFormationReminderEmail, sendDailyExportEmail, sendTrainerDailyDigestEmail } from './email';
 import { log } from './index';
 import { generateMissionsExcel, cleanOldExports } from './excel-export';
 import path from 'path';
@@ -33,6 +33,28 @@ function startKeepAlive(): void {
 }
 
 /**
+ * Retourne la date de la première session d'une mission, ou mission.startDate en fallback.
+ * Cela garantit que les rappels se basent sur la vraie date de formation.
+ */
+async function getEffectiveStartDate(mission: { id: number; startDate?: Date | null }): Promise<Date | null> {
+  try {
+    const sessions = await storage.getMissionSessions(mission.id);
+    if (sessions && sessions.length > 0) {
+      const futureSessions = sessions
+        .map(s => new Date(s.sessionDate))
+        .filter(d => !isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+      if (futureSessions.length > 0) {
+        return futureSessions[0];
+      }
+    }
+  } catch (e) {
+    log(`[Scheduler] Erreur getMissionSessions mission ${mission.id}: ${e instanceof Error ? e.message : 'Unknown'}`, 'scheduler');
+  }
+  return mission.startDate ? new Date(mission.startDate) : null;
+}
+
+/**
  * Génère les rappels pour toutes les missions actives basé sur les paramètres configurés
  */
 async function generateRemindersForAllMissions(): Promise<{ created: number; skipped: number }> {
@@ -47,25 +69,25 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
   // Filtrer les missions actives (pas annulées, pas terminées)
   const activeMissions = missions.filter(m =>
     m.status !== 'cancelled' &&
-    m.status !== 'completed'
+    m.status !== 'completed' &&
+    m.status !== 'archived'
   );
 
   for (const mission of activeMissions) {
+    // Utiliser la date effective (première session ou startDate en fallback)
+    const effectiveStartDate = await getEffectiveStartDate(mission);
+
     // Générer les rappels configurés
     for (const setting of activeSettings) {
       // Déterminer la date de référence selon le type de rappel
-      let referenceDate: Date | null = null;
-      
-      if (mission.startDate) {
-        referenceDate = new Date(mission.startDate);
-      }
-      
+      let referenceDate: Date | null = effectiveStartDate;
+
       // Ignorer si pas de date de référence
       if (!referenceDate) {
         skipped++;
         continue;
       }
-      
+
       // Ignorer si la date de référence est dans le passé
       if (referenceDate < new Date()) {
         skipped++;
@@ -108,13 +130,8 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
         });
       }
 
-      if (setting.notifyClient && client?.contactEmail) {
-        recipients.push({
-          type: 'client',
-          email: client.contactEmail,
-          name: client.contactName || client.name || 'Client',
-        });
-      }
+      // NE JAMAIS envoyer de rappels aux clients - ces alertes sont réservées aux admins et formateurs
+      // Le flag notifyClient dans les settings est ignoré volontairement
 
       for (const recipient of recipients) {
         // Vérifier si ce rappel existe déjà
@@ -211,8 +228,9 @@ async function generateRemindersForAllMissions(): Promise<{ created: number; ski
     }
 
     // Ajouter le rappel admin J-2 systématique (si pas déjà créé)
-    if (!mission.startDate) continue;
-    const j2Date = new Date(mission.startDate!);
+    // Utiliser la date effective (première session) plutôt que mission.startDate
+    if (!effectiveStartDate) continue;
+    const j2Date = new Date(effectiveStartDate);
     j2Date.setDate(j2Date.getDate() - 2);
 
     if (j2Date > new Date()) {
@@ -257,6 +275,13 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
   let failed = 0;
 
   for (const reminder of pendingReminders) {
+    // Annuler automatiquement les rappels destinés aux clients (ne doivent jamais être envoyés)
+    if (reminder.recipientType === 'client') {
+      await storage.updateReminder(reminder.id, { status: 'cancelled' });
+      log(`[Scheduler] Rappel #${reminder.id} annulé : les clients ne doivent pas recevoir de rappels`, 'scheduler');
+      continue;
+    }
+
     if (new Date(reminder.scheduledDate) <= now) {
       processed++;
       try {
@@ -269,9 +294,30 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
         const trainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
         const client = mission.clientId ? await storage.getClient(mission.clientId) : null;
 
+        // Vérifier que le formateur destinataire est toujours assigné à la mission
+        // Si le formateur a changé depuis la création du rappel, annuler ce rappel
+        if (reminder.recipientType === 'trainer' && reminder.recipientEmail) {
+          const currentTrainer = mission.trainerId ? await storage.getUser(mission.trainerId) : null;
+          const missionTrainers = await storage.getMissionTrainers(mission.id);
+          const allTrainerEmails = missionTrainers.map(mt => mt.trainer?.email).filter(Boolean);
+          if (currentTrainer?.email) allTrainerEmails.push(currentTrainer.email);
+
+          if (!allTrainerEmails.includes(reminder.recipientEmail)) {
+            log(`[Scheduler] Rappel #${reminder.id} annulé : formateur ${reminder.recipientEmail} n'est plus assigné à la mission ${mission.id}`, 'scheduler');
+            await storage.updateReminder(reminder.id, { status: 'cancelled' });
+            continue;
+          }
+        }
+
         // Récupérer le setting pour avoir les jours avant
         const setting = reminder.settingId ? await storage.getReminderSetting(reminder.settingId) : null;
-        const daysBefore = setting?.daysBefore || 2; // Défaut à 2 pour J-2 admin
+
+        // Calculer les jours réels restants à partir de la première session (ou startDate en fallback)
+        // Cela évite d'afficher "dans 2 jours" quand la formation est en réalité dans 7 jours
+        const effectiveDate = await getEffectiveStartDate(mission);
+        const actualDaysBefore = effectiveDate
+          ? Math.max(0, Math.ceil((effectiveDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+          : (setting?.daysBefore || 2);
 
         // Déterminer si c'est un rappel J-2 admin spécial (sans settingId)
         const isJ2AdminReminder = !reminder.settingId && reminder.recipientType === 'admin';
@@ -279,13 +325,14 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
         let emailSent = false;
 
         if (isJ2AdminReminder) {
-          // Utiliser le template spécial J-2 admin
+          // Utiliser le template spécial admin avec les détails complets
           emailSent = await sendAdminFormationReminderEmail(
             reminder.recipientEmail || '',
             reminder.recipientName || 'Admin',
             mission,
             trainer ?? null,
-            client ?? null
+            client ?? null,
+            actualDaysBefore
           );
         } else {
           // For task deadline reminders, include the task title in the subject and body
@@ -311,7 +358,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             mission,
             trainer,
             client,
-            daysBefore,
+            daysBefore: actualDaysBefore,
             customSubject,
             taskTitle,
           });
@@ -344,7 +391,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
 
           if (userId) {
             const notificationMetadata: Record<string, any> = {
-              daysBefore,
+              daysBefore: actualDaysBefore,
               trainerName: trainer ? `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() : null,
               clientName: client?.name || null,
               location: mission.location || null,
@@ -354,7 +401,7 @@ async function processPendingReminders(): Promise<{ processed: number; sent: num
             await storage.createInAppNotification({
               userId,
               type: isJ2AdminReminder ? 'admin_alert' : 'reminder',
-              title: `Rappel J-${daysBefore} : ${mission.title}`,
+              title: `Rappel J-${actualDaysBefore} : ${mission.title}`,
               message: `Formation "${mission.title}" prévue le ${formattedDate}`,
               missionId: mission.id,
               reminderId: reminder.id,
@@ -387,6 +434,7 @@ async function markLateStepsServerSide(): Promise<number> {
   const activeMissions = missions.filter(m =>
     m.status !== 'cancelled' &&
     m.status !== 'completed' &&
+    m.status !== 'archived' &&
     m.status !== 'draft'
   );
 
@@ -576,6 +624,71 @@ async function hasTodayExportBeenSent(): Promise<boolean> {
 }
 
 /**
+ * Envoie un récapitulatif quotidien par email à chaque formateur
+ * avec toutes les notifications non lues du jour, groupées par mission.
+ */
+async function runTrainerDailyDigestTask(): Promise<void> {
+  log('[Scheduler] Démarrage du digest quotidien formateurs', 'scheduler');
+
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const trainerNotifications = await storage.getUnreadNotificationsForTrainersSince(today);
+
+    if (trainerNotifications.length === 0) {
+      log('[Scheduler] Aucune notification à envoyer en digest', 'scheduler');
+      return;
+    }
+
+    let sentCount = 0;
+    let failCount = 0;
+
+    for (const { userId, notifications } of trainerNotifications) {
+      const trainer = await storage.getUser(userId);
+      if (!trainer || !trainer.email) continue;
+
+      // Grouper par mission
+      const byMission = new Map<string, { missionTitle: string; items: { title: string; message: string; createdAt: Date | null }[] }>();
+
+      for (const notif of notifications) {
+        const key = notif.missionId ? String(notif.missionId) : 'general';
+        if (!byMission.has(key)) {
+          let missionTitle = 'Général';
+          if (notif.missionId) {
+            const mission = await storage.getMission(notif.missionId);
+            missionTitle = mission?.title || `Mission #${notif.missionId}`;
+          }
+          byMission.set(key, { missionTitle, items: [] });
+        }
+        byMission.get(key)!.items.push({
+          title: notif.title,
+          message: notif.message,
+          createdAt: notif.createdAt,
+        });
+      }
+
+      const trainerName = `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur';
+      const success = await sendTrainerDailyDigestEmail(
+        trainer.email,
+        trainerName,
+        Array.from(byMission.values())
+      );
+
+      if (success) {
+        sentCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    log(`[Scheduler] Digest quotidien terminé: ${sentCount} envoyé(s), ${failCount} échoué(s)`, 'scheduler');
+  } catch (error) {
+    log(`[Scheduler] Erreur lors du digest quotidien: ${error instanceof Error ? error.message : 'Unknown error'}`, 'scheduler');
+  }
+}
+
+/**
  * Initialise et démarre le scheduler de rappels
  * Exécute toutes les heures à la minute 0
  */
@@ -597,6 +710,14 @@ export function startReminderScheduler(): void {
     runDailyExportTask().catch(err => log(`[Scheduler] Erreur critique export quotidien: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
+  // Digest quotidien formateurs à 18h00 — un seul email récapitulatif par formateur
+  cron.schedule('0 18 * * *', () => {
+    log('[Scheduler] Cron 18h00 déclenché - digest quotidien formateurs', 'scheduler');
+    runTrainerDailyDigestTask().catch(err =>
+      log(`[Scheduler] Erreur critique digest formateurs: ${err instanceof Error ? err.message : String(err)}`, 'scheduler')
+    );
+  });
+
   // Export de sécurité à 18h00 (fin de journée) si l'export de 1h00 n'a pas fonctionné
   cron.schedule('0 18 * * *', () => {
     log('[Scheduler] Cron 18h00 déclenché - vérification export de sécurité', 'scheduler');
@@ -611,9 +732,29 @@ export function startReminderScheduler(): void {
     })().catch(err => log(`[Scheduler] Erreur critique export sécurité 18h: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
-  log('[Scheduler] Export quotidien planifié à 1h00 (+ sécurité 18h00).', 'scheduler');
+  // Vérification au démarrage : si l'export du jour n'a pas été envoyé et qu'il est après 1h00, le lancer
+  // Cela couvre le cas où le serveur a redémarré après l'heure prévue du cron (ex: redémarrage Replit)
+  setTimeout(async () => {
+    try {
+      const now = new Date();
+      const currentHour = now.getHours();
+      if (currentHour >= 1) {
+        const alreadySent = await hasTodayExportBeenSent();
+        if (!alreadySent) {
+          log('[Scheduler] Export du jour non détecté au démarrage (après 1h00) - lancement de rattrapage', 'scheduler');
+          await runDailyExportTask();
+        } else {
+          log('[Scheduler] Export du jour déjà effectué - pas de rattrapage nécessaire', 'scheduler');
+        }
+      }
+    } catch (err) {
+      log(`[Scheduler] Erreur vérification export au démarrage: ${err instanceof Error ? err.message : String(err)}`, 'scheduler');
+    }
+  }, 30000); // Attendre 30 secondes après le démarrage pour laisser le temps à la DB de se connecter
 
-  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 + sécurité 18h00, keep-alive activé', 'scheduler');
+  log('[Scheduler] Export quotidien planifié à 1h00 (+ sécurité 18h00 + rattrapage au démarrage).', 'scheduler');
+
+  log('[Scheduler] Scheduler démarré - rappels toutes les heures, export Excel à 1h00 + sécurité 18h00, digest formateurs 18h00, rattrapage au démarrage, keep-alive activé', 'scheduler');
 }
 
 /**

@@ -51,6 +51,7 @@ const statusColors: Record<MissionStatus, string> = {
   in_progress: "bg-violet-200 text-violet-800 border-violet-300",
   completed: "bg-green-200 text-green-800 border-green-300",
   cancelled: "bg-red-200 text-red-700 border-red-300",
+  archived: "bg-gray-200 text-gray-500 border-gray-300",
 };
 
 const statusLabels: Record<MissionStatus, string> = {
@@ -59,6 +60,7 @@ const statusLabels: Record<MissionStatus, string> = {
   in_progress: "En cours",
   completed: "Terminee",
   cancelled: "Annulee",
+  archived: "Archivée",
 };
 
 function getMissionsForDate(missions: Mission[], date: Date, sessionsByMission?: Record<number, MissionSession[]>): Mission[] {
