@@ -2852,7 +2852,7 @@ export default function MissionDetail() {
                     <div className="flex items-center gap-2">
                       {doc.url ? (
                         <Button variant="ghost" size="sm" asChild>
-                          <a href={doc.url} target="_blank" rel="noopener noreferrer">
+                          <a href={`/api/documents/${doc.id}/download`} target="_blank" rel="noopener noreferrer">
                             <Download className="w-4 h-4" />
                           </a>
                         </Button>

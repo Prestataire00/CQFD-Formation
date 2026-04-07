@@ -17,7 +17,7 @@ import { generateMissionsExcel, listExports, getLatestExport } from "./excel-exp
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { ensureBucketExists, uploadToSupabase, deleteFromSupabase } from "./supabaseStorage";
+import { ensureBucketExists, uploadToSupabase, deleteFromSupabase, downloadFromSupabase } from "./supabaseStorage";
 
 // Configuration de multer pour l'upload de fichiers
 const uploadDir = path.join(process.cwd(), "uploads");
@@ -1956,6 +1956,50 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       return;
     }
     res.json(doc);
+  });
+
+  // Proxy de téléchargement : sert les fichiers Supabase via le serveur
+  // Cela évite les erreurs 404 liées aux restrictions d'accès public du bucket
+  app.get('/api/documents/:id/download', isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        res.status(400).json({ message: "ID invalide" });
+        return;
+      }
+
+      const doc = await storage.getDocument(id);
+      if (!doc) {
+        res.status(404).json({ message: "Document non trouvé" });
+        return;
+      }
+      if (!doc.url) {
+        res.status(404).json({ message: "Aucun fichier associé à ce document" });
+        return;
+      }
+
+      // Tenter le téléchargement via service role key (bypass les restrictions publiques)
+      const result = await downloadFromSupabase(doc.url);
+      if (!result) {
+        // Fallback : rediriger vers l'URL directe
+        res.redirect(doc.url);
+        return;
+      }
+
+      // Extraire le nom de fichier depuis l'URL
+      const urlParts = doc.url.split('/');
+      let filename = urlParts[urlParts.length - 1] || doc.title;
+      // Retirer le préfixe unique (timestamp-random-)
+      filename = filename.replace(/^\d+-\d+-/, '');
+
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Length', result.buffer.length);
+      res.send(result.buffer);
+    } catch (err) {
+      console.error('[documents] Erreur proxy download:', err);
+      res.status(500).json({ message: "Erreur lors du téléchargement" });
+    }
   });
 
   app.post(api.documents.create.path, isAuthenticated, async (req, res) => {

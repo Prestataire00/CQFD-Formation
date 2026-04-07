@@ -22,10 +22,19 @@ export async function ensureBucketExists(): Promise<void> {
       if (error) {
         console.error('[supabase-storage] Erreur création bucket:', error.message);
       } else {
-        console.log(`[supabase-storage] Bucket "${BUCKET_NAME}" créé`);
+        console.log(`[supabase-storage] Bucket "${BUCKET_NAME}" créé (public)`);
       }
     } else {
-      console.log(`[supabase-storage] Bucket "${BUCKET_NAME}" déjà existant`);
+      // S'assurer que le bucket est bien public (corrige si créé private initialement)
+      const { error } = await supabaseAdmin.storage.updateBucket(BUCKET_NAME, {
+        public: true,
+        fileSizeLimit: 10 * 1024 * 1024,
+      });
+      if (error) {
+        console.error('[supabase-storage] Erreur mise à jour bucket:', error.message);
+      } else {
+        console.log(`[supabase-storage] Bucket "${BUCKET_NAME}" vérifié (public)`);
+      }
     }
   } catch (err) {
     console.error('[supabase-storage] Erreur vérification bucket:', err);
@@ -66,6 +75,38 @@ export async function uploadToSupabase(
 
   console.log(`[supabase-storage] Fichier uploadé: ${urlData.publicUrl}`);
   return urlData.publicUrl;
+}
+
+/**
+ * Télécharge un fichier depuis Supabase Storage via le service role key (bypass les restrictions publiques).
+ * @returns Le buffer et le content-type, ou null si le fichier n'existe pas.
+ */
+export async function downloadFromSupabase(fileUrl: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+  if (!supabaseAdmin) return null;
+
+  try {
+    const match = fileUrl.match(/\/storage\/v1\/object\/public\/documents\/(.+)$/);
+    if (!match) return null;
+
+    const storagePath = decodeURIComponent(match[1]);
+    const { data, error } = await supabaseAdmin.storage
+      .from(BUCKET_NAME)
+      .download(storagePath);
+
+    if (error || !data) {
+      console.error('[supabase-storage] Erreur téléchargement:', error?.message);
+      return null;
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      contentType: data.type || 'application/octet-stream',
+    };
+  } catch (err) {
+    console.error('[supabase-storage] Erreur téléchargement:', err);
+    return null;
+  }
 }
 
 /**

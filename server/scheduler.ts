@@ -3,6 +3,7 @@ import { storage } from './storage';
 import { sendReminderEmail, sendAdminFormationReminderEmail, sendDailyExportEmail, sendTrainerDailyDigestEmail } from './email';
 import { log } from './index';
 import { generateMissionsExcel, cleanOldExports } from './excel-export';
+import { format } from 'date-fns';
 import path from 'path';
 
 // Variable pour suivre si le scheduler est actif
@@ -551,11 +552,19 @@ async function sendExportEmailWithRetry(
 
 /**
  * Génère l'export Excel quotidien des missions et l'envoie par email aux admins
+ * Vérifie d'abord qu'aucun export n'a déjà été généré aujourd'hui pour éviter les doublons
  */
 async function runDailyExportTask(): Promise<void> {
   log('[Scheduler] Démarrage de l\'export Excel quotidien', 'scheduler');
 
   try {
+    // Vérifier si l'export du jour a déjà été envoyé (évite les doublons lors de redémarrages multiples)
+    const alreadySent = await hasTodayExportBeenSent();
+    if (alreadySent) {
+      log('[Scheduler] Export du jour déjà effectué, génération ignorée', 'scheduler');
+      return;
+    }
+
     const filepath = await generateMissionsExcel();
     log(`[Scheduler] Export Excel généré: ${filepath}`, 'scheduler');
 
@@ -609,13 +618,14 @@ async function runDailyExportTask(): Promise<void> {
 /**
  * Vérifie si l'export quotidien a déjà été envoyé aujourd'hui
  * en cherchant un fichier d'export avec la date du jour dans le dossier exports/
+ * Utilise date-fns format() pour être cohérent avec le format du nom de fichier (heure locale)
  */
 async function hasTodayExportBeenSent(): Promise<boolean> {
   try {
     const fs = await import('fs');
     const exportDir = path.join(process.cwd(), 'exports');
     if (!fs.existsSync(exportDir)) return false;
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const today = format(new Date(), 'yyyy-MM-dd'); // Même format que le nom de fichier (heure locale)
     const files = fs.readdirSync(exportDir);
     return files.some(f => f.includes(today));
   } catch {
@@ -719,33 +729,21 @@ export function startReminderScheduler(): void {
   });
 
   // Export de sécurité à 18h00 (fin de journée) si l'export de 1h00 n'a pas fonctionné
+  // runDailyExportTask vérifie elle-même si l'export du jour existe déjà
   cron.schedule('0 18 * * *', () => {
     log('[Scheduler] Cron 18h00 déclenché - vérification export de sécurité', 'scheduler');
-    (async () => {
-      const alreadySent = await hasTodayExportBeenSent();
-      if (!alreadySent) {
-        log('[Scheduler] Export de 1h00 non détecté, lancement de l\'export de sécurité à 18h00', 'scheduler');
-        await runDailyExportTask();
-      } else {
-        log('[Scheduler] Export déjà effectué aujourd\'hui, export de 18h00 ignoré', 'scheduler');
-      }
-    })().catch(err => log(`[Scheduler] Erreur critique export sécurité 18h: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
+    runDailyExportTask().catch(err => log(`[Scheduler] Erreur critique export sécurité 18h: ${err instanceof Error ? err.message : String(err)}`, 'scheduler'));
   });
 
   // Vérification au démarrage : si l'export du jour n'a pas été envoyé et qu'il est après 1h00, le lancer
   // Cela couvre le cas où le serveur a redémarré après l'heure prévue du cron (ex: redémarrage Replit)
+  // runDailyExportTask vérifie elle-même si l'export du jour existe déjà
   setTimeout(async () => {
     try {
       const now = new Date();
-      const currentHour = now.getHours();
-      if (currentHour >= 1) {
-        const alreadySent = await hasTodayExportBeenSent();
-        if (!alreadySent) {
-          log('[Scheduler] Export du jour non détecté au démarrage (après 1h00) - lancement de rattrapage', 'scheduler');
-          await runDailyExportTask();
-        } else {
-          log('[Scheduler] Export du jour déjà effectué - pas de rattrapage nécessaire', 'scheduler');
-        }
+      if (now.getHours() >= 1) {
+        log('[Scheduler] Vérification export au démarrage...', 'scheduler');
+        await runDailyExportTask();
       }
     } catch (err) {
       log(`[Scheduler] Erreur vérification export au démarrage: ${err instanceof Error ? err.message : String(err)}`, 'scheduler');
