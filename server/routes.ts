@@ -1987,6 +1987,43 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         return;
       }
 
+      // Vérifier si c'est un fichier local (attached_assets/ ou uploads/)
+      const localPrefixes = ['attached_assets/', 'uploads/'];
+      const isLocalFile = localPrefixes.some(prefix => doc.url.startsWith(prefix));
+
+      if (isLocalFile) {
+        const filePath = path.resolve(doc.url);
+        // Sécurité : vérifier que le chemin résolu reste dans le répertoire de travail
+        const cwd = path.resolve('.');
+        if (!filePath.startsWith(cwd)) {
+          res.status(403).json({ message: "Accès interdit" });
+          return;
+        }
+        if (!fs.existsSync(filePath)) {
+          res.status(404).json({ message: "Fichier non trouvé sur le serveur" });
+          return;
+        }
+        const filename = path.basename(filePath).replace(/^\d+-\d+-/, '');
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          '.pdf': 'application/pdf',
+          '.doc': 'application/msword',
+          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          '.xls': 'application/vnd.ms-excel',
+          '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          '.png': 'image/png',
+          '.jpg': 'image/jpeg',
+          '.jpeg': 'image/jpeg',
+          '.gif': 'image/gif',
+        };
+        const contentType = mimeTypes[ext] || 'application/octet-stream';
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+        return;
+      }
+
       // Tenter le téléchargement via service role key (bypass les restrictions publiques)
       const result = await downloadFromSupabase(doc.url);
       if (!result) {
