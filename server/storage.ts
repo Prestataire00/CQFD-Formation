@@ -824,6 +824,19 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
+    // Copy all documents (preserve URLs and template references)
+    const originalDocs = await this.getDocumentsByMission(originalMissionId);
+    for (const doc of originalDocs) {
+      await db.insert(documents).values({
+        title: doc.title,
+        type: doc.type,
+        url: doc.url,
+        missionId: newMission.id,
+        userId: doc.userId,
+        templateId: doc.templateId,
+      });
+    }
+
     return newMission;
   }
 
@@ -916,6 +929,20 @@ export class DatabaseStorage implements IStorage {
           await this.addParticipantToMission({
             missionId: newMission.id,
             participantId: mp.participantId,
+          });
+        }
+
+        // Copy non-template documents from original mission (manually uploaded docs)
+        const originalDocs = await this.getDocumentsByMission(originalMissionId);
+        const nonTemplateDocs = originalDocs.filter((doc: Document) => !doc.templateId);
+        for (const doc of nonTemplateDocs) {
+          await db.insert(documents).values({
+            title: doc.title,
+            type: doc.type,
+            url: doc.url,
+            missionId: newMission.id,
+            userId: trainerId,
+            templateId: null,
           });
         }
 
