@@ -1403,31 +1403,40 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
       }
       const missionTitle = mission.title || `Mission #${mission.id}`;
 
-      // Collect recipients: client contactEmail + participant emails
+      // NE JAMAIS envoyer aux clients ni aux participants — uniquement aux admins et formateurs
       const recipients: { email: string; name: string }[] = [];
 
-      // Client contact email
-      if (mission.clientId) {
-        const client = await storage.getClient(mission.clientId);
-        if (client?.contactEmail) {
+      // Admins actifs
+      const allUsers = await storage.getUsers();
+      const admins = allUsers.filter(u => u.role === 'admin' && u.status === 'ACTIF');
+      for (const admin of admins) {
+        if (admin.email) {
           recipients.push({
-            email: client.contactEmail,
-            name: client.contactName || client.name || 'Client',
+            email: admin.email,
+            name: `${admin.firstName || ''} ${admin.lastName || ''}`.trim() || 'Admin',
           });
         }
       }
 
-      // Mission participants
-      const missionParticipants = await storage.getMissionParticipants(missionId);
-      for (const mp of missionParticipants) {
-        if (mp.participant?.email) {
-          // Avoid duplicates
-          if (!recipients.some(r => r.email === mp.participant.email)) {
-            recipients.push({
-              email: mp.participant.email,
-              name: `${mp.participant.firstName || ''} ${mp.participant.lastName || ''}`.trim() || 'Participant',
-            });
-          }
+      // Formateur principal de la mission
+      if (mission.trainerId) {
+        const trainer = await storage.getUser(mission.trainerId);
+        if (trainer?.email && !recipients.some(r => r.email === trainer.email)) {
+          recipients.push({
+            email: trainer.email,
+            name: `${trainer.firstName || ''} ${trainer.lastName || ''}`.trim() || 'Formateur',
+          });
+        }
+      }
+
+      // Formateurs additionnels de la mission
+      const missionTrainers = await storage.getMissionTrainers(missionId);
+      for (const mt of missionTrainers) {
+        if (mt.trainer?.email && !recipients.some(r => r.email === mt.trainer.email)) {
+          recipients.push({
+            email: mt.trainer.email,
+            name: `${mt.trainer.firstName || ''} ${mt.trainer.lastName || ''}`.trim() || 'Formateur',
+          });
         }
       }
 
@@ -2721,13 +2730,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
           });
         }
 
-        if (setting.notifyClient && client?.contactEmail) {
-          recipients.push({
-            type: 'client',
-            email: client.contactEmail,
-            name: client.contactName || client.name || 'Client',
-          });
-        }
+        // NE JAMAIS envoyer de rappels aux clients — flag notifyClient ignoré volontairement
 
         for (const recipient of recipients) {
           // Vérifier si ce rappel existe déjà
@@ -2824,14 +2827,7 @@ a{color:#2563eb;text-decoration:none;font-size:.875rem}</style></head>
         });
       }
 
-      // Client
-      if (client?.contactEmail) {
-        recipients.push({
-          type: 'client',
-          email: client.contactEmail,
-          name: client.contactName || client.name || 'Client',
-        });
-      }
+      // NE JAMAIS envoyer de rappels aux clients
 
       for (const recipient of recipients) {
         await storage.createReminder({
